@@ -1,30 +1,27 @@
 // ════ عوالم — Service Worker ════
-const CACHE_NAME = 'awalem-v2';
-const IMAGE_CACHE = 'awalem-images-v1';
+const CACHE_NAME = 'awalem-v3';
+const IMAGE_CACHE = 'awalem-images-v2';
 
 const CACHE_URLS = [
-  '',
-  'index.html',
-  'manifest.json',
+  '/',
+  '/index.html',
+  '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js',
 ];
 
-// Install
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
-      cache.addAll(CACHE_URLS).catch(err => console.log('[SW] partial fail:', err))
+      cache.addAll(CACHE_URLS).catch(() => {})
     )
   );
   self.skipWaiting();
 });
 
-// Activate
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -36,28 +33,27 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
 
   // Firebase Realtime DB — لا كاش
   if (url.hostname.includes('firebaseio.com')) return;
 
-  // Firebase Storage (الصور والفيديوهات) — كاش مع تحديث في الخلفية
-  if (url.hostname.includes('firebasestorage.googleapis.com') || 
-      url.hostname.includes('firebasestorage.app')) {
+  // Firebase Storage — كاش مع تحديث في الخلفية
+  if (url.hostname.includes('firebasestorage')) {
     event.respondWith(
-      caches.open(IMAGE_CACHE).then(cache =>
-        cache.match(event.request).then(cached => {
-          const fetchPromise = fetch(event.request).then(response => {
-            if (response.ok) cache.put(event.request, response.clone());
-            return response;
-          }).catch(() => cached);
-          // إرجاع الكاش فوراً إذا موجود، وتحديثه في الخلفية
-          return cached || fetchPromise;
-        })
-      )
+      caches.open(IMAGE_CACHE).then(async cache => {
+        const cached = await cache.match(event.request);
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) await cache.put(event.request, response.clone());
+          return response;
+        } catch {
+          return cached || new Response('', { status: 408 });
+        }
+      })
     );
     return;
   }
@@ -66,8 +62,9 @@ self.addEventListener('fetch', event => {
   if (event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(event.request)
-        .then(response => {
-          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+        .then(async response => {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
           return response;
         })
         .catch(() => caches.match(event.request))
@@ -79,12 +76,13 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
-      return fetch(event.request).then(response => {
+      return fetch(event.request).then(async response => {
         if (response.ok) {
-          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
         }
         return response;
-      }).catch(() => cached);
+      }).catch(() => new Response('', { status: 408 }));
     })
   );
 });
@@ -95,15 +93,14 @@ self.addEventListener('push', event => {
   const data = event.data.json();
   self.registration.showNotification(data.title || 'عوالم', {
     body: data.body || '',
-    icon: 'icon-192.png',
-    badge: 'icon-192.png',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     dir: 'rtl',
-    lang: 'ar',
-    data: data
+    lang: 'ar'
   });
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(''));
+  event.waitUntil(clients.openWindow('/'));
 });
