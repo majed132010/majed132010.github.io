@@ -1439,6 +1439,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
 
 <script>
@@ -1449,12 +1450,37 @@ const FB = firebase.initializeApp({
   authDomain: "awalim2-5bdb1.firebaseapp.com",
   databaseURL: "https://awalim2-5bdb1-default-rtdb.firebaseio.com",
   projectId: "awalim2-5bdb1",
-  storageBucket: "awalim2-5bdb1.firebasestorage.app"
+  storageBucket: "awalim2-5bdb1.firebasestorage.app",
+  messagingSenderId: "939518942115"
 });
 
 const auth    = FB.auth();
 const db      = FB.database();
 const storage = FB.storage();
+
+// ════ FCM NOTIFICATIONS ════
+const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
+let fcmMessaging = null;
+
+async function initFCM(userId) {
+  try {
+    if (!('Notification' in window)) return;
+    fcmMessaging = FB.messaging();
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+    if (token && userId) {
+      await db.ref('users/' + userId + '/fcmToken').set(token);
+    }
+    fcmMessaging.onMessage(payload => {
+      const { title, body } = payload.notification || {};
+      if (document.visibilityState === 'hidden') return;
+      toast('🔔 ' + (title || 'عوالم') + ': ' + (body || ''));
+    });
+  } catch(e) {
+    console.log('FCM error:', e);
+  }
+}
 const AGORA_APP_ID = '3a810a3ea5a24451ab56a6b7429c929c';
 
 // ⚠️ Token مؤقت صالح 24 ساعة - يحتاج تجديد يومياً من console.agora.io
