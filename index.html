@@ -1451,7 +1451,9 @@ const FB = firebase.initializeApp({
   databaseURL: "https://awalim2-5bdb1-default-rtdb.firebaseio.com",
   projectId: "awalim2-5bdb1",
   storageBucket: "awalim2-5bdb1.firebasestorage.app",
-  messagingSenderId: "939518942115"
+  messagingSenderId: "939518942115",
+  appId: "1:939518942115:web:404307d7b8e0677c335816",
+  measurementId: "G-74F9SB8HKK"
 });
 
 const auth    = FB.auth();
@@ -1564,29 +1566,24 @@ auth.onAuthStateChanged(user => {
 function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-  if (isMobile) {
-    auth.signInWithRedirect(provider).catch(e => {
-      console.error('redirect error:', e);
-      toast('❌ خطأ: ' + (e.message || e.code));
+
+  // استدعاء الـ popup مباشرة بدون أي await قبله (مهم جداً للجوال)
+  auth.signInWithPopup(provider)
+    .then(result => {
+      console.log('✅ تسجيل الدخول:', result.user.displayName);
+    })
+    .catch(e => {
+      console.error('signInGoogle:', e.code, e.message);
+      if (e.code === 'auth/popup-blocked') {
+        // الجوال حجب الـ popup — نفتح نافذة Google يدوياً
+        toast('⚠️ اضغط مجدداً بسرعة لفتح تسجيل الدخول');
+      } else if (
+        e.code !== 'auth/popup-closed-by-user' &&
+        e.code !== 'auth/cancelled-popup-request'
+      ) {
+        toast('❌ خطأ: ' + (e.message || e.code));
+      }
     });
-  } else {
-    auth.signInWithPopup(provider)
-      .then(result => {
-        console.log('✅ تسجيل الدخول:', result.user.displayName);
-      })
-      .catch(e => {
-        console.error('signInGoogle:', e.code, e.message);
-        if (e.code === 'auth/popup-blocked') {
-          auth.signInWithRedirect(provider);
-        } else if (
-          e.code !== 'auth/popup-closed-by-user' &&
-          e.code !== 'auth/cancelled-popup-request'
-        ) {
-          toast('❌ خطأ: ' + (e.message || e.code));
-        }
-      });
-  }
 }
 
 async function loadUserProfile() {
@@ -2395,14 +2392,12 @@ function showMessages(sid, cid) {
   db.ref(_currentMsgPath).limitToLast(PAGE_SIZE).once('value').then(snap => {
     const msgs = snap.val() || {};
     const entries = Object.entries(msgs).sort((a,b) => a[1].ts - b[1].ts);
-    const fragment = document.createDocumentFragment();
     entries.forEach(([key, msg]) => {
       const div = buildMsgDiv(msg, key);
       div.dataset.key = key;
       div.dataset.ts = msg.ts;
-      fragment.appendChild(div);
+      area.appendChild(div);
     });
-    area.appendChild(fragment);
     area.scrollTop = area.scrollHeight;
     if (entries.length > 0) {
       _oldestMsgKey = entries[0][0];
@@ -2902,20 +2897,14 @@ window._pendingMedia = []; // [{dataUrl, type, name}]
 async function uploadToStorage(file, path, retries = 3) {
   let uploadFile = file;
   if (file.type.startsWith('image/') && file.size > 300 * 1024) {
-    try {
-      uploadFile = await compressImageFile(file, 1024, 0.80);
-    } catch(e) {
-      uploadFile = file;
-    }
+    try { uploadFile = await compressImageFile(file, 1024, 0.80); } catch(e) { uploadFile = file; }
   }
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ref = storage.ref(path);
       const snap = await ref.put(uploadFile);
-      const url = await snap.ref.getDownloadURL();
-      return url;
+      return await snap.ref.getDownloadURL();
     } catch(e) {
-      console.log(`Upload attempt ${attempt} failed:`, e);
       if (attempt === retries) throw e;
       await new Promise(r => setTimeout(r, 1500 * attempt));
       toast('⏳ إعادة المحاولة ' + attempt + '...');
