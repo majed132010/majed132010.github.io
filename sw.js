@@ -1,5 +1,7 @@
 // ════ عوالم — Service Worker ════
-const CACHE_NAME = 'awalem-v1';
+const CACHE_NAME = 'awalem-v2';
+const IMAGE_CACHE = 'awalem-images-v1';
+
 const CACHE_URLS = [
   '',
   'index.html',
@@ -9,51 +11,63 @@ const CACHE_URLS = [
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js',
+  'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js',
 ];
 
-// Install — cache core files
+// Install
 self.addEventListener('install', event => {
-  console.log('[SW] Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(CACHE_URLS).catch(err => {
-        console.log('[SW] Cache addAll partial failure:', err);
-      });
-    })
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(CACHE_URLS).catch(err => console.log('[SW] partial fail:', err))
+    )
   );
   self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating...');
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys.filter(k => k !== CACHE_NAME && k !== IMAGE_CACHE).map(k => caches.delete(k))
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch — Network first, fall back to cache
+// Fetch
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // Skip non-GET and Firebase API requests (always need live data)
   if (event.request.method !== 'GET') return;
-  if (url.hostname.includes('firebaseio.com')) return;
-  if (url.hostname.includes('firebasestorage')) return;
-  if (url.hostname.includes('googleapis.com') && url.pathname.includes('/rtdb')) return;
 
-  // For HTML pages: Network first
+  // Firebase Realtime DB — لا كاش
+  if (url.hostname.includes('firebaseio.com')) return;
+
+  // Firebase Storage (الصور والفيديوهات) — كاش مع تحديث في الخلفية
+  if (url.hostname.includes('firebasestorage.googleapis.com') || 
+      url.hostname.includes('firebasestorage.app')) {
+    event.respondWith(
+      caches.open(IMAGE_CACHE).then(cache =>
+        cache.match(event.request).then(cached => {
+          const fetchPromise = fetch(event.request).then(response => {
+            if (response.ok) cache.put(event.request, response.clone());
+            return response;
+          }).catch(() => cached);
+          // إرجاع الكاش فوراً إذا موجود، وتحديثه في الخلفية
+          return cached || fetchPromise;
+        })
+      )
+    );
+    return;
+  }
+
+  // HTML — Network first
   if (event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
           return response;
         })
         .catch(() => caches.match(event.request))
@@ -61,14 +75,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For other assets: Cache first, then network
+  // باقي الملفات — Cache first
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
         if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
         }
         return response;
       }).catch(() => cached);
@@ -76,7 +89,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Push notifications (future use)
+// Push notifications
 self.addEventListener('push', event => {
   if (!event.data) return;
   const data = event.data.json();
@@ -92,7 +105,5 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(
-    clients.openWindow('')
-  );
+  event.waitUntil(clients.openWindow(''));
 });
