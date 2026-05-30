@@ -1526,6 +1526,7 @@ auth.onAuthStateChanged(user => {
       const app = document.getElementById('app');
       if (app) { app.style.display = 'flex'; }
       initApp();
+      initFCM(user.uid);
     });
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
