@@ -3861,17 +3861,23 @@ function lightboxDownload() {
 // ════ MEDIA DOWNLOAD ════
 function downloadMedia(url, name, type) {
   try {
-    const a = document.createElement('a');
-    a.href = url;
     const ext = type === 'video' ? '.mp4' : '.jpg';
-    a.download = name.includes('.') ? name : name + ext;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast('⬇️ جاري الحفظ...');
+    const filename = name.includes('.') ? name : name + ext;
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        toast('✅ تم الحفظ بنجاح!');
+      })
+      .catch(() => window.open(url, '_blank'));
   } catch(e) {
-    // Fallback: open in new tab
     window.open(url, '_blank');
   }
 }
