@@ -1451,9 +1451,7 @@ const FB = firebase.initializeApp({
   databaseURL: "https://awalim2-5bdb1-default-rtdb.firebaseio.com",
   projectId: "awalim2-5bdb1",
   storageBucket: "awalim2-5bdb1.firebasestorage.app",
-  messagingSenderId: "939518942115",
-  appId: "1:939518942115:web:404307d7b8e0677c335816",
-  measurementId: "G-74F9SB8HKK"
+  messagingSenderId: "939518942115"
 });
 
 const auth    = FB.auth();
@@ -2869,21 +2867,29 @@ async function doDeleteServer() {
 window._pendingMedia = []; // [{dataUrl, type, name}]
 
 // ════ UPLOAD TO FIREBASE STORAGE ════
-async function uploadToStorage(file, path) {
+async function uploadToStorage(file, path, retries = 3) {
   // Compress images before upload
   let uploadFile = file;
   if (file.type.startsWith('image/') && file.size > 500 * 1024) {
     try {
-      uploadFile = await compressImageFile(file, 1200, 0.85);
+      uploadFile = await compressImageFile(file, 1024, 0.80);
     } catch(e) {
-      console.log('Compression skipped:', e);
       uploadFile = file;
     }
   }
-  const ref = storage.ref(path);
-  const snap = await ref.put(uploadFile);
-  const url = await snap.ref.getDownloadURL();
-  return url;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const ref = storage.ref(path);
+      const snap = await ref.put(uploadFile);
+      const url = await snap.ref.getDownloadURL();
+      return url;
+    } catch(e) {
+      console.log(`Upload attempt ${attempt} failed:`, e);
+      if (attempt === retries) throw e;
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      toast('⏳ إعادة المحاولة ' + attempt + '...');
+    }
+  }
 }
 
 // Compress image File object (not base64)
