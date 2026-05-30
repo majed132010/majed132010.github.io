@@ -2215,6 +2215,30 @@ let _oldestMsgKey = null;
 let _allLoaded = false;
 let _currentMsgPath = null;
 
+function makeSaveBtn(msgKey, msg) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = '💾 حفظ';
+  btn.style.cssText = 'margin-top:4px;padding:4px 10px;border-radius:8px;border:1px solid var(--gold,#d4af5a);background:rgba(212,175,90,0.15);color:var(--gold,#d4af5a);font-family:Tajawal,sans-serif;font-size:12px;cursor:pointer';
+  btn.onclick = async (e) => {
+    e.stopPropagation();
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    try {
+      const path = 'messages/' + currentServer + '/' + currentChannel + '/' + msgKey;
+      await db.ref(path).update({ saved: true, expiresAt: null });
+      btn.textContent = '✅ تم الحفظ';
+      setTimeout(() => btn.remove(), 1500);
+      toast('📌 تم حفظ الصورة بشكل دائم');
+    } catch(e) {
+      btn.disabled = false;
+      btn.innerHTML = '💾 حفظ';
+      toast('❌ فشل الحفظ');
+    }
+  };
+  return btn;
+}
+
 function buildMsgDiv(msg, key) {
   const isAdmin = msg.role === 'owner' || msg.role === 'admin';
   const isMine = msg.uid === currentUser?.uid;
@@ -2275,13 +2299,24 @@ function buildMsgDiv(msg, key) {
   if (msg.mediaUrl) {
     const mediaWrap = document.createElement('div');
     mediaWrap.style.cssText = 'margin-top:4px;display:inline-flex;flex-direction:column;gap:0;align-items:flex-start';
-    if (msg.mediaType === 'video') {
+    // تحقق من انتهاء الصلاحية
+    const now = Date.now();
+    const expired = msg.expiresAt && !msg.saved && now > msg.expiresAt;
+
+    if (expired) {
+      const expDiv = document.createElement('div');
+      expDiv.style.cssText = 'padding:8px 12px;background:rgba(255,255,255,0.07);border-radius:10px;color:rgba(255,255,255,0.4);font-size:12px;font-family:Tajawal,sans-serif';
+      expDiv.textContent = '🕐 انتهت صلاحية هذه الصورة';
+      mediaWrap.appendChild(expDiv);
+    } else if (msg.mediaType === 'video') {
       const vid = document.createElement('video');
       vid.src = msg.mediaUrl; vid.controls = true;
       vid.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer';
       vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
       vid.addEventListener('loadedmetadata', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
       mediaWrap.appendChild(vid);
+      // زر الحفظ للفيديو
+      if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
     } else {
       const img = document.createElement('img');
       img.src = msg.mediaUrl;
@@ -2291,6 +2326,25 @@ function buildMsgDiv(msg, key) {
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
       img.addEventListener('load', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
       mediaWrap.appendChild(img);
+      // زر الحفظ للصورة
+      if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
+      // مؤشر محفوظ
+      if (msg.saved) {
+        const savedBadge = document.createElement('div');
+        savedBadge.style.cssText = 'font-size:11px;color:#4caf50;font-family:Tajawal,sans-serif;margin-top:2px';
+        savedBadge.textContent = '📌 محفوظة';
+        mediaWrap.appendChild(savedBadge);
+      }
+    }
+    // مؤشر وقت الانتهاء
+    if (msg.expiresAt && !msg.saved && !expired) {
+      const timeLeft = document.createElement('div');
+      const remaining = msg.expiresAt - now;
+      const hours = Math.floor(remaining / 3600000);
+      const mins = Math.floor((remaining % 3600000) / 60000);
+      timeLeft.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.4);font-family:Tajawal,sans-serif;margin-top:2px';
+      timeLeft.textContent = `⏳ تنتهي بعد ${hours > 0 ? hours + 'س ' : ''}${mins}د`;
+      mediaWrap.appendChild(timeLeft);
     }
     body.appendChild(mediaWrap);
   }
@@ -2511,8 +2565,10 @@ async function sendMessage() {
       const ext = m.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg');
       const path = `messages/${currentServer}/${currentChannel}/${Date.now()}_${Math.random().toString(36).substr(2,6)}.${ext}`;
       const mediaUrl = await uploadToStorage(m.file, path);
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 ساعة
       await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-        ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name
+        ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name,
+        expiresAt, storagePath: path, saved: false
       });
     } catch(e) {
       console.error('Upload error:', e);
