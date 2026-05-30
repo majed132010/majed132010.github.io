@@ -1466,20 +1466,45 @@ async function initFCM(userId) {
   try {
     if (!('Notification' in window)) return;
     fcmMessaging = FB.messaging();
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
-    const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
-    if (token && userId) {
-      await db.ref('users/' + userId + '/fcmToken').set(token);
-    }
+    // تسجيل onMessage بغض النظر عن الإذن
     fcmMessaging.onMessage(payload => {
       const { title, body } = payload.notification || {};
-      if (document.visibilityState === 'hidden') return;
       toast('🔔 ' + (title || 'عوالم') + ': ' + (body || ''));
     });
+    // إذا الإذن ممنوح مسبقاً، احصل على التوكن مباشرة
+    if (Notification.permission === 'granted') {
+      const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+      if (token && userId) await db.ref('users/' + userId + '/fcmToken').set(token);
+    } else if (Notification.permission !== 'denied') {
+      // أظهر زر الإشعارات
+      showNotifBtn(userId);
+    }
   } catch(e) {
     console.log('FCM error:', e);
   }
+}
+
+function showNotifBtn(userId) {
+  const existing = document.getElementById('notifPermBtn');
+  if (existing) return;
+  const btn = document.createElement('button');
+  btn.id = 'notifPermBtn';
+  btn.innerHTML = '🔔 فعّل الإشعارات';
+  btn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--teal,#1a5f5f);color:#fff;border:none;border-radius:24px;padding:12px 24px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
+  btn.onclick = async () => {
+    btn.remove();
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+        if (token && userId) await db.ref('users/' + userId + '/fcmToken').set(token);
+        toast('✅ تم تفعيل الإشعارات!');
+      }
+    } catch(e) { console.log('Notif error:', e); }
+  };
+  document.body.appendChild(btn);
+  // إخفاء الزر تلقائياً بعد 10 ثوان
+  setTimeout(() => btn.remove(), 10000);
 }
 const AGORA_APP_ID = '3a810a3ea5a24451ab56a6b7429c929c';
 
@@ -2867,29 +2892,21 @@ async function doDeleteServer() {
 window._pendingMedia = []; // [{dataUrl, type, name}]
 
 // ════ UPLOAD TO FIREBASE STORAGE ════
-async function uploadToStorage(file, path, retries = 3) {
+async function uploadToStorage(file, path) {
   // Compress images before upload
   let uploadFile = file;
   if (file.type.startsWith('image/') && file.size > 500 * 1024) {
     try {
-      uploadFile = await compressImageFile(file, 1024, 0.80);
+      uploadFile = await compressImageFile(file, 1200, 0.85);
     } catch(e) {
+      console.log('Compression skipped:', e);
       uploadFile = file;
     }
   }
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const ref = storage.ref(path);
-      const snap = await ref.put(uploadFile);
-      const url = await snap.ref.getDownloadURL();
-      return url;
-    } catch(e) {
-      console.log(`Upload attempt ${attempt} failed:`, e);
-      if (attempt === retries) throw e;
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-      toast('⏳ إعادة المحاولة ' + attempt + '...');
-    }
-  }
+  const ref = storage.ref(path);
+  const snap = await ref.put(uploadFile);
+  const url = await snap.ref.getDownloadURL();
+  return url;
 }
 
 // Compress image File object (not base64)
