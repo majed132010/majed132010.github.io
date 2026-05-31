@@ -1064,6 +1064,27 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   }
 }
 
+/* ══ Do Not Disturb ══ */
+#dndBtn { position:fixed; top:12px; left:12px; z-index:999; background:rgba(11,26,31,0.85); border:1px solid rgba(200,168,75,0.3); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; transition:.2s; }
+#dndBtn.active { border-color:#e05050; background:rgba(224,80,80,0.15); }
+#dndBtn .dnd-tooltip { display:none; position:absolute; left:44px; top:50%; transform:translateY(-50%); background:#1a2f35; border:1px solid rgba(200,168,75,0.2); border-radius:8px; padding:4px 10px; font-size:12px; white-space:nowrap; color:#fff; font-family:Tajawal,sans-serif; }
+#dndBtn:hover .dnd-tooltip { display:block; }
+
+/* ══ Voice Message ══ */
+.voice-record-btn { background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px; border-radius:50%; transition:.2s; color:var(--muted); }
+.voice-record-btn:hover { background:rgba(255,255,255,0.08); color:var(--gold); }
+.voice-record-btn.recording { color:#e05050; animation:recordPulse 1s infinite; }
+@keyframes recordPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.voice-msg-wrap { display:flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(26,95,95,0.15); border-radius:12px; min-width:180px; max-width:260px; }
+.voice-play-btn { width:32px; height:32px; border-radius:50%; background:var(--teal); border:none; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+.voice-progress { flex:1; height:3px; background:rgba(255,255,255,0.15); border-radius:2px; overflow:hidden; cursor:pointer; }
+.voice-progress-fill { height:100%; background:var(--gold); border-radius:2px; transition:width 0.1s; }
+.voice-duration { font-size:11px; color:var(--muted); font-family:Tajawal,sans-serif; flex-shrink:0; }
+
+/* ══ Read Receipts ══ */
+.msg-status { font-size:11px; color:var(--muted); margin-top:2px; text-align:left; }
+.msg-status.read { color:#4caf50; }
+
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -1089,6 +1110,10 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 <div id="drawerOverlay" onclick="closeDrawer()"></div>
 
 <!-- ════ APP ════ -->
+<button id="dndBtn" onclick="toggleDND()" title="وضع عدم الإزعاج">
+  🔔
+  <span class="dnd-tooltip">وضع عدم الإزعاج</span>
+</button>
 <div id="app">
 
   <!-- Server List -->
@@ -1217,6 +1242,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
                 onkeydown="handleChatKeydown(event)"
                 oninput="handleChatInput(this)"
                 style="font-size:16px!important"></textarea>
+              <button class="voice-record-btn" id="voiceRecordBtn" type="button" onclick="toggleVoiceRecording()" title="رسالة صوتية">🎤</button>
               <button class="ci-btn send" id="sendBtn" type="button" onclick="sendMessage()" title="إرسال">➤</button>
             </div>
           </div>
@@ -2309,6 +2335,13 @@ function buildMsgDiv(msg, key) {
   if (msg.mediaUrl) {
     const mediaWrap = document.createElement('div');
     mediaWrap.style.cssText = 'margin-top:4px;display:inline-flex;flex-direction:column;gap:0;align-items:flex-start';
+    // رسالة صوتية
+    if (msg.voiceUrl) {
+      const voiceWrap = document.createElement('div');
+      voiceWrap.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
+      body.appendChild(voiceWrap);
+    }
+
     // تحقق من انتهاء الصلاحية
     const now = Date.now();
     const expired = msg.expiresAt && !msg.saved && now > msg.expiresAt;
@@ -2361,6 +2394,15 @@ function buildMsgDiv(msg, key) {
 
   // Reactions
   if (msg.reactions) renderReactions(msg.reactions, key, body);
+
+  // Read Receipt (للرسائل الخاصة بالمستخدم الحالي)
+  if (currentUser && msg.uid === currentUser.uid) {
+    const status = document.createElement('div');
+    status.className = 'msg-status' + (msg.readBy && Object.keys(msg.readBy).length > 1 ? ' read' : '');
+    status.textContent = msg.readBy && Object.keys(msg.readBy).filter(k => k !== msg.uid).length > 0 ? '✓✓' : '✓';
+    status.id = 'status-' + key;
+    div.appendChild(status);
+  }
 
   // ── Action buttons (show on hover) ──
   const actions = document.createElement('div');
@@ -3122,7 +3164,125 @@ function listenTyping(sid, cid) {
 const _unreadCounts = {}; // { 'sid/cid': count }
 
 // صوت الرسائل
+// ════ DO NOT DISTURB ════
+let _dndActive = false;
+function toggleDND() {
+  _dndActive = !_dndActive;
+  const btn = document.getElementById('dndBtn');
+  if (_dndActive) {
+    btn.textContent = '🔕';
+    btn.classList.add('active');
+    btn.querySelector('.dnd-tooltip').textContent = 'إلغاء عدم الإزعاج';
+    toast('🔕 وضع عدم الإزعاج مفعّل');
+  } else {
+    btn.innerHTML = '🔔<span class="dnd-tooltip">وضع عدم الإزعاج</span>';
+    btn.classList.remove('active');
+    toast('🔔 الإشعارات مفعّلة');
+  }
+}
+
+// ════ VOICE MESSAGES ════
+let _mediaRecorder = null;
+let _audioChunks = [];
+let _recordingTimer = null;
+let _recordingSeconds = 0;
+
+async function toggleVoiceRecording() {
+  const btn = document.getElementById('voiceRecordBtn');
+  if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+    // إيقاف التسجيل
+    _mediaRecorder.stop();
+    clearInterval(_recordingTimer);
+    btn.classList.remove('recording');
+    btn.textContent = '🎤';
+  } else {
+    // بدء التسجيل
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _audioChunks = [];
+      _recordingSeconds = 0;
+      _mediaRecorder = new MediaRecorder(stream);
+      _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
+      _mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(_audioChunks, { type: 'audio/webm' });
+        if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
+        await sendVoiceMessage(blob, _recordingSeconds);
+      };
+      _mediaRecorder.start();
+      btn.classList.add('recording');
+      _recordingTimer = setInterval(() => {
+        _recordingSeconds++;
+        btn.textContent = `⏹ ${_recordingSeconds}s`;
+        if (_recordingSeconds >= 60) { toggleVoiceRecording(); }
+      }, 1000);
+      toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال');
+    } catch(e) {
+      toast('❌ لا يمكن الوصول للميكروفون');
+    }
+  }
+}
+
+async function sendVoiceMessage(blob, duration) {
+  if (!currentServer || !currentChannel || !currentUser) return;
+  toast('⏳ جاري إرسال الرسالة الصوتية...');
+  try {
+    const path = `voice/${currentServer}/${currentChannel}/${Date.now()}.webm`;
+    const ref = storage.ref(path);
+    await ref.put(blob, { contentType: 'audio/webm' });
+    const url = await ref.getDownloadURL();
+    const msgBase = {
+      uid: currentUser.uid,
+      name: userProfile.displayName || 'مستخدم',
+      avatar: userProfile.photoURL || '',
+      ts: Date.now()
+    };
+    await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+      ...msgBase, voiceUrl: url, voiceDuration: duration, text: ''
+    });
+    toast('✅ تم إرسال الرسالة الصوتية');
+  } catch(e) {
+    toast('❌ فشل إرسال الرسالة الصوتية');
+  }
+}
+
+function buildVoiceMsg(url, duration) {
+  const wrap = document.createElement('div');
+  wrap.className = 'voice-msg-wrap';
+  const audio = new Audio(url);
+  let playing = false;
+  const playBtn = document.createElement('button');
+  playBtn.className = 'voice-play-btn';
+  playBtn.textContent = '▶';
+  const progress = document.createElement('div');
+  progress.className = 'voice-progress';
+  const fill = document.createElement('div');
+  fill.className = 'voice-progress-fill';
+  fill.style.width = '0%';
+  progress.appendChild(fill);
+  const dur = document.createElement('div');
+  dur.className = 'voice-duration';
+  dur.textContent = duration ? `${duration}s` : '0s';
+  audio.ontimeupdate = () => {
+    const pct = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
+    fill.style.width = pct + '%';
+    const remaining = Math.ceil(audio.duration - audio.currentTime);
+    dur.textContent = remaining + 's';
+  };
+  audio.onended = () => { playing = false; playBtn.textContent = '▶'; fill.style.width = '0%'; };
+  playBtn.onclick = () => {
+    if (playing) { audio.pause(); playBtn.textContent = '▶'; }
+    else { audio.play(); playBtn.textContent = '⏸'; }
+    playing = !playing;
+  };
+  wrap.appendChild(playBtn);
+  wrap.appendChild(progress);
+  wrap.appendChild(dur);
+  return wrap;
+}
+
 function playMsgSound() {
+  if (_dndActive) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -3148,6 +3308,17 @@ function incrementUnread(sid, cid) {
 function clearUnread(sid, cid) {
   const key = sid + '/' + cid;
   _unreadCounts[key] = 0;
+  // تحديد الرسائل كمقروءة
+  if (currentUser) {
+    db.ref('messages/' + sid + '/' + cid).limitToLast(20).once('value').then(snap => {
+      const msgs = snap.val() || {};
+      Object.entries(msgs).forEach(([msgKey, msg]) => {
+        if (msg.uid !== currentUser.uid && (!msg.readBy || !msg.readBy[currentUser.uid])) {
+          db.ref('messages/' + sid + '/' + cid + '/' + msgKey + '/readBy/' + currentUser.uid).set(true);
+        }
+      });
+    });
+  }
   // Update badge in channel list
   const chItems = document.querySelectorAll('.ch-item');
   chItems.forEach(el => {
