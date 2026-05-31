@@ -1627,8 +1627,12 @@ function initApp() {
   listenServers();
   if (currentUser) {
     const presRef = db.ref('presence/' + currentUser.uid);
-    presRef.set({ online: true });
-    presRef.onDisconnect().update({ online: false });
+    presRef.set({ online: true, lastSeen: Date.now(), name: userProfile.displayName || '' });
+    presRef.onDisconnect().update({ online: false, lastSeen: Date.now() });
+    // تحديث lastSeen كل دقيقة
+    setInterval(() => {
+      if (currentUser) presRef.update({ lastSeen: Date.now() });
+    }, 60000);
   }
   agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
   log('✅ Agora initialized');
@@ -3067,6 +3071,18 @@ function startTyping() {
   _typingTimer = setTimeout(() => db.ref(path).remove(), 4000);
 }
 
+function formatLastSeen(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 2) return 'نشط الآن';
+  if (mins < 60) return `آخر ظهور منذ ${mins} دقيقة`;
+  if (hours < 24) return `آخر ظهور منذ ${hours} ساعة`;
+  return `آخر ظهور منذ ${days} يوم`;
+}
+
 function stopTyping() {
   if (!currentServer || !currentChannel || !currentUser) return;
   clearTimeout(_typingTimer);
@@ -3089,12 +3105,15 @@ function listenTyping(sid, cid) {
     if (!el) return;
     if (others.length === 0) {
       el.innerHTML = '';
+      el.style.opacity = '0';
     } else {
-      const names = others.slice(0, 2).join(' و ');
+      const names = others.slice(0, 3).join(' و ');
+      const verb = others.length === 1 ? 'يكتب' : others.length === 2 ? 'يكتبان' : 'يكتبون';
       el.innerHTML = `
         <div class="typing-dots"><span></span><span></span><span></span></div>
-        <span>${escHtml(names)} ${others.length === 1 ? 'يكتب...' : 'يكتبان...'}</span>
+        <span style="font-size:12px;color:var(--muted)">${escHtml(names)} ${verb}...</span>
       `;
+      el.style.opacity = '1';
     }
   });
 }
@@ -3102,9 +3121,27 @@ function listenTyping(sid, cid) {
 // ════ UNREAD BADGES ════
 const _unreadCounts = {}; // { 'sid/cid': count }
 
+// صوت الرسائل
+function playMsgSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
 function incrementUnread(sid, cid) {
   const key = sid + '/' + cid;
   _unreadCounts[key] = (_unreadCounts[key] || 0) + 1;
+  playMsgSound();
   renderChannels(sid);
 }
 
