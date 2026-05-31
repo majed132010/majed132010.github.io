@@ -2950,20 +2950,31 @@ async function doDeleteServer() {
 window._pendingMedia = []; // [{dataUrl, type, name}]
 
 // ════ UPLOAD TO FIREBASE STORAGE ════
-async function uploadToStorage(file, path, retries = 3) {
+async function uploadToStorage(file, path, retries = 4) {
   let uploadFile = file;
-  if (file.type.startsWith('image/') && file.size > 300 * 1024) {
-    try { uploadFile = await compressImageFile(file, 1024, 0.80); } catch(e) { uploadFile = file; }
+  if (file.type.startsWith('image/')) {
+    try {
+      // ضغط أكثر للجوال
+      const maxSize = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 800 : 1024;
+      const quality = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 0.65 : 0.80;
+      uploadFile = await compressImageFile(file, maxSize, quality);
+    } catch(e) { uploadFile = file; }
   }
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ref = storage.ref(path);
-      const snap = await ref.put(uploadFile);
+      // رفع مع timeout 30 ثانية
+      const uploadPromise = ref.put(uploadFile);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 30000)
+      );
+      const snap = await Promise.race([uploadPromise, timeoutPromise]);
       return await snap.ref.getDownloadURL();
     } catch(e) {
+      console.log(`Upload attempt ${attempt} failed:`, e.message);
       if (attempt === retries) throw e;
-      await new Promise(r => setTimeout(r, 1500 * attempt));
-      toast('⏳ إعادة المحاولة ' + attempt + '...');
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      toast('⏳ إعادة المحاولة ' + attempt + ' من ' + retries + '...');
     }
   }
 }
