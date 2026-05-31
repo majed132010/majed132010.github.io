@@ -1060,6 +1060,11 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     user-select: text !important;
   }
 }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 </style>
 </head>
 <body>
@@ -2318,13 +2323,27 @@ function buildMsgDiv(msg, key) {
       // زر الحفظ للفيديو
       if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
     } else {
+      // Skeleton placeholder
+      const skeleton = document.createElement('div');
+      skeleton.style.cssText = 'width:200px;height:150px;border-radius:10px;background:linear-gradient(90deg,rgba(255,255,255,0.05) 25%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.05) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite';
+      mediaWrap.appendChild(skeleton);
+
       const img = document.createElement('img');
-      img.src = msg.mediaUrl;
       img.loading = 'lazy';
       img.decoding = 'async';
-      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover';
+      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:none;cursor:pointer;object-fit:cover';
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
-      img.addEventListener('load', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
+      img.addEventListener('load', () => {
+        skeleton.remove();
+        img.style.display = 'block';
+        const a=document.getElementById('messagesArea');
+        if(a) a.scrollTop=a.scrollHeight;
+      });
+      img.addEventListener('error', () => {
+        skeleton.style.background = 'rgba(255,0,0,0.1)';
+        skeleton.textContent = '❌';
+      });
+      img.src = msg.mediaUrl;
       mediaWrap.appendChild(img);
       // زر الحفظ للصورة
       if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
@@ -2950,31 +2969,36 @@ async function doDeleteServer() {
 window._pendingMedia = []; // [{dataUrl, type, name}]
 
 // ════ UPLOAD TO FIREBASE STORAGE ════
-async function uploadToStorage(file, path, retries = 4) {
+async function uploadToStorage(file, path, retries = 5) {
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   let uploadFile = file;
   if (file.type.startsWith('image/')) {
     try {
-      // ضغط أكثر للجوال
-      const maxSize = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 800 : 1024;
-      const quality = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 0.65 : 0.80;
+      const maxSize = isMobile ? 720 : 1024;
+      const quality = isMobile ? 0.60 : 0.80;
       uploadFile = await compressImageFile(file, maxSize, quality);
+      console.log(`Compressed: ${file.size} -> ${uploadFile.size} bytes`);
     } catch(e) { uploadFile = file; }
   }
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ref = storage.ref(path);
-      // رفع مع timeout 30 ثانية
-      const uploadPromise = ref.put(uploadFile);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 30000)
-      );
-      const snap = await Promise.race([uploadPromise, timeoutPromise]);
+      const task = ref.put(uploadFile);
+      const snap = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          task.cancel();
+          reject(new Error('timeout'));
+        }, 45000);
+        task.then(s => { clearTimeout(timeout); resolve(s); })
+            .catch(e => { clearTimeout(timeout); reject(e); });
+      });
       return await snap.ref.getDownloadURL();
     } catch(e) {
-      console.log(`Upload attempt ${attempt} failed:`, e.message);
+      console.log(`Upload attempt ${attempt}/${retries} failed:`, e.message);
       if (attempt === retries) throw e;
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-      toast('⏳ إعادة المحاولة ' + attempt + ' من ' + retries + '...');
+      const delay = Math.min(2000 * attempt, 8000);
+      await new Promise(r => setTimeout(r, delay));
+      toast(`⏳ إعادة المحاولة ${attempt} من ${retries}...`);
     }
   }
 }
