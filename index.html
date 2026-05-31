@@ -1655,10 +1655,13 @@ function initApp() {
     const presRef = db.ref('presence/' + currentUser.uid);
     presRef.set({ online: true, lastSeen: Date.now(), name: userProfile.displayName || '' });
     presRef.onDisconnect().update({ online: false, lastSeen: Date.now() });
-    // تحديث lastSeen كل دقيقة
-    setInterval(() => {
-      if (currentUser) presRef.update({ lastSeen: Date.now() });
-    }, 60000);
+    // تحديث lastSeen كل دقيقة + تجديد token المصادقة
+    setInterval(async () => {
+      if (currentUser) {
+        presRef.update({ lastSeen: Date.now() });
+        try { await currentUser.getIdToken(true); } catch(e) {}
+      }
+    }, 55 * 60 * 1000); // كل 55 دقيقة
   }
   agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
   log('✅ Agora initialized');
@@ -3190,45 +3193,36 @@ let _recordingSeconds = 0;
 async function toggleVoiceRecording() {
   const btn = document.getElementById('voiceRecordBtn');
   if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+    // إيقاف التسجيل
     _mediaRecorder.stop();
     clearInterval(_recordingTimer);
-    _recordingTimer = null;
     btn.classList.remove('recording');
     btn.textContent = '🎤';
-    return;
-  }
-  if (_mediaRecorder && _mediaRecorder.state === 'inactive') return;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    _audioChunks = [];
-    _recordingSeconds = 0;
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
-      MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-    _mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-    _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
-    _mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      _mediaRecorder = null;
-      const blob = new Blob(_audioChunks, { type: mimeType || 'audio/webm' });
-      if (blob.size < 500) { toast('⚠️ التسجيل قصير جداً'); return; }
-      await sendVoiceMessage(blob, _recordingSeconds);
-    };
-    _mediaRecorder.start(1000);
-    btn.classList.add('recording');
-    btn.textContent = '⏹ 0s';
-    _recordingTimer = setInterval(() => {
-      _recordingSeconds++;
-      btn.textContent = `⏹ ${_recordingSeconds}s`;
-      if (_recordingSeconds >= 60) {
-        clearInterval(_recordingTimer);
-        _recordingTimer = null;
-        if (_mediaRecorder && _mediaRecorder.state === 'recording') _mediaRecorder.stop();
-        btn.classList.remove('recording');
-        btn.textContent = '🎤';
-      }
-    }, 1000);
-  } catch(e) {
-    toast('❌ لا يمكن الوصول للميكروفون');
+  } else {
+    // بدء التسجيل
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _audioChunks = [];
+      _recordingSeconds = 0;
+      _mediaRecorder = new MediaRecorder(stream);
+      _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
+      _mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(_audioChunks, { type: 'audio/webm' });
+        if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
+        await sendVoiceMessage(blob, _recordingSeconds);
+      };
+      _mediaRecorder.start();
+      btn.classList.add('recording');
+      _recordingTimer = setInterval(() => {
+        _recordingSeconds++;
+        btn.textContent = `⏹ ${_recordingSeconds}s`;
+        if (_recordingSeconds >= 60) { toggleVoiceRecording(); }
+      }, 1000);
+      toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال');
+    } catch(e) {
+      toast('❌ لا يمكن الوصول للميكروفون');
+    }
   }
 }
 
@@ -3236,7 +3230,7 @@ async function sendVoiceMessage(blob, duration) {
   if (!currentServer || !currentChannel || !currentUser) return;
   toast('⏳ جاري إرسال الرسالة الصوتية...');
   try {
-    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}_voice.webm`;
+    const path = `voice/${currentServer}/${currentChannel}/${Date.now()}.webm`;
     const ref = storage.ref(path);
     await ref.put(blob, { contentType: 'audio/webm' });
     const url = await ref.getDownloadURL();
