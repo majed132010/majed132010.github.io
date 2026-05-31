@@ -3190,30 +3190,43 @@ let _audioChunks = [];
 let _recordingTimer = null;
 let _recordingSeconds = 0;
 
+let _voiceRecordingBusy = false;
+
 async function toggleVoiceRecording() {
+  if (_voiceRecordingBusy) return;
   const btn = document.getElementById('voiceRecordBtn');
-  if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+
+  if (_mediaRecorder && (_mediaRecorder.state === 'recording' || _mediaRecorder.state === 'paused')) {
     // إيقاف التسجيل
-    _mediaRecorder.stop();
+    _voiceRecordingBusy = true;
     clearInterval(_recordingTimer);
     btn.classList.remove('recording');
     btn.textContent = '🎤';
-  } else {
+    btn.disabled = true;
+    _mediaRecorder.stop();
+  } else if (!_mediaRecorder || _mediaRecorder.state === 'inactive') {
     // بدء التسجيل
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       _audioChunks = [];
       _recordingSeconds = 0;
-      _mediaRecorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      _mediaRecorder = new MediaRecorder(stream, { mimeType });
       _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
       _mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(_audioChunks, { type: 'audio/webm' });
+        const blob = new Blob(_audioChunks, { type: mimeType });
+        btn.disabled = false;
+        _voiceRecordingBusy = false;
+        _mediaRecorder = null;
         if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
-        await sendVoiceMessage(blob, _recordingSeconds);
+        await sendVoiceMessage(blob, _recordingSeconds, mimeType);
       };
       _mediaRecorder.start();
       btn.classList.add('recording');
+      btn.textContent = '⏹ 0s';
       _recordingTimer = setInterval(() => {
         _recordingSeconds++;
         btn.textContent = `⏹ ${_recordingSeconds}s`;
@@ -3226,13 +3239,15 @@ async function toggleVoiceRecording() {
   }
 }
 
-async function sendVoiceMessage(blob, duration) {
+async function sendVoiceMessage(blob, duration, mimeType) {
   if (!currentServer || !currentChannel || !currentUser) return;
   toast('⏳ جاري إرسال الرسالة الصوتية...');
+  const ct = (mimeType || 'audio/webm').split(';')[0]; // audio/webm فقط بدون codecs
   try {
-    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}.webm`;
+    const ext = ct === 'audio/ogg' ? 'ogg' : 'webm';
+    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
     const ref = storage.ref(path);
-    await ref.put(blob, { contentType: 'audio/webm' });
+    await ref.put(blob, { contentType: ct });
     const url = await ref.getDownloadURL();
     const msgBase = {
       uid: currentUser.uid,
