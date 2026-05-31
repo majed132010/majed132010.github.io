@@ -3201,11 +3201,14 @@ async function toggleVoiceRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       _audioChunks = [];
       _recordingSeconds = 0;
-      _mediaRecorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+      MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' :
+      MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' : '';
+    _mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
       _mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(_audioChunks, { type: 'audio/webm' });
+        const blob = new Blob(_audioChunks, { type: _mediaRecorder.mimeType || 'audio/webm' });
         if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
         await sendVoiceMessage(blob, _recordingSeconds);
       };
@@ -3227,9 +3230,10 @@ async function sendVoiceMessage(blob, duration) {
   if (!currentServer || !currentChannel || !currentUser) return;
   toast('⏳ جاري إرسال الرسالة الصوتية...');
   try {
-    const path = `voice/${currentServer}/${currentChannel}/${Date.now()}.webm`;
+    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}_voice.webm`;
     const ref = storage.ref(path);
-    await ref.put(blob, { contentType: 'audio/webm' });
+    const mimeType = blob.type || 'audio/webm';
+    await ref.put(blob, { contentType: mimeType });
     const url = await ref.getDownloadURL();
     const msgBase = {
       uid: currentUser.uid,
