@@ -3230,7 +3230,7 @@ async function sendVoiceMessage(blob, duration) {
   if (!currentServer || !currentChannel || !currentUser) return;
   toast('⏳ جاري إرسال الرسالة الصوتية...');
   try {
-    const path = `voice/${currentServer}/${currentChannel}/${Date.now()}.webm`;
+    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}.webm`;
     const ref = storage.ref(path);
     await ref.put(blob, { contentType: 'audio/webm' });
     const url = await ref.getDownloadURL();
