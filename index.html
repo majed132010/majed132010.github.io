@@ -2969,15 +2969,7 @@ async function uploadToStorage(file, path, retries = 5) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ref = storage.ref(path);
-      const task = ref.put(uploadFile);
-      const snap = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          task.cancel();
-          reject(new Error('timeout'));
-        }, 45000);
-        task.then(s => { clearTimeout(timeout); resolve(s); })
-            .catch(e => { clearTimeout(timeout); reject(e); });
-      });
+      const snap = await ref.put(uploadFile);
       return await snap.ref.getDownloadURL();
     } catch(e) {
       console.log(`Upload attempt ${attempt}/${retries} failed:`, e.message);
