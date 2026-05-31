@@ -12,6 +12,9 @@
 <meta name="description" content="عوالم — منصة تواصل اجتماعي">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="shortcut icon" href="icon-192.png">
 <title>عوالم</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -1487,7 +1490,6 @@ async function initFCM(userId) {
       showNotifBtn(userId);
     }
   } catch(e) {
-    console.log('FCM error:', e);
   }
 }
 
@@ -1575,7 +1577,6 @@ function signInGoogle() {
   // استدعاء الـ popup مباشرة بدون أي await قبله (مهم جداً للجوال)
   auth.signInWithPopup(provider)
     .then(result => {
-      console.log('✅ تسجيل الدخول:', result.user.displayName);
     })
     .catch(e => {
       console.error('signInGoogle:', e.code, e.message);
@@ -2963,7 +2964,6 @@ async function uploadToStorage(file, path, retries = 5) {
       const maxSize = isMobile ? 720 : 1024;
       const quality = isMobile ? 0.60 : 0.80;
       uploadFile = await compressImageFile(file, maxSize, quality);
-      console.log(`Compressed: ${file.size} -> ${uploadFile.size} bytes`);
     } catch(e) { uploadFile = file; }
   }
   for (let attempt = 1; attempt <= retries; attempt++) {
