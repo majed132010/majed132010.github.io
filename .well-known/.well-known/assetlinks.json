@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.awalem.app",
+    "sha256_cert_fingerprints": ["50:50:DC:28:4D:68:DC:06:05:5B:CC:6D:45:C2:58:54:92:40:02:06:96:5C:1B:DF:52:12:D1:6C:1C:95:BA:E8"]
+  }
+}]
