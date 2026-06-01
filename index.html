@@ -1127,7 +1127,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 
   <!-- Server List -->
   <div id="serverList">
-    <div class="sv-item active" id="homeBtn" onclick="showHome()" title="الرئيسية">🌍</div>
+    <div class="sv-item active" id="homeBtn" onclick="closeDrawer();showHome();" title="الرئيسية">🌍</div>
     <div class="sv-sep"></div>
     <div id="svItems"></div>
     <div class="sv-sep"></div>
@@ -3170,8 +3170,10 @@ function confirmLeaveServerById(sid) {
   const el = document.getElementById('confirmLeaveText');
   if (el) el.textContent = `هل أنت متأكد أنك تريد مغادرة سيرفر "${sv?.name||''}"؟`;
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
-  // حفظ الـ sid للاستخدام في doLeaveServer
   window._pendingLeaveSid = sid;
+  // أغلق الـ Drawer وأظهر homeView حتى يظهر الـ modal بشكل صحيح
+  closeDrawer();
+  showView('home');
   openModal('confirmLeaveModal');
 }
 
@@ -3203,6 +3205,9 @@ function confirmDeleteServerById(sid) {
   if (el) el.textContent = `سيُحذف سيرفر "${sv?.name||''}" نهائياً لجميع الأعضاء. لا يمكن التراجع.`;
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
   window._pendingDeleteSid = sid;
+  // أغلق الـ Drawer وأظهر homeView
+  closeDrawer();
+  showView('home');
   openModal('confirmDeleteModal');
 }
 
