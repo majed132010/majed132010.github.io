@@ -2334,11 +2334,18 @@ function buildMsgDiv(msg, key) {
     body.appendChild(txt);
   }
 
+  // رسالة صوتية مستقلة
+  if (msg.voiceUrl && !msg.mediaUrl) {
+    const voiceWrap = document.createElement('div');
+    voiceWrap.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
+    body.appendChild(voiceWrap);
+  }
+
   // Media
   if (msg.mediaUrl) {
     const mediaWrap = document.createElement('div');
     mediaWrap.style.cssText = 'margin-top:4px;display:inline-flex;flex-direction:column;gap:0;align-items:flex-start';
-    // رسالة صوتية
+    // رسالة صوتية داخل media
     if (msg.voiceUrl) {
       const voiceWrap = document.createElement('div');
       voiceWrap.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
