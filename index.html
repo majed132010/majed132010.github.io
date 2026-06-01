@@ -2176,6 +2176,8 @@ function showView(name) {
 }
 
 function selectChannel(sid, cid, ch) {
+  localStorage.setItem('awalem_lastServer', sid);
+  localStorage.setItem('awalem_lastChannel', cid);
   currentServer = sid;
   currentChannel = cid;
   renderChannels(sid);
@@ -4394,7 +4396,29 @@ function compressImage(dataUrl, maxSize, quality) {
 }
 
 function restoreLastServer() {
-  showHome();
+  const lastSid = localStorage.getItem('awalem_lastServer');
+  const lastCid = localStorage.getItem('awalem_lastChannel');
+  if (lastSid && servers[lastSid]) {
+    selectServer(lastSid);
+    if (lastCid && servers[lastSid].channels && servers[lastSid].channels[lastCid]) {
+      setTimeout(() => selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]), 300);
+    }
+  } else {
+    // أول مرة — افتح أول سيرفر وأول قناة
+    const svKeys = Object.keys(servers);
+    if (svKeys.length > 0) {
+      const sid = svKeys[0];
+      selectServer(sid);
+      const sv = servers[sid];
+      if (sv && sv.channels) {
+        const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+        const firstText = chs.find(([,ch]) => ch.type !== 'voice');
+        if (firstText) setTimeout(() => selectChannel(sid, firstText[0], firstText[1]), 300);
+      }
+    } else {
+      showHome();
+    }
+  }
 }
 
 
