@@ -2047,13 +2047,11 @@ function renderHomeServers() {
 
     if (isOwner) {
       actions.appendChild(makeActionBtn('🗑️ حذف السيرفر', 'rgba(192,64,64,0.12)', 'rgba(192,64,64,0.3)', () => {
-        currentServer = sid;
-        confirmDeleteServer();
+        confirmDeleteServerById(sid);
       }));
     } else {
       actions.appendChild(makeActionBtn('🚪 مغادرة', 'rgba(192,64,64,0.08)', 'rgba(192,64,64,0.25)', () => {
-        currentServer = sid;
-        confirmLeaveServer();
+        confirmLeaveServerById(sid);
       }));
     }
 
@@ -2954,19 +2952,25 @@ function openProfile() {
   openModal('profileModal');
 }
 
-function confirmLeaveServer() {
-  if (!currentServer) return;
-  const sv = servers[currentServer];
+function confirmLeaveServerById(sid) {
+  const sv = servers[sid];
   const el = document.getElementById('confirmLeaveText');
   if (el) el.textContent = `هل أنت متأكد أنك تريد مغادرة سيرفر "${sv?.name||''}"؟`;
-  // Close any open modal first
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
+  // حفظ الـ sid للاستخدام في doLeaveServer
+  window._pendingLeaveSid = sid;
   openModal('confirmLeaveModal');
 }
 
+function confirmLeaveServer() {
+  if (!currentServer) return;
+  confirmLeaveServerById(currentServer);
+}
+
 async function doLeaveServer() {
-  if (!currentServer || !currentUser) return;
-  const sid = currentServer;
+  const sid = window._pendingLeaveSid || currentServer;
+  if (!sid || !currentUser) return;
+  window._pendingLeaveSid = null;
   closeModal('confirmLeaveModal');
   try {
     await db.ref('servers/' + sid + '/members/' + currentUser.uid).remove();
@@ -2980,19 +2984,24 @@ async function doLeaveServer() {
   } catch(e) { toast('❌ فشل في المغادرة: ' + e.message); }
 }
 
-function confirmDeleteServer() {
-  if (!currentServer) return;
-  const sv = servers[currentServer];
+function confirmDeleteServerById(sid) {
+  const sv = servers[sid];
   const el = document.getElementById('confirmDeleteText');
   if (el) el.textContent = `سيُحذف سيرفر "${sv?.name||''}" نهائياً لجميع الأعضاء. لا يمكن التراجع.`;
-  // Close any open modal first
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
+  window._pendingDeleteSid = sid;
   openModal('confirmDeleteModal');
 }
 
+function confirmDeleteServer() {
+  if (!currentServer) return;
+  confirmDeleteServerById(currentServer);
+}
+
 async function doDeleteServer() {
-  if (!currentServer || !currentUser) return;
-  const sid = currentServer;
+  const sid = window._pendingDeleteSid || currentServer;
+  if (!sid || !currentUser) return;
+  window._pendingDeleteSid = null;
   const sv = servers[sid];
   if (!sv) return;
   const isOwner = sv.ownerId === currentUser.uid || sv.members?.[currentUser.uid]?.role === 'owner';
@@ -4343,11 +4352,7 @@ function compressImage(dataUrl, maxSize, quality) {
 function restoreLastServer() {
   const lastSid = localStorage.getItem('awalem_lastServer');
   if (lastSid && servers[lastSid]) selectServer(lastSid);
-  else {
-    const svKeys = Object.keys(servers);
-    if (svKeys.length > 0) selectServer(svKeys[svKeys.length - 1]);
-    else showHome();
-  }
+  else showHome();
 }
 
 
