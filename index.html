@@ -2054,7 +2054,16 @@ async function joinServer() {
   const snap = await db.ref('servers').orderByChild('inviteCode').equalTo(code).once('value');
   if (!snap.exists()) { toast('❌ كود خاطئ'); return; }
   const sid = Object.keys(snap.val())[0];
-  if (servers[sid]) { toast('⚠️ أنت بالفعل في هذا السيرفر'); closeModal('joinServerModal'); selectServer(sid); return; }
+  // تحقق إذا كان مضافاً بالفعل من Firebase مباشرة
+  const alreadyMember = await db.ref('servers/' + sid + '/members/' + currentUser.uid).once('value');
+  if (alreadyMember.exists() || servers[sid]) {
+    toast('⚠️ أنت بالفعل في هذا السيرفر');
+    closeModal('joinServerModal');
+    servers[sid] = snap.val()[sid];
+    renderServerList();
+    selectServer(sid);
+    return;
+  }
   await db.ref('servers/' + sid + '/members/' + currentUser.uid).set({ role: 'member' });
   await db.ref('users/' + currentUser.uid + '/servers/' + sid).set(true);
   servers[sid] = snap.val()[sid];
