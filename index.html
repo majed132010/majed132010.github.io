@@ -1931,12 +1931,25 @@ function selectServer(sid) {
   cleanupVoiceListener();
   currentServer = sid;
   currentChannel = null;
-  // لا نحفظ lastServer — التطبيق يبدأ دائماً من الصفحة الرئيسية
   renderServerList();
   renderChannels(sid);
-  showView('none');
+  // على الجوال: افتح الـ Drawer لاختيار قناة
+  // على الكمبيوتر: افتح أول قناة نصية تلقائياً
+  if (isMobile()) {
+    openDrawer();
+  } else {
+    const sv = servers[sid];
+    if (sv && sv.channels) {
+      const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+      const firstText = chs.find(([,ch]) => ch.type !== 'voice');
+      if (firstText) {
+        selectChannel(sid, firstText[0], firstText[1]);
+        return;
+      }
+    }
+    showView('home');
+  }
   document.getElementById('chSettingsBtn').style.display = '';
-  if (isMobile()) openDrawer();
 }
 
 function showHome() {
@@ -2214,7 +2227,7 @@ function closeDrawer() {
     }
   }
 
-  // إذا لا يوجد سيرفر مفتوح — افتح أول سيرفر متاح
+  // إذا لا يوجد سيرفر مفتوح — افتح أول سيرفر وأول قناة فيه
   if (!currentServer) {
     const svKeys = Object.keys(servers);
     if (svKeys.length > 0) {
@@ -2226,6 +2239,9 @@ function closeDrawer() {
         const firstText = chs.find(([,ch]) => ch.type !== 'voice');
         if (firstText) setTimeout(() => selectChannel(sid, firstText[0], firstText[1]), 100);
       }
+    } else {
+      // لا يوجد أي سيرفر — اعرض الصفحة الرئيسية
+      showHome();
     }
   }
 }
