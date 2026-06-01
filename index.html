@@ -1124,6 +1124,11 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     <div class="sv-sep"></div>
     <div class="sv-item sv-add" onclick="openCreateServer()" title="إنشاء سيرفر">+</div>
     <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
+    <div class="sv-sep"></div>
+    <div class="sv-item" id="dmBtn" onclick="openDMScreen()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
+      💬
+      <span id="dmBadge" style="display:none;position:absolute;top:2px;right:2px;background:#f04747;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1"></span>
+    </div>
   </div>
 
   <!-- Channel Sidebar -->
@@ -1144,12 +1149,8 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     </div>
     <div class="ch-list" id="channelList"></div>
 
-    <!-- DM Section in sidebar -->
-    <div class="dm-section-title">
-      <span>💬 الرسائل الخاصة</span>
-      <span style="cursor:pointer;font-size:16px;color:var(--gold)" onclick="openNewDM()" title="رسالة جديدة">✉️</span>
-    </div>
-    <div id="dmList" style="flex:1;overflow-y:auto;padding-bottom:8px"></div>
+    <!-- DM List hidden - moved to DM screen -->
+    <div id="dmList" style="display:none"></div>
     <div class="voice-connected" id="voiceConnectedBar">
       <div class="vc-info">🔊 <span id="vcChannelName"></span></div>
       <div class="vc-btns">
@@ -2211,6 +2212,11 @@ function selectChannel(sid, cid, ch) {
   currentServer = sid;
   currentChannel = cid;
   renderChannels(sid);
+  // أغلق الـ Drawer على الجوال فوراً
+  const sidebar = document.getElementById('channelSidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  if (sidebar) sidebar.classList.remove('drawer-open');
+  if (overlay) overlay.classList.remove('show');
   // Update header
   const icon = document.getElementById('mhIcon');
   const name = document.getElementById('mhName');
@@ -3776,6 +3782,25 @@ async function openNewDM() {
   document.body.appendChild(popup);
 }
 
+function openDMScreen() {
+  // إظهار شاشة الرسائل الخاصة مع القائمة
+  currentServer = null;
+  currentChannel = null;
+  document.getElementById('chSettingsBtn').style.display = 'none';
+  document.getElementById('mhIcon').textContent = '💬';
+  document.getElementById('mhName').textContent = 'الرسائل الخاصة';
+  document.getElementById('searchToggleBtn').style.display = 'none';
+  document.getElementById('membersToggleBtn').style.display = 'none';
+  renderServerList();
+  renderDmList();
+  showView('dm');
+  // إخفاء الـ badge
+  const badge = document.getElementById('dmBadge');
+  if (badge) badge.style.display = 'none';
+  // على الجوال افتح الـ Drawer لاختيار محادثة
+  if (isMobile()) openDrawer();
+}
+
 function openDM(uid, name) {
   _currentDmUid = uid;
   // Update header
@@ -3809,6 +3834,17 @@ function openDM(uid, name) {
     if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
       _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
       renderDmList();
+      // تحديث badge أيقونة الرسائل الخاصة
+      const total = Object.values(_dmUnread).reduce((a,b) => a+b, 0);
+      const badge = document.getElementById('dmBadge');
+      if (badge) {
+        if (total > 0) {
+          badge.textContent = total > 9 ? '9+' : total;
+          badge.style.display = 'flex';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
     }
   };
 
