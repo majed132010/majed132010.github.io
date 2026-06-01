@@ -1526,6 +1526,101 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 <script>
 'use strict';
 
+// ════ IMAGE CACHE (IndexedDB) ════
+const _imgCacheDB = (() => {
+  let db = null;
+  const DB_NAME = 'awalem_img_cache';
+  const DB_VER = 1;
+  const STORE = 'images';
+
+  function open() {
+    return new Promise((res, rej) => {
+      if (db) return res(db);
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(STORE)) {
+          d.createObjectStore(STORE, { keyPath: 'url' });
+        }
+      };
+      req.onsuccess = e => { db = e.target.result; res(db); };
+      req.onerror = () => rej(req.error);
+    });
+  }
+
+  async function get(url) {
+    try {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).get(url);
+        req.onsuccess = () => res(req.result || null);
+        req.onerror = () => res(null);
+      });
+    } catch { return null; }
+  }
+
+  async function set(url, blob, expiresAt, saved) {
+    try {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put({ url, blob, expiresAt: expiresAt || null, saved: saved || false, cachedAt: Date.now() });
+        tx.oncomplete = () => res(true);
+        tx.onerror = () => res(false);
+      });
+    } catch { return false; }
+  }
+
+  // حذف الصور المنتهية الصلاحية غير المحفوظة
+  async function cleanup() {
+    try {
+      const d = await open();
+      const now = Date.now();
+      const tx = d.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      const req = store.openCursor();
+      req.onsuccess = e => {
+        const cursor = e.target.result;
+        if (!cursor) return;
+        const item = cursor.value;
+        if (item.expiresAt && !item.saved && now > item.expiresAt) {
+          cursor.delete();
+        }
+        cursor.continue();
+      };
+    } catch {}
+  }
+
+  return { get, set, cleanup };
+})();
+
+// تنظيف الكاش عند بدء التطبيق
+setTimeout(() => _imgCacheDB.cleanup(), 3000);
+
+// دالة لتحميل الصورة مع الكاش
+async function loadCachedImage(url, expiresAt, saved) {
+  // تحقق من الكاش أولاً
+  const cached = await _imgCacheDB.get(url);
+  if (cached) {
+    // إذا انتهت صلاحيتها وغير محفوظة — احذفها
+    if (cached.expiresAt && !cached.saved && Date.now() > cached.expiresAt) {
+      return null; // منتهية
+    }
+    return URL.createObjectURL(cached.blob);
+  }
+  // حمّل من الإنترنت واحفظ في الكاش
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return url;
+    const blob = await resp.blob();
+    await _imgCacheDB.set(url, blob, expiresAt, saved);
+    return URL.createObjectURL(blob);
+  } catch {
+    return url; // fallback للرابط المباشر
+  }
+}
+
 const FB = firebase.initializeApp({
   apiKey: "AIzaSyCmZPRoEt3IDFxeH-aqvYQIi5dGOmFlS5Y",
   authDomain: "awalim2-5bdb1.firebaseapp.com",
@@ -2519,12 +2614,24 @@ function buildMsgDiv(msg, key) {
       mediaWrap.appendChild(vid);
     } else {
       const img = document.createElement('img');
-      img.src = msg.mediaUrl;
       img.loading = 'lazy';
       img.decoding = 'async';
-      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover';
+      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover;background:#1a2a2a';
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
       img.addEventListener('load', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
+      // تحميل الصورة من الكاش أولاً
+      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
+        if (src) img.src = src;
+        else {
+          // الصورة منتهية الصلاحية
+          img.style.cssText += ';opacity:0.3;filter:grayscale(1)';
+          img.src = '';
+          const expired = document.createElement('div');
+          expired.style.cssText = 'font-size:11px;color:var(--muted);font-family:Tajawal,sans-serif;margin-top:2px;text-align:center';
+          expired.textContent = '⏰ انتهت صلاحية الصورة';
+          mediaWrap.appendChild(expired);
+        }
+      });
       mediaWrap.appendChild(img);
     }
     body.appendChild(mediaWrap);
@@ -3165,7 +3272,13 @@ async function uploadToStorage(file, path, retries = 5) {
     try {
       const ref = storage.ref(path);
       const snap = await ref.put(uploadFile);
-      return await snap.ref.getDownloadURL();
+      const url = await snap.ref.getDownloadURL();
+      // احفظ في الكاش فوراً بعد الرفع
+      try {
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        await _imgCacheDB.set(url, uploadFile, expiresAt, false);
+      } catch {}
+      return url;
     } catch(e) {
       console.log(`Upload attempt ${attempt}/${retries} failed:`, e.message);
       if (attempt === retries) throw e;
@@ -4435,6 +4548,9 @@ async function lightboxSaveInChat() {
   try {
     const path = 'messages/' + currentServer + '/' + currentChannel + '/' + _lightboxMsgKey;
     await db.ref(path).update({ saved: true, expiresAt: null });
+    // تحديث الكاش ليعرف أن الصورة محفوظة
+    const cached = await _imgCacheDB.get(_lightboxUrl);
+    if (cached) await _imgCacheDB.set(_lightboxUrl, cached.blob, null, true);
     toast('📌 تم حفظ الصورة بشكل دائم');
     if (btn) { btn.textContent = '✅ تم الحفظ'; btn.style.display = 'none'; }
     _lightboxMsgKey = null;
