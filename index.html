@@ -2200,6 +2200,34 @@ function closeDrawer() {
   const overlay = document.getElementById('drawerOverlay');
   if (sidebar) sidebar.classList.remove('drawer-open');
   if (overlay) overlay.classList.remove('show');
+
+  // إذا لا توجد قناة مفتوحة — افتح آخر قناة أو أول قناة في السيرفر
+  if (currentServer && !currentChannel) {
+    const sv = servers[currentServer];
+    if (sv && sv.channels) {
+      const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+      const firstText = chs.find(([,ch]) => ch.type !== 'voice');
+      if (firstText) {
+        selectChannel(currentServer, firstText[0], firstText[1]);
+        return;
+      }
+    }
+  }
+
+  // إذا لا يوجد سيرفر مفتوح — افتح أول سيرفر متاح
+  if (!currentServer) {
+    const svKeys = Object.keys(servers);
+    if (svKeys.length > 0) {
+      const sid = svKeys[0];
+      const sv = servers[sid];
+      selectServer(sid);
+      if (sv && sv.channels) {
+        const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+        const firstText = chs.find(([,ch]) => ch.type !== 'voice');
+        if (firstText) setTimeout(() => selectChannel(sid, firstText[0], firstText[1]), 100);
+      }
+    }
+  }
 }
 
 // Touch swipe to open/close drawer from right edge
