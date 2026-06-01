@@ -3219,8 +3219,14 @@ async function toggleVoiceRecording() {
       _recordingSeconds = 0;
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      _mediaRecorder = new MediaRecorder(stream, { mimeType });
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/mp4')
+            ? 'audio/mp4'
+            : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+              ? 'audio/ogg;codecs=opus'
+              : '';
+      _mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
       _mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
@@ -3251,7 +3257,7 @@ async function sendVoiceMessage(blob, duration, mimeType) {
   toast('⏳ جاري إرسال الرسالة الصوتية...');
   const ct = (mimeType || 'audio/webm').split(';')[0]; // audio/webm فقط بدون codecs
   try {
-    const ext = ct === 'audio/ogg' ? 'ogg' : 'webm';
+    const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
     const path = `messages/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
     const ref = storage.ref(path);
     await ref.put(blob, { contentType: ct });
