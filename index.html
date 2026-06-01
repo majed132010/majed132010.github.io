@@ -950,13 +950,34 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     right: 65px;
     width: 260px !important;
     min-width: 260px !important;
-    transform: translateX(100%);
+    transform: translateX(calc(100% - 12px));
     transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
     z-index: 190;
     box-shadow: -4px 0 20px rgba(0,0,0,0.4);
   }
+  /* لسان بسيط يدل على وجود الـ Drawer */
+  #channelSidebar::before {
+    content: '◀';
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 48px;
+    background: var(--teal, #1a5f5f);
+    border-radius: 6px 0 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: rgba(255,255,255,0.6);
+    transition: opacity 0.28s;
+  }
   #channelSidebar.drawer-open {
     transform: translateX(0);
+  }
+  #channelSidebar.drawer-open::before {
+    opacity: 0;
   }
 
   /* Drawer overlay */
@@ -1970,9 +1991,9 @@ function selectServer(sid) {
   renderChannels(sid);
   // على الجوال: افتح الـ Drawer لاختيار قناة
   // على الكمبيوتر: افتح أول قناة نصية تلقائياً
-  if (isMobile()) {
+  if (isMobile() && !window._restoringSession) {
     openDrawer();
-  } else {
+  } else if (!isMobile()) {
     const sv = servers[sid];
     if (sv && sv.channels) {
       const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
@@ -4508,6 +4529,7 @@ function compressImage(dataUrl, maxSize, quality) {
 }
 
 function restoreLastServer() {
+  window._restoringSession = true;
   const lastSid = localStorage.getItem('awalem_lastServer');
   const lastCid = localStorage.getItem('awalem_lastChannel');
 
@@ -4524,8 +4546,8 @@ function restoreLastServer() {
       const sv = servers[lastSid];
       const chs = Object.entries(sv.channels || {}).sort((a,b) => (a[1].position||0) - (b[1].position||0));
       const first = chs.find(([,ch]) => ch.type !== 'voice');
-      if (first) selectChannel(lastSid, first[0], first[1]);
-      else showHome();
+      if (first) { selectChannel(lastSid, first[0], first[1]); window._restoringSession = false; }
+      else { showHome(); window._restoringSession = false; }
     }
   } else {
     // أول مرة — افتح أول سيرفر وأول قناة
