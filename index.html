@@ -1284,6 +1284,9 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
               <span style="cursor:pointer;font-size:16px;padding:2px 6px" onclick="clearDmReply()">✕</span>
             </div>
             <div class="chat-input-top">
+              <button class="ci-btn" type="button" onclick="document.getElementById('dmMediaInp').click()" title="إرفاق صورة">📎</button>
+              <input type="file" id="dmMediaInp" accept="image/*,video/*" style="display:none" onchange="handleDmMediaSelect(this)">
+              <button class="ci-btn" type="button" id="dmVoiceBtn" onclick="toggleDmVoiceRecording()" title="تسجيل صوتي">🎤</button>
               <textarea class="chat-inp" id="dmChatInp" placeholder="اكتب رسالة خاصة..." rows="1" inputmode="text" autocomplete="off"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDM()}"
                 oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight,140)+'px';document.getElementById('dmSendBtn').classList.toggle('active',!!this.value.trim());startDmTyping()"
@@ -1609,6 +1612,9 @@ const FB = firebase.initializeApp({
 const auth    = FB.auth();
 const db      = FB.database();
 const storage = FB.storage();
+
+// حفظ تسجيل الدخول بشكل دائم على الجوال
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
 
 // ════ FCM NOTIFICATIONS ════
 const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
@@ -2204,7 +2210,7 @@ function renderHomeServers() {
       b.textContent = text;
       b.type = 'button';
       b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); onClick(); });
-      b.addEventListener('touchend', (e) => { e.stopPropagation(); });
+      b.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); onClick(); });
       return b;
     };
 
@@ -4027,16 +4033,20 @@ function openDM(uid, name) {
     if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
       _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
       renderDmList();
-      // تحديث badge أيقونة الرسائل الخاصة
+      // تحديث badge
       const total = Object.values(_dmUnread).reduce((a,b) => a+b, 0);
       const badge = document.getElementById('dmBadge');
       if (badge) {
-        if (total > 0) {
-          badge.textContent = total > 9 ? '9+' : total;
-          badge.style.display = 'flex';
-        } else {
-          badge.style.display = 'none';
-        }
+        if (total > 0) { badge.textContent = total > 9 ? '9+' : total; badge.style.display = 'flex'; }
+        else badge.style.display = 'none';
+      }
+      // إشعار للرسائل الخاصة
+      const senderName = msg.name || 'رسالة خاصة';
+      const body = msg.text || (msg.mediaUrl ? '🖼️ صورة' : msg.voiceUrl ? '🎤 رسالة صوتية' : '');
+      if (Notification.permission === 'granted' && document.hidden) {
+        new Notification(senderName, { body, icon: '/icon-192.png', tag: 'dm-' + uid });
+      } else {
+        showInAppNotif(senderName, body, null, null, uid);
       }
     }
   };
@@ -4097,6 +4107,33 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(txt);
   }
 
+  // صورة أو فيديو
+  if (msg.mediaUrl) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:4px';
+    if (msg.mediaType === 'video') {
+      const vid = document.createElement('video');
+      vid.src = msg.mediaUrl; vid.controls = true;
+      vid.style.cssText = 'max-width:220px;max-height:160px;border-radius:10px;display:block';
+      wrap.appendChild(vid);
+    } else {
+      const img = document.createElement('img');
+      img.style.cssText = 'max-width:220px;max-height:160px;border-radius:10px;display:block;cursor:pointer;object-fit:cover';
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
+      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+      wrap.appendChild(img);
+    }
+    body.appendChild(wrap);
+  }
+
+  // رسالة صوتية
+  if (msg.voiceUrl) {
+    const vWrap = document.createElement('div');
+    vWrap.style.cssText = 'margin-top:4px';
+    vWrap.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
+    body.appendChild(vWrap);
+  }
+
   // Actions
   const actions = document.createElement('div');
   actions.className = 'msg-actions';
@@ -4131,23 +4168,125 @@ async function sendDM() {
   if (!_currentDmUid || !currentUser) return;
   const inp = document.getElementById('dmChatInp');
   const text = inp?.value.trim();
-  if (!text) return;
+  if (!text && !window._pendingDmMedia?.length) return;
   inp.value = ''; inp.style.height = '';
   document.getElementById('dmSendBtn').classList.remove('active');
   stopDmTyping();
 
   const dmId = getDmId(currentUser.uid, _currentDmUid);
-  const msg = {
+  const msgBase = {
     uid: currentUser.uid,
     name: userProfile.displayName || 'مستخدم',
-    text, ts: Date.now()
+    ts: Date.now()
   };
-  if (_dmReplyTo) { msg.replyTo = { ..._dmReplyTo }; clearDmReply(); }
+  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
 
-  await db.ref('dm_messages/' + dmId).push(msg);
-  // Track DM conversation for both users
-  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: (await db.ref('users/' + _currentDmUid + '/displayName').once('value')).val() || 'مستخدم', ts: Date.now() });
+  // إرسال النص
+  if (text) await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+
+  // إرسال الوسائط
+  const media = window._pendingDmMedia || [];
+  window._pendingDmMedia = [];
+  const dmPreview = document.getElementById('dmMediaPreview');
+  if (dmPreview) { dmPreview.innerHTML = ''; dmPreview.style.display = 'none'; }
+
+  for (const m of media) {
+    try {
+      toast('⏳ جاري رفع ' + (m.type === 'video' ? 'الفيديو' : 'الصورة') + '...');
+      const ext = m.name.split('.').pop() || 'jpg';
+      const path = `dm_messages/${dmId}/${Date.now()}.${ext}`;
+      const url = await uploadToStorage(m.file, path);
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      await db.ref('dm_messages/' + dmId).push({ ...msgBase, text: '', mediaUrl: url, mediaType: m.type, mediaName: m.name, expiresAt, saved: false });
+      toast('✅ تم إرسال الصورة');
+    } catch(e) { toast('❌ فشل رفع الملف'); }
+  }
+
+  // تتبع المحادثة
+  const otherName = (await db.ref('users/' + _currentDmUid + '/displayName').once('value')).val() || 'مستخدم';
+  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
   await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+}
+
+// اختيار صور في الرسائل الخاصة
+window._pendingDmMedia = [];
+function handleDmMediaSelect(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  if (!window._pendingDmMedia) window._pendingDmMedia = [];
+  let preview = document.getElementById('dmMediaPreview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.id = 'dmMediaPreview';
+    preview.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;background:rgba(0,0,0,0.1);border-radius:8px;margin:4px 0';
+    const dmInput = document.querySelector('#dmChatArea .chat-input-wrap');
+    if (dmInput) dmInput.insertBefore(preview, dmInput.firstChild);
+  }
+  preview.style.display = 'flex';
+  files.forEach(file => {
+    if (file.size > 10 * 1024 * 1024) { toast('❌ الملف أكبر من 10MB'); return; }
+    const entry = { file, type: file.type.startsWith('video') ? 'video' : 'image', name: file.name };
+    window._pendingDmMedia.push(entry);
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;display:inline-flex';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    img.style.cssText = 'height:60px;max-width:90px;border-radius:6px;object-fit:cover';
+    const rm = document.createElement('button');
+    rm.textContent = '✕';
+    rm.style.cssText = 'position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:9px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center';
+    rm.onclick = () => { window._pendingDmMedia = window._pendingDmMedia.filter(e => e !== entry); wrap.remove(); if (!window._pendingDmMedia.length) preview.style.display = 'none'; };
+    wrap.appendChild(img); wrap.appendChild(rm);
+    preview.appendChild(wrap);
+  });
+  input.value = '';
+  document.getElementById('dmSendBtn').classList.add('active');
+}
+
+// تسجيل صوتي في الرسائل الخاصة
+let _dmMediaRecorder = null, _dmAudioChunks = [], _dmRecordingSeconds = 0, _dmRecordingTimer = null;
+async function toggleDmVoiceRecording() {
+  const btn = document.getElementById('dmVoiceBtn');
+  if (_dmMediaRecorder && _dmMediaRecorder.state === 'recording') {
+    clearInterval(_dmRecordingTimer);
+    btn.textContent = '🎤'; btn.style.color = '';
+    _dmMediaRecorder.stop();
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _dmAudioChunks = []; _dmRecordingSeconds = 0;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm';
+      _dmMediaRecorder = new MediaRecorder(stream, { mimeType });
+      _dmMediaRecorder.ondataavailable = e => { if (e.data.size > 0) _dmAudioChunks.push(e.data); };
+      _dmMediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(_dmAudioChunks, { type: mimeType });
+        _dmMediaRecorder = null;
+        btn.disabled = false;
+        if (blob.size < 500) return;
+        toast('⏳ جاري إرسال الرسالة الصوتية...');
+        try {
+          const dmId = getDmId(currentUser.uid, _currentDmUid);
+          const ct = mimeType.split(';')[0];
+          const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
+          const path = `dm_messages/${dmId}/${Date.now()}.${ext}`;
+          const ref = storage.ref(path);
+          await ref.put(blob, { contentType: ct });
+          const url = await ref.getDownloadURL();
+          const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), text: '' };
+          await db.ref('dm_messages/' + dmId).push({ ...msgBase, voiceUrl: url, voiceDuration: _dmRecordingSeconds });
+          const otherName = (await db.ref('users/' + _currentDmUid + '/displayName').once('value')).val() || 'مستخدم';
+          await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
+          await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+          toast('✅ تم إرسال الرسالة الصوتية');
+        } catch(e) { toast('❌ فشل إرسال الصوت'); }
+      };
+      _dmMediaRecorder.start();
+      btn.textContent = '⏹ 0s'; btn.style.color = '#f04747';
+      _dmRecordingTimer = setInterval(() => { _dmRecordingSeconds++; btn.textContent = `⏹ ${_dmRecordingSeconds}s`; if (_dmRecordingSeconds >= 60) toggleDmVoiceRecording(); }, 1000);
+      toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال');
+    } catch(e) { toast('❌ لا يمكن الوصول للميكروفون'); }
+  }
 }
 
 async function deleteDmMessage(key, otherUid) {
