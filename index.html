@@ -1252,6 +1252,16 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 
       <!-- DM View -->
       <div id="dmView">
+        <!-- شاشة اختيار محادثة -->
+        <div id="dmPickerScreen" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(200,168,75,0.15)">
+            <span style="font-size:15px;font-weight:800;color:var(--gold)">💬 الرسائل الخاصة</span>
+            <button onclick="openNewDM()" style="background:var(--teal);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer">+ جديد</button>
+          </div>
+          <div id="dmPickerList" style="flex:1;overflow-y:auto;padding:8px"></div>
+        </div>
+        <!-- منطقة المحادثة -->
+        <div id="dmChatArea" style="flex:1;display:none;flex-direction:column;overflow:hidden">
         <div id="dmMessages"></div>
         <div id="dmTypingIndicator" style="min-height:22px;padding:2px 16px 4px;font-size:12px;color:var(--muted);font-style:italic"></div>
         <div class="chat-input-wrap">
@@ -1274,6 +1284,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
             </div>
           </div>
         </div>
+        </div><!-- end dmChatArea -->
       </div>
 
       <!-- Members Panel -->
@@ -1619,15 +1630,8 @@ function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-  if (isMobile) {
-    // الجوال: redirect — يفتح في نفس التبويب ويرجع تلقائياً
-    auth.signInWithRedirect(provider).catch(e => {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg> دخول بـ Google'; }
-      toast('❌ خطأ: ' + (e.message || e.code));
-    });
-  } else {
+  // popup يعمل على الجوال والكمبيوتر
+  {
     // الكمبيوتر: popup
     auth.signInWithPopup(provider)
       .then(() => {
@@ -3714,8 +3718,14 @@ function getDmId(uid1, uid2) {
 }
 
 async function openNewDM() {
-  if (!currentServer || !servers[currentServer]) { toast('افتح سيرفراً أولاً لاختيار عضو'); return; }
-  const members = servers[currentServer]?.members || {};
+  // جمع كل الأعضاء من جميع السيرفرات
+  const allMembers = {};
+  Object.values(servers).forEach(sv => {
+    Object.entries(sv.members || {}).forEach(([uid, m]) => {
+      if (uid !== currentUser?.uid) allMembers[uid] = m;
+    });
+  });
+  const members = allMembers;
   const otherUids = Object.keys(members).filter(uid => uid !== currentUser?.uid);
   if (!otherUids.length) { toast('لا يوجد أعضاء آخرون'); return; }
 
@@ -3783,33 +3793,69 @@ async function openNewDM() {
 }
 
 function openDMScreen() {
-  // إظهار شاشة الرسائل الخاصة مع القائمة
   currentServer = null;
   currentChannel = null;
+  _currentDmUid = null;
   document.getElementById('chSettingsBtn').style.display = 'none';
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = 'الرسائل الخاصة';
   document.getElementById('searchToggleBtn').style.display = 'none';
   document.getElementById('membersToggleBtn').style.display = 'none';
   renderServerList();
-  renderDmList();
   showView('dm');
-  // إخفاء الـ badge
+  // إظهار قائمة المحادثات وإخفاء منطقة الدردشة
+  const picker = document.getElementById('dmPickerScreen');
+  const chat = document.getElementById('dmChatArea');
+  if (picker) picker.style.display = 'flex';
+  if (chat) chat.style.display = 'none';
+  renderDmPickerList();
+  // إخفاء badge
   const badge = document.getElementById('dmBadge');
   if (badge) badge.style.display = 'none';
-  // على الجوال افتح الـ Drawer لاختيار محادثة
-  if (isMobile()) openDrawer();
+}
+
+function renderDmPickerList() {
+  const container = document.getElementById('dmPickerList');
+  if (!container) return;
+  container.innerHTML = '';
+  const dms = Object.keys(_dmUnread).length > 0 ? Object.keys(_dmUnread) : [];
+  // اجمع كل المحادثات من Firebase
+  db.ref('dms/' + currentUser.uid).once('value').then(snap => {
+    const dmMap = snap.val() || {};
+    if (!Object.keys(dmMap).length) {
+      container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-family:Tajawal,sans-serif">لا توجد محادثات خاصة بعد<br><br><button onclick="openNewDM()" style="background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-family:Tajawal,sans-serif;cursor:pointer">ابدأ محادثة</button></div>';
+      return;
+    }
+    Object.entries(dmMap).forEach(([uid, info]) => {
+      const name = info.name || 'مستخدم';
+      const unread = _dmUnread[uid] || 0;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:rgba(255,255,255,0.05)';
+      row.innerHTML = `
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0">${name[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:Tajawal,sans-serif;font-weight:700;color:var(--text)">${name}</div>
+        </div>
+        ${unread > 0 ? `<div style="background:#f04747;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${unread}</div>` : ''}
+      `;
+      row.addEventListener('click', () => openDM(uid, name));
+      container.appendChild(row);
+    });
+  });
 }
 
 function openDM(uid, name) {
   _currentDmUid = uid;
-  // Update header
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = name;
   document.getElementById('searchToggleBtn').style.display = 'none';
   document.getElementById('membersToggleBtn').style.display = 'none';
-
   showView('dm');
+  // إظهار منطقة الدردشة وإخفاء القائمة
+  const picker = document.getElementById('dmPickerScreen');
+  const chat = document.getElementById('dmChatArea');
+  if (picker) picker.style.display = 'none';
+  if (chat) { chat.style.display = 'flex'; chat.style.flexDirection = 'column'; }
   clearDmUnread(uid);
   renderDmList();
 
