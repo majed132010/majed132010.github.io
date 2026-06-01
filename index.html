@@ -3296,18 +3296,27 @@ function compressImageFile(file, maxSize, quality) {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const canvas = document.createElement('canvas');
-      const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
-      canvas.width  = Math.round(img.width  * ratio);
-      canvas.height = Math.round(img.height * ratio);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => {
-        if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-        else reject(new Error('Compression failed'));
-      }, 'image/jpeg', quality);
+      try {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width  = Math.max(1, Math.round(img.width  * ratio));
+        canvas.height = Math.max(1, Math.round(img.height * ratio));
+        const ctx = canvas.getContext('2d');
+        // دعم EXIF orientation للجوال
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          if (blob && blob.size > 0) {
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+          } else {
+            // fallback: ارفع الملف الأصلي بدون ضغط
+            resolve(file);
+          }
+        }, 'image/jpeg', quality);
+      } catch(e) {
+        resolve(file); // fallback
+      }
     };
-    img.onerror = reject;
+    img.onerror = () => resolve(file); // fallback بدلاً من reject
     img.src = url;
   });
 }
