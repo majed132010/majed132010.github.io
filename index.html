@@ -1577,6 +1577,15 @@ let selectedMicDeviceId = null;
 let messagesListener = null;
 
 // ════ AUTH ════
+// معالجة نتيجة redirect بعد العودة من Google على الجوال
+auth.getRedirectResult().then(result => {
+  // onAuthStateChanged سيتولى الباقي تلقائياً
+}).catch(e => {
+  if (e.code && e.code !== 'auth/no-auth-event') {
+    console.error('redirect error:', e);
+  }
+});
+
 auth.onAuthStateChanged(user => {
   if (user) {
     currentUser = user;
@@ -1595,27 +1604,33 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-// تسجيل الدخول — بدون async/await لضمان عمل popup على الجوال
+// تسجيل الدخول — popup للكمبيوتر، redirect للجوال
 function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  // استدعاء الـ popup مباشرة بدون أي await قبله (مهم جداً للجوال)
-  auth.signInWithPopup(provider)
-    .then(result => {
-    })
-    .catch(e => {
-      console.error('signInGoogle:', e.code, e.message);
-      if (e.code === 'auth/popup-blocked') {
-        // الجوال حجب الـ popup — نفتح نافذة Google يدوياً
-        toast('⚠️ اضغط مجدداً بسرعة لفتح تسجيل الدخول');
-      } else if (
-        e.code !== 'auth/popup-closed-by-user' &&
-        e.code !== 'auth/cancelled-popup-request'
-      ) {
-        toast('❌ خطأ: ' + (e.message || e.code));
-      }
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // الجوال: redirect أفضل من popup
+    auth.signInWithRedirect(provider).catch(e => {
+      toast('❌ خطأ: ' + (e.message || e.code));
     });
+  } else {
+    // الكمبيوتر: popup
+    auth.signInWithPopup(provider)
+      .catch(e => {
+        console.error('signInGoogle:', e.code, e.message);
+        if (e.code === 'auth/popup-blocked') {
+          toast('⚠️ اضغط مجدداً لفتح تسجيل الدخول');
+        } else if (
+          e.code !== 'auth/popup-closed-by-user' &&
+          e.code !== 'auth/cancelled-popup-request'
+        ) {
+          toast('❌ خطأ: ' + (e.message || e.code));
+        }
+      });
+  }
 }
 
 async function loadUserProfile() {
