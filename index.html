@@ -955,29 +955,43 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     z-index: 190;
     box-shadow: -4px 0 20px rgba(0,0,0,0.4);
   }
-  /* لسان بسيط يدل على وجود الـ Drawer */
+  /* لسان جميل للـ Drawer */
   #channelSidebar::before {
-    content: '◀';
+    content: '';
     position: absolute;
-    left: -2px;
+    left: -20px;
     top: 50%;
     transform: translateY(-50%);
-    width: 12px;
-    height: 48px;
-    background: var(--teal, #1a5f5f);
-    border-radius: 6px 0 0 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    color: rgba(255,255,255,0.6);
-    transition: opacity 0.28s;
+    width: 20px;
+    height: 56px;
+    background: linear-gradient(160deg, #1e8a7a 0%, #0f4a42 100%);
+    border-radius: 12px 0 0 12px;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.4), inset -1px 0 0 rgba(212,175,90,0.3);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+  }
+  #channelSidebar::after {
+    content: '〈';
+    position: absolute;
+    left: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    font-weight: 900;
+    color: rgba(212,175,90,0.95);
+    text-shadow: 0 0 6px rgba(212,175,90,0.5);
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1;
+    line-height: 1;
   }
   #channelSidebar.drawer-open {
     transform: translateX(0);
   }
-  #channelSidebar.drawer-open::before {
+  #channelSidebar.drawer-open::before,
+  #channelSidebar.drawer-open::after {
     opacity: 0;
+    pointer-events: none;
   }
 
   /* Drawer overlay */
@@ -4541,16 +4555,16 @@ function restoreLastServer() {
     document.getElementById('chSettingsBtn').style.display = '';
     if (lastCid && servers[lastSid].channels?.[lastCid]) {
       selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
+      window._restoringSession = false;
     } else {
-      // آخر سيرفر بدون قناة — افتح أول قناة
       const sv = servers[lastSid];
       const chs = Object.entries(sv.channels || {}).sort((a,b) => (a[1].position||0) - (b[1].position||0));
       const first = chs.find(([,ch]) => ch.type !== 'voice');
-      if (first) { selectChannel(lastSid, first[0], first[1]); window._restoringSession = false; }
-      else { showHome(); window._restoringSession = false; }
+      if (first) selectChannel(lastSid, first[0], first[1]);
+      else showHome();
+      window._restoringSession = false;
     }
   } else {
-    // أول مرة — افتح أول سيرفر وأول قناة
     const svKeys = Object.keys(servers);
     if (svKeys.length > 0) {
       const sid = svKeys[0];
@@ -4563,8 +4577,10 @@ function restoreLastServer() {
       const first = chs.find(([,ch]) => ch.type !== 'voice');
       if (first) selectChannel(sid, first[0], first[1]);
       else showHome();
+      window._restoringSession = false;
     } else {
       showHome();
+      window._restoringSession = false;
     }
   }
 }
