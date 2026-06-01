@@ -1756,14 +1756,44 @@ function listenServers() {
       renderServerList();
       if (!window._loaded) {
         window._loaded = true;
-        setTimeout(restoreLastServer, 500);
+        restoreLastServer();
         listenDMs();
       }
     });
   });
 }
 
+function _refreshSvIcons() {
+  const container = document.getElementById('svItems');
+  if (!container) return;
+  container.innerHTML = '';
+  const seen = new Set();
+  Object.entries(servers).forEach(([sid, sv]) => {
+    if (seen.has(sid)) return;
+    seen.add(sid);
+    const div = document.createElement('div');
+    div.className = 'sv-item' + (currentServer === sid ? ' active' : '');
+    div.style.cssText = 'cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;position:relative;overflow:hidden';
+    if (sv.avatarUrl) {
+      div.innerHTML = `<img src="${sv.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`;
+    } else {
+      div.textContent = sv.emoji || sv.name?.[0] || '?';
+    }
+    div.title = sv.name || '';
+    div.addEventListener('click', (e) => { e.stopPropagation(); selectServer(sid); });
+    div.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showSvCtx(sid, sv, div); });
+    let lpTimer;
+    div.addEventListener('touchstart', () => { lpTimer = setTimeout(() => showSvCtx(sid, sv, div), 600); }, {passive:true});
+    div.addEventListener('touchend', () => clearTimeout(lpTimer), {passive:true});
+    div.addEventListener('touchmove', () => clearTimeout(lpTimer), {passive:true});
+    container.appendChild(div);
+  });
+  document.getElementById('homeBtn').classList.toggle('active', !currentServer);
+}
+
 function renderServerList() {
+  // لا تعرض الصفحة الرئيسية إذا كانت هناك قناة مفتوحة
+  if (currentChannel) { _refreshSvIcons(); return; }
   renderHomeServers();
   const container = document.getElementById('svItems');
   container.innerHTML = '';
@@ -4398,23 +4428,37 @@ function compressImage(dataUrl, maxSize, quality) {
 function restoreLastServer() {
   const lastSid = localStorage.getItem('awalem_lastServer');
   const lastCid = localStorage.getItem('awalem_lastChannel');
+
   if (lastSid && servers[lastSid]) {
-    selectServer(lastSid);
-    if (lastCid && servers[lastSid].channels && servers[lastSid].channels[lastCid]) {
-      setTimeout(() => selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]), 300);
+    // فتح آخر قناة مباشرة بدون Drawer
+    currentServer = lastSid;
+    renderServerList();
+    renderChannels(lastSid);
+    document.getElementById('chSettingsBtn').style.display = '';
+    if (lastCid && servers[lastSid].channels?.[lastCid]) {
+      selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
+    } else {
+      // آخر سيرفر بدون قناة — افتح أول قناة
+      const sv = servers[lastSid];
+      const chs = Object.entries(sv.channels || {}).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+      const first = chs.find(([,ch]) => ch.type !== 'voice');
+      if (first) selectChannel(lastSid, first[0], first[1]);
+      else showHome();
     }
   } else {
     // أول مرة — افتح أول سيرفر وأول قناة
     const svKeys = Object.keys(servers);
     if (svKeys.length > 0) {
       const sid = svKeys[0];
-      selectServer(sid);
+      currentServer = sid;
+      renderServerList();
+      renderChannels(sid);
+      document.getElementById('chSettingsBtn').style.display = '';
       const sv = servers[sid];
-      if (sv && sv.channels) {
-        const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
-        const firstText = chs.find(([,ch]) => ch.type !== 'voice');
-        if (firstText) setTimeout(() => selectChannel(sid, firstText[0], firstText[1]), 300);
-      }
+      const chs = Object.entries(sv.channels || {}).sort((a,b) => (a[1].position||0) - (b[1].position||0));
+      const first = chs.find(([,ch]) => ch.type !== 'voice');
+      if (first) selectChannel(sid, first[0], first[1]);
+      else showHome();
     } else {
       showHome();
     }
