@@ -2396,36 +2396,15 @@ function buildMsgDiv(msg, key) {
       vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
       vid.addEventListener('loadedmetadata', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
       mediaWrap.appendChild(vid);
-      // زر الحفظ للفيديو
-      if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
     } else {
       const img = document.createElement('img');
       img.src = msg.mediaUrl;
       img.loading = 'lazy';
       img.decoding = 'async';
       img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover';
-      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
       img.addEventListener('load', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
       mediaWrap.appendChild(img);
-      // زر الحفظ للصورة
-      if (msg.expiresAt && !msg.saved) mediaWrap.appendChild(makeSaveBtn(key, msg));
-      // مؤشر محفوظ
-      if (msg.saved) {
-        const savedBadge = document.createElement('div');
-        savedBadge.style.cssText = 'font-size:11px;color:#4caf50;font-family:Tajawal,sans-serif;margin-top:2px';
-        savedBadge.textContent = '📌 محفوظة';
-        mediaWrap.appendChild(savedBadge);
-      }
-    }
-    // مؤشر وقت الانتهاء
-    if (msg.expiresAt && !msg.saved && !expired) {
-      const timeLeft = document.createElement('div');
-      const remaining = msg.expiresAt - now;
-      const hours = Math.floor(remaining / 3600000);
-      const mins = Math.floor((remaining % 3600000) / 60000);
-      timeLeft.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.4);font-family:Tajawal,sans-serif;margin-top:2px';
-      timeLeft.textContent = `⏳ تنتهي بعد ${hours > 0 ? hours + 'س ' : ''}${mins}د`;
-      mediaWrap.appendChild(timeLeft);
     }
     body.appendChild(mediaWrap);
   }
@@ -4224,19 +4203,40 @@ function clearSearchHighlights() {
 }
 
 let _lightboxUrl = '', _lightboxType = '', _lightboxName = '';
-function openLightbox(url, type, name) {
+let _lightboxMsgKey = null;
+function openLightbox(url, type, name, msgKey) {
   _lightboxUrl = url; _lightboxType = type; _lightboxName = name || 'media';
+  _lightboxMsgKey = msgKey || null;
   const bg = document.getElementById('lightboxBg');
   const img = document.getElementById('lightboxImg');
   const vid = document.getElementById('lightboxVid');
+  const saveInChat = document.getElementById('lightboxSaveInChat');
   if (!bg) return;
   bg.style.display = 'flex';
+  // إظهار/إخفاء زر الحفظ في المحادثة
+  if (saveInChat) saveInChat.style.display = msgKey ? 'inline-block' : 'none';
   if (type === 'video') {
     if (img) img.style.display = 'none';
     if (vid) { vid.src = url; vid.style.display = 'block'; }
   } else {
     if (vid) { vid.style.display = 'none'; vid.src = ''; }
     if (img) { img.src = url; img.style.display = 'block'; }
+  }
+}
+
+async function lightboxSaveInChat() {
+  if (!_lightboxMsgKey) return;
+  const btn = document.getElementById('lightboxSaveInChat');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+  try {
+    const path = 'messages/' + currentServer + '/' + currentChannel + '/' + _lightboxMsgKey;
+    await db.ref(path).update({ saved: true, expiresAt: null });
+    toast('📌 تم حفظ الصورة بشكل دائم');
+    if (btn) { btn.textContent = '✅ تم الحفظ'; btn.style.display = 'none'; }
+    _lightboxMsgKey = null;
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '📌 حفظ في المحادثة'; }
+    toast('❌ فشل الحفظ');
   }
 }
 function closeLightbox() {
@@ -4396,7 +4396,8 @@ function installPWA() {
 <div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;flex-direction:column;gap:12px" onclick="closeLightbox()">
   <img id="lightboxImg" style="max-width:92vw;max-height:80vh;border-radius:12px;object-fit:contain;display:none">
   <video id="lightboxVid" controls style="max-width:92vw;max-height:80vh;border-radius:12px;display:none"></video>
-  <div style="display:flex;gap:12px;margin-top:4px">
+  <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:center">
+    <button id="lightboxSaveInChat" type="button" style="display:none;padding:10px 20px;background:rgba(212,175,90,0.2);color:var(--gold,#d4af5a);border:1px solid var(--gold,#d4af5a);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxSaveInChat()">📌 حفظ في المحادثة</button>
     <button id="lightboxDl" type="button" style="padding:10px 24px;background:rgba(26,95,95,0.8);color:#fff;border:1px solid var(--gold);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxDownload()">⬇️ حفظ في الجهاز</button>
     <button type="button" style="padding:10px 20px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="closeLightbox()">✕ إغلاق</button>
   </div>
