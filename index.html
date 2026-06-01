@@ -2006,8 +2006,10 @@ function selectServer(sid) {
   // على الجوال: افتح الـ Drawer لاختيار قناة
   // على الكمبيوتر: افتح أول قناة نصية تلقائياً
   if (isMobile() && !window._restoringSession) {
+    // الجوال: افتح Drawer فقط عند اختيار سيرفر يدوياً
     openDrawer();
-  } else if (!isMobile()) {
+  } else {
+    // الكمبيوتر أو عند الاستعادة: افتح أول قناة
     const sv = servers[sid];
     if (sv && sv.channels) {
       const chs = Object.entries(sv.channels).sort((a,b) => (a[1].position||0) - (b[1].position||0));
@@ -3154,8 +3156,8 @@ async function uploadToStorage(file, path, retries = 5) {
   let uploadFile = file;
   if (file.type.startsWith('image/')) {
     try {
-      const maxSize = isMobile ? 720 : 1024;
-      const quality = isMobile ? 0.60 : 0.80;
+      const maxSize = isMobile ? 600 : 900;
+      const quality = isMobile ? 0.50 : 0.70;
       uploadFile = await compressImageFile(file, maxSize, quality);
     } catch(e) { uploadFile = file; }
   }
