@@ -3258,14 +3258,11 @@ async function uploadToStorage(file, path, retries = 5) {
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   let uploadFile = file;
   // ضغط الصور فقط — الفيديو والصوت يُرفعان مباشرة
-  const isImage = file.type.startsWith('image/') || file.type === 'image/heic' || file.type === 'image/heif' || (!file.type && !file.name.match(/\.(mp4|mov|webm|mp3|ogg|wav)$/i));
-  if (isImage) {
+  // على الجوال: ارفع الصورة مباشرة بدون ضغط لتجنب مشاكل canvas.toBlob
+  if (!isMobile && file.type.startsWith('image/')) {
     try {
-      const maxSize = isMobile ? 800 : 1200;
-      const quality = isMobile ? 0.65 : 0.75;
-      uploadFile = await compressImageFile(file, maxSize, quality);
+      uploadFile = await compressImageFile(file, 1200, 0.75);
     } catch(e) {
-      console.warn('Compression failed, using original:', e);
       uploadFile = file;
     }
   }
@@ -3276,9 +3273,16 @@ async function uploadToStorage(file, path, retries = 5) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ref = storage.ref(path);
-      const snap = await ref.put(uploadFile, metadata);
+      // استخدم uploadBytesResumable للجوال — أكثر استقراراً مع الشبكة الضعيفة
+      const uploadTask = ref.put(uploadFile, metadata);
+      const snap = await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+          null,
+          (err) => reject(err),
+          () => resolve(uploadTask.snapshot)
+        );
+      });
       const url = await snap.ref.getDownloadURL();
-      // احفظ في الكاش فوراً بعد الرفع
       try {
         const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
         await _imgCacheDB.set(url, uploadFile, expiresAt, false);
@@ -3287,13 +3291,13 @@ async function uploadToStorage(file, path, retries = 5) {
     } catch(e) {
       console.error(`Upload attempt ${attempt}/${retries} failed:`, e.code, e.message);
       if (e.code === 'storage/unauthorized') {
-        toast('❌ لا صلاحية للرفع — تحقق من Firebase Rules');
+        toast('❌ لا صلاحية للرفع');
         throw e;
       }
       if (attempt === retries) throw e;
-      const delay = Math.min(1500 * attempt, 6000);
-      await new Promise(r => setTimeout(r, delay));
+      const delay = Math.min(2000 * attempt, 8000);
       toast(`⏳ إعادة المحاولة ${attempt} من ${retries}...`);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
 }
