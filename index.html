@@ -2209,8 +2209,9 @@ function renderHomeServers() {
       b.style.cssText = `flex:1;padding:10px;background:${bgColor};color:#e06060;border:1px solid ${borderColor};border-radius:9px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none`;
       b.textContent = text;
       b.type = 'button';
-      b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); onClick(); });
-      b.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); onClick(); });
+      let _btnTouched = false;
+      b.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); _btnTouched = true; onClick(); setTimeout(() => { _btnTouched = false; }, 500); });
+      b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); if (!_btnTouched) onClick(); });
       return b;
     };
 
