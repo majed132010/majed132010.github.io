@@ -2829,17 +2829,38 @@ async function sendMessage() {
   for (const m of media) {
     try {
       toast('⏳ جاري رفع ' + (m.type === 'video' ? 'الفيديو' : 'الصورة') + '...');
-      const ext = m.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg');
+      // تحديد الامتداد من mime type بدلاً من اسم الملف — أموثق على الجوال
+      let ext = 'jpg';
+      if (m.file.type) {
+        const mime = m.file.type.toLowerCase();
+        if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+        else if (mime.includes('png')) ext = 'png';
+        else if (mime.includes('gif')) ext = 'gif';
+        else if (mime.includes('webp')) ext = 'webp';
+        else if (mime.includes('heic')) ext = 'jpg'; // iOS HEIC → jpg بعد الضغط
+        else if (mime.includes('mp4')) ext = 'mp4';
+        else if (mime.includes('mov')) ext = 'mp4';
+        else if (mime.includes('webm')) ext = 'webm';
+        else if (mime.includes('video')) ext = 'mp4';
+        else if (mime.includes('image')) ext = 'jpg';
+      }
       const path = `messages/${currentServer}/${currentChannel}/${Date.now()}_${Math.random().toString(36).substr(2,6)}.${ext}`;
       const mediaUrl = await uploadToStorage(m.file, path);
-      const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 ساعة
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       await db.ref('messages/' + currentServer + '/' + currentChannel).push({
         ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name,
         expiresAt, storagePath: path, saved: false
       });
+      toast('✅ تم إرسال الصورة');
     } catch(e) {
-      console.error('Upload error:', e);
-      toast('❌ فشل رفع الملف: ' + (e.message||''));
+      console.error('Upload error:', e.code, e.message);
+      if (e.code === 'storage/unauthorized') {
+        toast('❌ خطأ في الصلاحيات — تحقق من Firebase Rules');
+      } else if (e.code === 'storage/canceled') {
+        toast('❌ تم إلغاء الرفع');
+      } else {
+        toast('❌ فشل رفع الملف: ' + (e.message || e.code || 'خطأ غير معروف'));
+      }
     }
   }
 }
@@ -3236,12 +3257,17 @@ window._pendingMedia = []; // [{dataUrl, type, name}]
 async function uploadToStorage(file, path, retries = 5) {
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   let uploadFile = file;
-  if (file.type.startsWith('image/')) {
+  // ضغط الصور فقط — الفيديو والصوت يُرفعان مباشرة
+  const isImage = file.type.startsWith('image/') || file.type === 'image/heic' || file.type === 'image/heif' || (!file.type && !file.name.match(/\.(mp4|mov|webm|mp3|ogg|wav)$/i));
+  if (isImage) {
     try {
-      const maxSize = isMobile ? 600 : 900;
-      const quality = isMobile ? 0.50 : 0.70;
+      const maxSize = isMobile ? 800 : 1200;
+      const quality = isMobile ? 0.65 : 0.75;
       uploadFile = await compressImageFile(file, maxSize, quality);
-    } catch(e) { uploadFile = file; }
+    } catch(e) {
+      console.warn('Compression failed, using original:', e);
+      uploadFile = file;
+    }
   }
   // تحديد contentType بشكل صريح لضمان عمل الرفع على الجوال
   const contentType = uploadFile.type || 'application/octet-stream';
