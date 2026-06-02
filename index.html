@@ -1605,8 +1605,8 @@ const auth    = FB.auth();
 const db      = FB.database();
 const storage = FB.storage();
 
-// حفظ تسجيل الدخول بشكل دائم على الجوال
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+// حفظ تسجيل الدخول بشكل دائم — لا يخرج إلا عند تسجيل الخروج يدوياً
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('Persistence error:', e));
 
 // ════ FCM NOTIFICATIONS ════
 const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
@@ -1706,15 +1706,16 @@ auth.getRedirectResult().then(result => {
 auth.onAuthStateChanged(user => {
   if (user) {
     currentUser = user;
+    // إخفاء شاشة الدخول فوراً قبل تحميل البيانات
+    document.getElementById('loginScreen').style.display = 'none';
+    const app = document.getElementById('app');
+    if (app) app.style.display = 'flex';
     loadUserProfile().then(() => {
-      document.getElementById('loginScreen').style.display = 'none';
-      // Show app on both mobile and desktop
-      const app = document.getElementById('app');
-      if (app) { app.style.display = 'flex'; }
       initApp();
       initFCM(user.uid);
     });
   } else {
+    currentUser = null;
     document.getElementById('loginScreen').style.display = 'flex';
     const app = document.getElementById('app');
     if (app) app.style.display = 'none';
@@ -1730,7 +1731,7 @@ function signInGoogle() {
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التحميل...'; }
 
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
+  // لا نضع prompt: 'select_account' حتى يتذكر الحساب تلقائياً
 
   // popup يعمل على الجوال والكمبيوتر
   {
