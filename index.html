@@ -2738,7 +2738,11 @@ function showMessages(sid, cid) {
       div.dataset.ts = msg.ts;
       area.appendChild(div);
     });
+    // انزل للأسفل فوراً ثم مرة أخرى بعد تحميل الصور
     area.scrollTop = area.scrollHeight;
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 100);
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 500);
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 1000);
     if (entries.length > 0) {
       _oldestMsgKey = entries[0][0];
       if (loadBtn) loadBtn.style.display = entries.length >= PAGE_SIZE ? 'block' : 'none';
