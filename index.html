@@ -2600,7 +2600,13 @@ function buildMsgDiv(msg, key) {
       img.decoding = 'async';
       img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover;background:#1a2a2a';
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
-      img.addEventListener('load', () => { const a=document.getElementById('messagesArea'); if(a) a.scrollTop=a.scrollHeight; });
+      img.addEventListener('load', () => {
+        const a = document.getElementById('messagesArea');
+        if (!a) return;
+        // انزل فقط إذا كان المستخدم قريباً من الأسفل
+        const distFromBottom = a.scrollHeight - a.scrollTop - a.clientHeight;
+        if (distFromBottom < 300) a.scrollTop = a.scrollHeight;
+      });
       // تحميل الصورة من الكاش أولاً
       loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
         if (src) img.src = src;
@@ -2849,6 +2855,11 @@ async function sendMessage() {
         expiresAt, saved: false
       });
       toast('✅ تم إرسال الصورة');
+      // انزل للأسفل فوراً بعد الإرسال
+      setTimeout(() => {
+        const area = document.getElementById('messagesArea');
+        if (area) area.scrollTop = area.scrollHeight;
+      }, 300);
     } catch(e) {
       console.error('Upload error:', e.message);
       toast('❌ فشل رفع الملف: ' + (e.message || 'خطأ غير معروف'));
