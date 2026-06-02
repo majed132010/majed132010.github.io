@@ -3270,14 +3270,8 @@ async function uploadToStorage(file, path, retries = 5) {
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   let uploadFile = file;
   // ضغط الصور فقط — الفيديو والصوت يُرفعان مباشرة
-  // على الجوال: ارفع الصورة مباشرة بدون ضغط لتجنب مشاكل canvas.toBlob
-  if (!isMobile && file.type.startsWith('image/')) {
-    try {
-      uploadFile = await compressImageFile(file, 1200, 0.75);
-    } catch(e) {
-      uploadFile = file;
-    }
-  }
+  // رفع مباشر بدون ضغط — أكثر استقراراً على جميع الأجهزة
+  uploadFile = file;
   // تحديد contentType بشكل صريح لضمان عمل الرفع على الجوال
   const contentType = uploadFile.type || 'application/octet-stream';
   const metadata = { contentType };
