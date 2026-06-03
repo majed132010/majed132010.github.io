@@ -4191,21 +4191,30 @@ function openDM(uid, name) {
     // Unread count if DM not open
     if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
       _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
-      renderDmList();
-      // تحديث badge
-      const total = Object.values(_dmUnread).reduce((a,b) => a+b, 0);
-      const badge = document.getElementById('dmBadge');
-      if (badge) {
-        if (total > 0) { badge.textContent = total > 9 ? '9+' : total; badge.style.display = 'flex'; }
-        else badge.style.display = 'none';
+      // تحديث badge في زر رسائلي الخاصة بقائمة القنوات
+      const dmChannelBtn = document.getElementById('dmChannelBtn');
+      if (dmChannelBtn) {
+        const total = Object.values(_dmUnread).reduce((a,b) => a+b, 0);
+        let badgeEl = dmChannelBtn.querySelector('.dm-ch-badge');
+        if (!badgeEl) {
+          badgeEl = document.createElement('span');
+          badgeEl.className = 'dm-ch-badge';
+          badgeEl.style.cssText = 'background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center';
+          dmChannelBtn.appendChild(badgeEl);
+        }
+        if (total > 0) { badgeEl.textContent = total > 9 ? '9+' : total; badgeEl.style.display = 'inline'; }
+        else badgeEl.style.display = 'none';
       }
-      // إشعار للرسائل الخاصة
+      renderDmList();
+      // إشعار داخل التطبيق
       const senderName = msg.name || 'رسالة خاصة';
       const body = msg.text || (msg.mediaUrl ? '🖼️ صورة' : msg.voiceUrl ? '🎤 رسالة صوتية' : '');
-      if (Notification.permission === 'granted' && document.hidden) {
-        new Notification(senderName, { body, icon: '/icon-192.png', tag: 'dm-' + uid });
-      } else {
-        showInAppNotif(senderName, body, null, null, uid);
+      if (body) {
+        if (Notification.permission === 'granted' && document.hidden) {
+          new Notification(senderName, { body, icon: '/icon-192.png', tag: 'dm-' + uid });
+        } else {
+          showInAppNotif(senderName, body, null, null, uid);
+        }
       }
     }
   };
@@ -4369,6 +4378,11 @@ async function sendDM() {
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       await db.ref('dm_messages/' + dmId).push({ ...msgBase, text: '', mediaUrl: url, mediaType: m.type, mediaName: m.name, expiresAt, saved: false });
       toast('✅ تم إرسال الصورة');
+      // إشعار للطرف الآخر
+      setTimeout(() => {
+        sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة',
+          m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid });
+      }, 0);
     } catch(e) { toast('❌ فشل رفع الملف'); }
   }
 
