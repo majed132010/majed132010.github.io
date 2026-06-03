@@ -2102,6 +2102,11 @@ function selectServer(sid) {
 }
 
 function showHome() {
+  // أغلق الـ Drawer أولاً
+  const sidebar = document.getElementById('channelSidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  if (sidebar) sidebar.classList.remove('drawer-open');
+  if (overlay) overlay.classList.remove('show');
   cleanupMessagesListener();
   cleanupVoiceListener();
   currentServer = null;
@@ -3988,6 +3993,11 @@ async function openNewDM() {
 }
 
 function openDMScreen() {
+  // أغلق الـ Drawer أولاً
+  const sidebar = document.getElementById('channelSidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  if (sidebar) sidebar.classList.remove('drawer-open');
+  if (overlay) overlay.classList.remove('show');
   currentServer = null;
   currentChannel = null;
   _currentDmUid = null;
@@ -4040,6 +4050,11 @@ function renderDmPickerList() {
 }
 
 function openDM(uid, name) {
+  // أغلق الـ Drawer أولاً
+  const sidebar = document.getElementById('channelSidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  if (sidebar) sidebar.classList.remove('drawer-open');
+  if (overlay) overlay.classList.remove('show');
   _currentDmUid = uid;
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = name;
