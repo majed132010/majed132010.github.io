@@ -1608,6 +1608,20 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.war
 const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
 let fcmMessaging = null;
 
+// إرسال إشعار لمستخدم آخر عبر قاعدة البيانات
+async function sendPushToUser(targetUid, title, body, data = {}) {
+  try {
+    // نكتب الإشعار في قاعدة البيانات وسيرسله Service Worker
+    await db.ref('notifications/' + targetUid).push({
+      title, body, data,
+      ts: Date.now(),
+      from: currentUser?.uid || ''
+    });
+  } catch(e) {
+    console.warn('Push notification error:', e);
+  }
+}
+
 async function initFCM(userId) {
   try {
     if (!('Notification' in window)) return;
@@ -2886,6 +2900,17 @@ async function sendMessage() {
 
   if (text) {
     await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
+  // إرسال إشعار لأعضاء السيرفر
+  try {
+    const members = servers[currentServer]?.members || {};
+    Object.keys(members).forEach(uid => {
+      if (uid !== currentUser.uid) {
+        sendPushToUser(uid, userProfile.displayName || 'عوالم', text.slice(0, 80), {
+          serverId: currentServer, channelId: currentChannel, type: 'message'
+        });
+      }
+    });
+  } catch(e) {}
   }
   // Upload each media to Storage then save URL in DB
   for (const m of media) {
