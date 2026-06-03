@@ -4100,7 +4100,11 @@ function openDM(uid, name) {
       const div = buildDmMsgDiv(msg, key, uid, name);
       dmArea.appendChild(div);
     });
+    // انزل للأسفل مع انتظار تحميل الصور
     dmArea.scrollTop = dmArea.scrollHeight;
+    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 100);
+    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 500);
+    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 1000);
     const lastKey = Object.keys(msgs).sort().pop();
     let q = db.ref(path).limitToLast(1);
     if (lastKey) q = db.ref(path).orderByKey().startAfter(lastKey);
