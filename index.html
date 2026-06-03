@@ -1636,8 +1636,22 @@ async function initFCM(userId) {
       const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
       if (token && userId) await db.ref('users/' + userId + '/fcmToken').set(token);
     } else if (Notification.permission !== 'denied') {
-      // أظهر زر الإشعارات
-      showNotifBtn(userId);
+      // على الجوال: اطلب الإذن تلقائياً بعد 3 ثوان
+      const isMob = /Android|iPhone|iPad/i.test(navigator.userAgent);
+      if (isMob) {
+        setTimeout(async () => {
+          try {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+              const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+              if (token && userId) await db.ref('users/' + userId + '/fcmToken').set(token);
+              toast('✅ تم تفعيل الإشعارات!');
+            }
+          } catch(e) {}
+        }, 3000);
+      } else {
+        showNotifBtn(userId);
+      }
     }
   } catch(e) {
   }
@@ -4304,7 +4318,15 @@ async function sendDM() {
   if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
 
   // إرسال النص
-  if (text) await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+  if (text) {
+    await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+    // إشعار للطرف الآخر
+    setTimeout(() => {
+      sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), {
+        type: 'dm', fromUid: currentUser.uid
+      });
+    }, 0);
+  }
 
   // إرسال الوسائط
   const media = window._pendingDmMedia || [];
