@@ -1611,7 +1611,6 @@ let fcmMessaging = null;
 // إرسال إشعار لمستخدم آخر عبر قاعدة البيانات
 async function sendPushToUser(targetUid, title, body, data = {}) {
   try {
-    // نكتب الإشعار في قاعدة البيانات وسيرسله Service Worker
     await db.ref('notifications/' + targetUid).push({
       title, body, data,
       ts: Date.now(),
@@ -1620,6 +1619,33 @@ async function sendPushToUser(targetUid, title, body, data = {}) {
   } catch(e) {
     console.warn('Push notification error:', e);
   }
+}
+
+// استماع للإشعارات الواردة
+let _notifListener = null;
+function listenNotifications(userId) {
+  if (_notifListener) return;
+  const ref = db.ref('notifications/' + userId).limitToLast(1);
+  const fn = snap => {
+    if (!snap.exists()) return;
+    const notif = snap.val();
+    // تجاهل الإشعارات القديمة (أكثر من 10 ثوان)
+    if (Date.now() - notif.ts > 10000) return;
+    // تجاهل إشعاراتك الخاصة
+    if (notif.from === userId) return;
+    const title = notif.title || 'عوالم';
+    const body = notif.body || '';
+    // عرض الإشعار
+    if (Notification.permission === 'granted' && document.hidden) {
+      new Notification(title, { body, icon: '/icon-192.png', tag: snap.key });
+    } else if (!document.hidden) {
+      showInAppNotif(title, body, notif.data?.serverId, notif.data?.channelId, notif.data?.fromUid);
+    }
+    // احذف الإشعار بعد استلامه
+    db.ref('notifications/' + userId + '/' + snap.key).remove();
+  };
+  ref.on('child_added', fn);
+  _notifListener = { ref, fn };
 }
 
 async function initFCM(userId) {
@@ -1737,6 +1763,7 @@ auth.onAuthStateChanged(user => {
     loadUserProfile().then(() => {
       initApp();
       initFCM(user.uid);
+      listenNotifications(user.uid);
     });
   } else {
     currentUser = null;
