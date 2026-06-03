@@ -2900,17 +2900,19 @@ async function sendMessage() {
 
   if (text) {
     await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
-  // إرسال إشعار لأعضاء السيرفر
-  try {
-    const members = servers[currentServer]?.members || {};
-    Object.keys(members).forEach(uid => {
-      if (uid !== currentUser.uid) {
-        sendPushToUser(uid, userProfile.displayName || 'عوالم', text.slice(0, 80), {
-          serverId: currentServer, channelId: currentChannel, type: 'message'
+    // إرسال الإشعارات بعد الرسالة وبشكل غير متزامن حتى لا يبطئ الإرسال
+    setTimeout(() => {
+      try {
+        const members = servers[currentServer]?.members || {};
+        Object.keys(members).forEach(uid => {
+          if (uid !== currentUser.uid) {
+            sendPushToUser(uid, userProfile.displayName || 'عوالم', text.slice(0, 80), {
+              serverId: currentServer, channelId: currentChannel, type: 'message'
+            });
+          }
         });
-      }
-    });
-  } catch(e) {}
+      } catch(e) {}
+    }, 0);
   }
   // Upload each media to Storage then save URL in DB
   for (const m of media) {
