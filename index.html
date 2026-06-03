@@ -2360,41 +2360,64 @@ function renderChannels(sid) {
   const dmSection = document.createElement('div');
   dmSection.style.cssText = 'margin-top:8px';
   const dmHdr = document.createElement('div');
-  dmHdr.className = 'ch-category';
-  dmHdr.innerHTML = '<span class="cat-arrow">▼</span><span>الرسائل الخاصة</span>';
+  dmHdr.className = 'ch-section-title';
+  dmHdr.textContent = 'الرسائل الخاصة';
   dmSection.appendChild(dmHdr);
 
+  // زر رسائلي الخاصة الرئيسي
   const dmBtn = document.createElement('div');
-  dmBtn.className = 'ch-item' + (_currentDmUid || currentServer === null ? '' : '');
+  dmBtn.className = 'ch-item';
   dmBtn.id = 'dmChannelBtn';
-  dmBtn.style.cssText = 'cursor:pointer';
-  // badge للرسائل غير المقروءة
   const dmUnreadTotal = Object.values(_dmUnread || {}).reduce((a,b) => a+b, 0);
   dmBtn.innerHTML = `
     <span class="ch-item-icon">💬</span>
     <span class="ch-item-name">رسائلي الخاصة</span>
-    ${dmUnreadTotal > 0 ? `<span style="background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center">${dmUnreadTotal > 9 ? '9+' : dmUnreadTotal}</span>` : ''}
+    ${dmUnreadTotal > 0 ? `<span class="ch-badge">${dmUnreadTotal > 9 ? '9+' : dmUnreadTotal}</span>` : ''}
   `;
-  dmBtn.addEventListener('click', () => {
-    // أغلق الـ Drawer وافتح الرسائل الخاصة
-    const sidebar = document.getElementById('channelSidebar');
-    const overlay = document.getElementById('drawerOverlay');
-    if (sidebar) sidebar.classList.remove('drawer-open');
-    if (overlay) overlay.classList.remove('show');
-    openDMScreen();
-  });
-  dmBtn.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    const sidebar = document.getElementById('channelSidebar');
-    const overlay = document.getElementById('drawerOverlay');
-    if (sidebar) sidebar.classList.remove('drawer-open');
-    if (overlay) overlay.classList.remove('show');
-    openDMScreen();
-  });
+  dmBtn.addEventListener('click', () => { closeSidebar(); openDMScreen(); });
+  dmBtn.addEventListener('touchend', e => { e.preventDefault(); closeSidebar(); openDMScreen(); });
   dmSection.appendChild(dmBtn);
+
+  // قائمة المحادثات النشطة مع badge
+  const dmConvList = document.createElement('div');
+  dmConvList.id = 'dmConvList';
+  dmSection.appendChild(dmConvList);
   list.appendChild(dmSection);
-  // تحديث badge فوراً بعد البناء
+
+  // تحميل المحادثات من Firebase
+  renderDmConvList(dmConvList);
   setTimeout(() => updateDmBadge(), 100);
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('channelSidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  if (sidebar) sidebar.classList.remove('drawer-open');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function renderDmConvList(container) {
+  if (!container || !currentUser) return;
+  db.ref('dms/' + currentUser.uid).orderByChild('ts').limitToLast(10).once('value').then(snap => {
+    if (!snap.exists()) return;
+    container.innerHTML = '';
+    const entries = [];
+    snap.forEach(ch => entries.unshift({ uid: ch.key, ...ch.val() }));
+    entries.forEach(({ uid, name }) => {
+      const unread = _dmUnread[uid] || 0;
+      const row = document.createElement('div');
+      row.className = 'ch-item';
+      row.style.cssText = 'padding-right:28px';
+      row.innerHTML = `
+        <div style="width:28px;height:28px;border-radius:50%;background:#5865f2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(name||'?')[0]}</div>
+        <span class="ch-item-name" style="font-size:13px">${escHtml(name||'مستخدم')}</span>
+        ${unread > 0 ? `<span class="ch-badge">${unread > 9 ? '9+' : unread}</span>` : ''}
+      `;
+      row.addEventListener('click', () => { closeSidebar(); openDM(uid, name); });
+      row.addEventListener('touchend', e => { e.preventDefault(); closeSidebar(); openDM(uid, name); });
+      container.appendChild(row);
+    });
+  });
 }
 
 // ════ MOBILE NAVIGATION - CLEAN ════
@@ -3779,21 +3802,22 @@ let _notifTimeout = null;
 
 function updateDmBadge() {
   const total = Object.values(_dmUnread || {}).reduce((a,b) => a+b, 0);
+  // تحديث badge الرئيسي
   const btn = document.getElementById('dmChannelBtn');
-  if (!btn) return;
-  let badge = btn.querySelector('.dm-ch-badge');
-  if (total > 0) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'dm-ch-badge';
-      badge.style.cssText = 'background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;margin-right:4px';
-      btn.appendChild(badge);
-    }
-    badge.textContent = total > 9 ? '9+' : total;
-    badge.style.display = 'inline';
-  } else if (badge) {
-    badge.style.display = 'none';
+  if (btn) {
+    let badge = btn.querySelector('.ch-badge');
+    if (total > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'ch-badge';
+        btn.appendChild(badge);
+      }
+      badge.textContent = total > 9 ? '9+' : total;
+    } else if (badge) badge.remove();
   }
+  // تحديث قائمة المحادثات
+  const convList = document.getElementById('dmConvList');
+  if (convList) renderDmConvList(convList);
 }
 
 function showDmNotif(msg, fromUid) {
