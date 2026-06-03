@@ -3767,6 +3767,81 @@ function clearUnread(sid, cid) {
 // ════ IN-APP NOTIFICATIONS ════
 let _notifTimeout = null;
 
+function updateDmBadge() {
+  const total = Object.values(_dmUnread || {}).reduce((a,b) => a+b, 0);
+  const btn = document.getElementById('dmChannelBtn');
+  if (!btn) return;
+  let badge = btn.querySelector('.dm-ch-badge');
+  if (total > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'dm-ch-badge';
+      badge.style.cssText = 'background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;margin-right:4px';
+      btn.appendChild(badge);
+    }
+    badge.textContent = total > 9 ? '9+' : total;
+    badge.style.display = 'inline';
+  } else if (badge) {
+    badge.style.display = 'none';
+  }
+}
+
+function showDmNotif(msg, fromUid) {
+  // لا تعرض إذا كانت المحادثة مفتوحة
+  if (_currentDmUid === fromUid) return;
+
+  const senderName = msg.name || 'رسالة خاصة';
+  const body = msg.text
+    ? msg.text.slice(0, 60)
+    : msg.mediaUrl ? '🖼️ صورة'
+    : msg.voiceUrl ? '🎤 رسالة صوتية'
+    : '';
+  if (!body) return;
+
+  // صوت الإشعار
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(); osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+
+  // إشعار النظام
+  if (Notification.permission === 'granted' && document.hidden) {
+    new Notification(senderName, { body, icon: '/icon-192.png', tag: 'dm-' + fromUid });
+    return;
+  }
+
+  // إشعار داخل التطبيق
+  const old = document.getElementById('notifToast');
+  if (old) old.remove();
+  clearTimeout(_notifTimeout);
+
+  const t = document.createElement('div');
+  t.id = 'notifToast';
+  t.className = 'notif-toast';
+  t.innerHTML = `
+    <div class="notif-av">${senderName[0]}</div>
+    <div class="notif-body">
+      <div class="notif-title">💬 ${escHtml(senderName)}</div>
+      <div class="notif-text">${escHtml(body)}</div>
+    </div>
+    <div style="font-size:18px;opacity:0.5;padding-right:4px">✕</div>
+  `;
+  t.addEventListener('click', () => { t.remove(); openDM(fromUid, senderName); });
+  document.body.appendChild(t);
+  t.getBoundingClientRect();
+  t.classList.add('show');
+  _notifTimeout = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 400);
+  }, 5000);
+}
+
 function showInAppNotif(msg, sid, cid) {
   // Don't show if already on this channel
   if (currentServer === sid && currentChannel === cid) return;
@@ -4191,31 +4266,11 @@ function openDM(uid, name) {
     // Unread count if DM not open
     if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
       _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
-      // تحديث badge في زر رسائلي الخاصة بقائمة القنوات
-      const dmChannelBtn = document.getElementById('dmChannelBtn');
-      if (dmChannelBtn) {
-        const total = Object.values(_dmUnread).reduce((a,b) => a+b, 0);
-        let badgeEl = dmChannelBtn.querySelector('.dm-ch-badge');
-        if (!badgeEl) {
-          badgeEl = document.createElement('span');
-          badgeEl.className = 'dm-ch-badge';
-          badgeEl.style.cssText = 'background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center';
-          dmChannelBtn.appendChild(badgeEl);
-        }
-        if (total > 0) { badgeEl.textContent = total > 9 ? '9+' : total; badgeEl.style.display = 'inline'; }
-        else badgeEl.style.display = 'none';
-      }
+      // تحديث badge
+      updateDmBadge();
       renderDmList();
-      // إشعار داخل التطبيق
-      const senderName = msg.name || 'رسالة خاصة';
-      const body = msg.text || (msg.mediaUrl ? '🖼️ صورة' : msg.voiceUrl ? '🎤 رسالة صوتية' : '');
-      if (body) {
-        if (Notification.permission === 'granted' && document.hidden) {
-          new Notification(senderName, { body, icon: '/icon-192.png', tag: 'dm-' + uid });
-        } else {
-          showInAppNotif(senderName, body, null, null, uid);
-        }
-      }
+      // إشعار مثل العام تماماً
+      showDmNotif(msg, uid);
     }
   };
 
