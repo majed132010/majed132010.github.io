@@ -1125,11 +1125,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     <div class="sv-sep"></div>
     <div class="sv-item sv-add" onclick="openCreateServer()" title="إنشاء سيرفر">+</div>
     <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
-    <div class="sv-sep"></div>
-    <div class="sv-item" id="dmBtn" onclick="openDMScreen()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
-      💬
-      <span id="dmBadge" style="display:none;position:absolute;top:2px;right:2px;background:#f04747;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1"></span>
-    </div>
+    <!-- أيقونة الرسائل الخاصة نُقلت لقائمة القنوات -->
   </div>
 
   <!-- Channel Sidebar -->
@@ -2304,6 +2300,44 @@ function renderChannels(sid) {
 
   makeCategory('القنوات النصية',  sid+'_text',  texts,  (cid,ch) => makeChItem(cid,ch,'#'));
   makeCategory('القنوات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
+
+  // قسم الرسائل الخاصة
+  const dmSection = document.createElement('div');
+  dmSection.style.cssText = 'margin-top:8px';
+  const dmHdr = document.createElement('div');
+  dmHdr.className = 'ch-category';
+  dmHdr.innerHTML = '<span class="cat-arrow">▼</span><span>الرسائل الخاصة</span>';
+  dmSection.appendChild(dmHdr);
+
+  const dmBtn = document.createElement('div');
+  dmBtn.className = 'ch-item' + (_currentDmUid || currentServer === null ? '' : '');
+  dmBtn.id = 'dmChannelBtn';
+  dmBtn.style.cssText = 'cursor:pointer';
+  // badge للرسائل غير المقروءة
+  const dmUnreadTotal = Object.values(_dmUnread || {}).reduce((a,b) => a+b, 0);
+  dmBtn.innerHTML = `
+    <span class="ch-item-icon">💬</span>
+    <span class="ch-item-name">رسائلي الخاصة</span>
+    ${dmUnreadTotal > 0 ? `<span style="background:#ed4245;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center">${dmUnreadTotal > 9 ? '9+' : dmUnreadTotal}</span>` : ''}
+  `;
+  dmBtn.addEventListener('click', () => {
+    // أغلق الـ Drawer وافتح الرسائل الخاصة
+    const sidebar = document.getElementById('channelSidebar');
+    const overlay = document.getElementById('drawerOverlay');
+    if (sidebar) sidebar.classList.remove('drawer-open');
+    if (overlay) overlay.classList.remove('show');
+    openDMScreen();
+  });
+  dmBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    const sidebar = document.getElementById('channelSidebar');
+    const overlay = document.getElementById('drawerOverlay');
+    if (sidebar) sidebar.classList.remove('drawer-open');
+    if (overlay) overlay.classList.remove('show');
+    openDMScreen();
+  });
+  dmSection.appendChild(dmBtn);
+  list.appendChild(dmSection);
 }
 
 // ════ MOBILE NAVIGATION - CLEAN ════
