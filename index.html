@@ -4587,10 +4587,39 @@ function clearDmUnread(uid) {
   renderDmList();
 }
 
+const _dmGlobalListeners = {};
+
 function listenDMs() {
   if (!currentUser) return;
+  // استمع لقائمة المحادثات
   db.ref('dms/' + currentUser.uid).on('value', snap => {
     renderDmList();
+    if (!snap.exists()) return;
+    // لكل محادثة — أضف listener للرسائل الجديدة
+    snap.forEach(ch => {
+      const uid = ch.key;
+      if (_dmGlobalListeners[uid]) return; // لا تضيف مرتين
+      const dmId = getDmId(currentUser.uid, uid);
+      const path = 'dm_messages/' + dmId;
+      // احصل على آخر key موجود ثم استمع لما بعده فقط
+      db.ref(path).limitToLast(1).once('value').then(lastSnap => {
+        let lastKey = null;
+        lastSnap.forEach(s => { lastKey = s.key; });
+        let q = lastKey
+          ? db.ref(path).orderByKey().startAfter(lastKey)
+          : db.ref(path).limitToLast(1);
+        const fn = msgSnap => {
+          const msg = msgSnap.val();
+          if (!msg || msg.uid === currentUser.uid) return;
+          if (_currentDmUid === uid) return; // المحادثة مفتوحة
+          _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
+          updateDmBadge();
+          showDmNotif(msg, uid);
+        };
+        q.on('child_added', fn);
+        _dmGlobalListeners[uid] = { q, fn };
+      });
+    });
   });
 }
 
