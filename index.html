@@ -1125,7 +1125,11 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     <div class="sv-sep"></div>
     <div class="sv-item sv-add" onclick="openCreateServer()" title="إنشاء سيرفر">+</div>
     <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
-    <!-- أيقونة الرسائل الخاصة نُقلت لقائمة القنوات -->
+    <div class="sv-sep"></div>
+    <div class="sv-item" id="dmSvBtn" onclick="openDMFromSvBar()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
+      💬
+      <span id="dmSvBadge" style="display:none;position:absolute;top:0;right:0;background:#ed4245;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;line-height:16px;text-align:center"></span>
+    </div>
   </div>
 
   <!-- Channel Sidebar -->
@@ -2394,6 +2398,15 @@ function closeSidebar() {
   const overlay = document.getElementById('drawerOverlay');
   if (sidebar) sidebar.classList.remove('drawer-open');
   if (overlay) overlay.classList.remove('show');
+}
+
+function openDMFromSvBar() {
+  // على الجوال: افتح الـ Drawer أولاً ليظهر قائمة القنوات مع رسائلي الخاصة
+  if (isMobile()) {
+    openDrawer();
+  } else {
+    openDMScreen();
+  }
 }
 
 function renderDmConvList(container) {
@@ -3804,7 +3817,19 @@ let _notifTimeout = null;
 
 function updateDmBadge() {
   const total = Object.values(_dmUnread || {}).reduce((a,b) => a+b, 0);
-  // تحديث badge الرئيسي
+
+  // 1. badge في شريط السيرفرات — مرئي دائماً على الجوال
+  const svBadge = document.getElementById('dmSvBadge');
+  if (svBadge) {
+    if (total > 0) {
+      svBadge.textContent = total > 9 ? '9+' : total;
+      svBadge.style.display = 'block';
+    } else {
+      svBadge.style.display = 'none';
+    }
+  }
+
+  // 2. badge في قائمة القنوات (Drawer)
   const btn = document.getElementById('dmChannelBtn');
   if (btn) {
     let badge = btn.querySelector('.ch-badge');
@@ -3817,7 +3842,8 @@ function updateDmBadge() {
       badge.textContent = total > 9 ? '9+' : total;
     } else if (badge) badge.remove();
   }
-  // تحديث قائمة المحادثات
+
+  // 3. تحديث قائمة المحادثات
   const convList = document.getElementById('dmConvList');
   if (convList) renderDmConvList(convList);
 }
