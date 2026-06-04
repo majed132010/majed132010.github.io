@@ -1722,15 +1722,27 @@ setInterval(() => {
   fetch(TOKEN_SERVER_URL + '/').catch(() => {});
 }, 10 * 60 * 1000);
 
-async function getAgoraToken(channelName, uid) {
-  try {
-    const res = await fetch(`${TOKEN_SERVER_URL}/token?channel=${channelName}&uid=${uid}`);
-    const data = await res.json();
-    return data.token;
-  } catch(e) {
-    console.error('Token fetch failed:', e);
-    return null;
+async function getAgoraToken(channelName, uid, retries = 3) {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      toast(i > 1 ? `⏳ إعادة المحاولة ${i}...` : '⏳ جاري الاتصال...');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`${TOKEN_SERVER_URL}/token?channel=${channelName}&uid=${uid}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error('Server error: ' + res.status);
+      const data = await res.json();
+      if (data.token) return data.token;
+      throw new Error('No token in response');
+    } catch(e) {
+      console.error(`Token attempt ${i} failed:`, e.message);
+      if (i === retries) return null;
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
+  return null;
 }
 
 let currentUser = null;
