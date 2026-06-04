@@ -731,7 +731,8 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   font-size:15px;font-weight:800;color:#fff;
 }
 .voice-user-name{flex:1;font-size:14px;font-weight:600;color:#1a3a3a}
-.voice-indicator{width:10px;height:10px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+.voice-indicator{width:10px;height:10px;border-radius:50%;background:#ccc;transition:all .15s}
+.voice-indicator.speaking{background:#23a55a;box-shadow:0 0 0 3px rgba(35,165,90,0.3);animation:pulse .8s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(0.8)}}
 .voice-log{
   margin-top:12px;padding:10px 12px;background:rgba(0,0,0,0.05);
@@ -3057,10 +3058,14 @@ function showVoiceChannel(sid, cid, ch) {
       Object.entries(users).forEach(([uid, u]) => {
         const div = document.createElement('div');
         div.className = 'voice-user';
+        const isSpeaking = u.speaking && !u.muted;
         div.innerHTML = `
-          <div class="voice-user-av">${(u.name||'?')[0]}</div>
+          <div class="voice-user-av" id="va-${uid}" style="border:2px solid ${isSpeaking ? '#23a55a' : 'transparent'};transition:border .15s">${(u.name||'?')[0]}</div>
           <div class="voice-user-name">${escHtml(u.name||'مستخدم')}</div>
-          ${u.muted ? '<span style="font-size:16px">🔇</span>' : '<div class="voice-indicator"></div>'}
+          ${u.muted
+            ? '<span style="font-size:16px">🔇</span>'
+            : `<div class="voice-indicator${isSpeaking ? ' speaking' : ''}" id="vi-${uid}"></div>`
+          }
         `;
         ul.appendChild(div);
       });
@@ -3093,6 +3098,60 @@ async function selectMicrophone() {
   } catch(e) {
     toast('❌ لا يمكن الوصول للميكروفون: ' + (e.message||''));
   }
+}
+
+// ════ SPEAKING DETECTION ════
+let _speakingDetector = null;
+
+function startSpeakingDetection(localTrack) {
+  if (_speakingDetector) { clearInterval(_speakingDetector); }
+  if (!localTrack) return;
+
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(new MediaStream([localTrack.getMediaStreamTrack()]));
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let wasSpeaking = false;
+
+    _speakingDetector = setInterval(() => {
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b) => a+b, 0) / data.length;
+      const isSpeaking = avg > 15;
+
+      if (isSpeaking !== wasSpeaking) {
+        wasSpeaking = isSpeaking;
+        // حدّث مؤشر الكلام
+        updateSpeakingIndicator(currentUser?.uid, isSpeaking);
+        // حدّث Firebase حتى يراه الآخرون
+        if (voiceChannel) {
+          db.ref('voice/' + voiceChannel.sid + '/' + voiceChannel.cid + '/' + currentUser.uid + '/speaking')
+            .set(isSpeaking).catch(() => {});
+        }
+      }
+    }, 100);
+  } catch(e) {
+    console.warn('Speaking detection error:', e);
+  }
+}
+
+function stopSpeakingDetection() {
+  if (_speakingDetector) { clearInterval(_speakingDetector); _speakingDetector = null; }
+  if (voiceChannel && currentUser) {
+    db.ref('voice/' + voiceChannel.sid + '/' + voiceChannel.cid + '/' + currentUser.uid + '/speaking').set(false).catch(() => {});
+  }
+}
+
+function updateSpeakingIndicator(uid, isSpeaking) {
+  const el = document.getElementById('vi-' + uid);
+  if (!el) return;
+  if (isSpeaking) el.classList.add('speaking');
+  else el.classList.remove('speaking');
+  // تحديث border الأفاتار
+  const av = document.getElementById('va-' + uid);
+  if (av) av.style.border = isSpeaking ? '2px solid #23a55a' : '2px solid transparent';
 }
 
 async function joinVoice() {
@@ -3142,6 +3201,8 @@ async function joinVoice() {
     await agoraClient.join(AGORA_APP_ID, channelName, token, uidHash);
     await agoraClient.publish([localAudioTrack]);
     log('✅ انضممت بنجاح - Channel: ' + channelName + ' UID: ' + uidHash);
+    // بدء كشف الكلام
+    startSpeakingDetection(localAudioTrack);
 
     await db.ref('voice/' + voiceChannel.sid + '/' + voiceChannel.cid + '/' + currentUser.uid).set({
       name: userProfile.displayName || 'مستخدم', muted: false, ts: Date.now()
@@ -3159,6 +3220,7 @@ async function joinVoice() {
     console.error('Voice error:', e);
     log('❌ خطأ: ' + e.message);
     toast('❌ فشل الانضمام: ' + (e.message||'خطأ'));
+    stopSpeakingDetection();
     if (localAudioTrack) { localAudioTrack.close(); localAudioTrack = null; }
     try { await agoraClient.leave(); } catch(ex){}
     agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
