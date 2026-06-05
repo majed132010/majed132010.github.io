@@ -1,7 +1,7 @@
 importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js');
 
-firebase.initializeApp({
+const firebaseConfig = {
   apiKey: "AIzaSyCmZPRoEt3IDFxeH-aqvYQIi5dGOmFlS5Y",
   authDomain: "awalim2-5bdb1.firebaseapp.com",
   databaseURL: "https://awalim2-5bdb1-default-rtdb.firebaseio.com",
@@ -9,28 +9,31 @@ firebase.initializeApp({
   storageBucket: "awalim2-5bdb1.firebasestorage.app",
   messagingSenderId: "939518942115",
   appId: "1:939518942115:web:404307d7b8e0677c335816"
-});
+};
 
+firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// استقبال الإشعارات في الخلفية
+// استقبال إشعارات FCM في الخلفية
 messaging.onBackgroundMessage(payload => {
-  const title = payload.notification?.title || payload.data?.title || 'عوالم';
+  const title = payload.notification?.title || payload.data?.title || 'عوالم 🌍';
   const body  = payload.notification?.body  || payload.data?.body  || 'رسالة جديدة';
-  const icon  = payload.notification?.icon  || '/icon-192.png';
+  const icon  = '/icon-192.png';
 
   self.registration.showNotification(title, {
     body,
     icon,
     badge: '/icon-192.png',
-    tag: payload.data?.tag || 'awalem-msg',
+    tag: payload.data?.tag || 'awalem-' + Date.now(),
     data: payload.data || {},
     vibrate: [200, 100, 200],
-    requireInteraction: false
+    requireInteraction: false,
+    dir: 'rtl',
+    lang: 'ar'
   });
 });
 
-// عند الضغط على الإشعار — افتح التطبيق
+// عند الضغط على الإشعار
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(

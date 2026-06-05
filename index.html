@@ -1616,6 +1616,21 @@ let fcmMessaging = null;
 // إرسال إشعار لمستخدم آخر عبر قاعدة البيانات
 async function sendPushToUser(targetUid, title, body, data = {}) {
   try {
+    // احصل على FCM token الهدف
+    const tokenSnap = await db.ref('users/' + targetUid + '/fcmToken').once('value');
+    const fcmToken = tokenSnap.val();
+
+    if (fcmToken && fcmMessaging) {
+      // أرسل عبر FCM مباشرة — يعمل على الجوال في الخلفية
+      await db.ref('fcm_queue').push({
+        token: fcmToken,
+        title, body,
+        data: { ...data, click_action: 'https://majed132010.github.io' },
+        ts: Date.now()
+      });
+    }
+
+    // أيضاً أرسل عبر Realtime Database للإشعار الداخلي
     await db.ref('notifications/' + targetUid).push({
       title, body, data,
       ts: Date.now(),
