@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="عوالم">
+<meta name="application-name" content="عوالم">
+<meta name="theme-color" content="#f2f3f5">
+<meta name="description" content="عوالم — منصة تواصل اجتماعي">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="shortcut icon" href="icon-192.png">
+<title>عوالم</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+
+<!-- ════ LOGIN ════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🌍</div>
+    <div class="login-title">عوالم</div>
+    <div class="login-sub">منصة محادثات صوتية ونصية</div>
+    <button class="google-btn" id="googleSignInBtn" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      دخول بـ Google
+    </button>
+  </div>
+</div>
+
+<!-- Drawer Overlay (mobile) -->
+<div id="drawerOverlay" onclick="closeDrawer()"></div>
+
+<!-- ════ APP ════ -->
+<button id="dndBtn" onclick="toggleDND()" title="وضع عدم الإزعاج">
+  🔔
+  <span class="dnd-tooltip">وضع عدم الإزعاج</span>
+</button>
+<div id="app">
+
+  <!-- Server List -->
+  <div id="serverList">
+    <div class="sv-item active" id="homeBtn" onclick="closeDrawer();showHome();" title="الرئيسية">🌍</div>
+    <div class="sv-sep"></div>
+    <div id="svItems"></div>
+    <div class="sv-sep"></div>
+    <div class="sv-item sv-add" onclick="openCreateServer()" title="إنشاء سيرفر">+</div>
+    <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
+    <div class="sv-sep"></div>
+    <div class="sv-item" id="dmSvBtn" onclick="openDMFromSvBar()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
+      💬
+      <span id="dmSvBadge" style="display:none;position:absolute;top:0;right:0;background:#ed4245;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;line-height:16px;text-align:center"></span>
+    </div>
+  </div>
+
+  <!-- Channel Sidebar -->
+  <div id="channelSidebar">
+    <!-- Mobile server pills -->
+    <div id="mobileSvRow">
+      <div class="mob-sv-pill" onclick="showHome()">🏠 الرئيسية</div>
+      <div id="mobSvPills" style="display:contents"></div>
+      <div class="mob-sv-pill mob-sv-pill-add" onclick="openCreateServer()">+ جديد</div>
+      <div class="mob-sv-pill mob-sv-pill-add" onclick="openJoinServer()">🔗 انضمام</div>
+    </div>
+    <div class="ch-header">
+      <div class="back-btn" onclick="showHome()" title="الرئيسية">◀</div>
+      <div class="ch-server-name" id="chServerName">الرئيسية</div>
+      <div class="ch-header-icons">
+        <div class="ch-header-icon" onclick="openServerSettings()" id="chSettingsBtn" style="display:none" title="إعدادات السيرفر">⚙️</div>
+      </div>
+    </div>
+    <div class="ch-list" id="channelList"></div>
+
+    <!-- DM List hidden - moved to DM screen -->
+    <div id="dmList" style="display:none"></div>
+    <div class="voice-connected" id="voiceConnectedBar">
+      <div class="vc-info">🔊 <span id="vcChannelName"></span></div>
+      <div class="vc-btns">
+        <button class="vc-btn" id="vcMuteBtn" onclick="toggleMute()" title="كتم">🎤</button>
+        <button class="vc-btn" onclick="leaveVoice()" title="مغادرة">📵</button>
+      </div>
+    </div>
+    <div class="user-panel">
+      <div class="up-av" onclick="openProfile()" id="upAv">?</div>
+      <div class="up-info">
+        <div class="up-name" id="upName">—</div>
+        <div class="up-tag" id="upTag">#0000</div>
+      </div>
+      <div class="up-btns">
+        <button class="up-btn" onclick="openProfile()" title="الملف الشخصي">👤</button>
+        <button class="up-btn" onclick="openSettings()" title="الإعدادات">⚙️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="mainContent">
+    <div class="main-header">
+      <div id="mobHamburger" onclick="toggleDrawer()" title="القنوات">☰</div>
+      <div class="main-header-back" onclick="goBack()" title="رجوع">◀</div>
+      <div class="main-header-icon" id="mhIcon">#</div>
+      <div class="main-header-name" id="mhName">اختر قناة</div>
+      <button id="searchToggleBtn" type="button" onclick="toggleSearch()"
+        style="display:none;width:30px;height:30px;border-radius:8px;background:rgba(200,168,75,0.1);
+        border:1px solid rgba(200,168,75,0.2);color:var(--gold);cursor:pointer;font-size:16px;
+        -webkit-tap-highlight-color:transparent;flex-shrink:0">🔍</button>
+      <button id="membersToggleBtn" type="button" onclick="toggleMembersPanel()"
+        style="display:none;width:30px;height:30px;border-radius:8px;background:rgba(200,168,75,0.1);
+        border:1px solid rgba(200,168,75,0.2);color:var(--gold);cursor:pointer;font-size:16px;
+        -webkit-tap-highlight-color:transparent;flex-shrink:0">👥</button>
+      <button id="pwaInstallBtn" type="button" onclick="installPWA()"
+        style="display:none;padding:5px 10px;background:rgba(200,168,75,0.15);
+        border:1px solid rgba(200,168,75,0.3);border-radius:8px;color:var(--gold);
+        font-family:Tajawal,sans-serif;font-size:12px;font-weight:700;cursor:pointer;
+        -webkit-tap-highlight-color:transparent;flex-shrink:0">📲 تثبيت</button>
+    </div>
+
+    <!-- Search Bar -->
+    <div id="searchBar">
+      <input id="searchInput" type="text" placeholder="ابحث في الرسائل..." oninput="searchMessages(this.value)" onkeydown="if(event.key==='Escape')toggleSearch()">
+      <span id="searchCount"></span>
+      <button class="search-nav-btn" onclick="navigateSearch(-1)" title="السابق">▲</button>
+      <button class="search-nav-btn" onclick="navigateSearch(1)" title="التالي">▼</button>
+      <button class="search-nav-btn" onclick="toggleSearch()" title="إغلاق">✕</button>
+    </div>
+
+    <div id="contentArea" style="flex:1;display:flex;overflow:hidden;position:relative">
+
+      <!-- Home View -->
+      <div id="homeView" style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative">
+        <div id="homeServersList" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 12px 80px;display:flex;flex-direction:column;gap:12px">
+          <!-- Servers rendered here -->
+        </div>
+        <div id="homeEmpty" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px">
+          <div style="font-size:60px">🌍</div>
+          <div style="font-size:24px;font-weight:800;color:var(--gold)">عوالم</div>
+          <div style="font-size:15px;color:var(--muted);text-align:center">لا يوجد سيرفرات بعد</div>
+          <button class="voice-join-btn" onclick="openCreateServer()" style="margin-top:8px;font-size:16px;padding:14px 28px">+ إنشاء سيرفر</button>
+          <button class="mic-select-btn" onclick="openJoinServer()" style="font-size:15px;padding:12px 24px">🔗 انضمام برابط</button>
+        </div>
+      </div>
+
+      <!-- Messages View -->
+      <div id="messagesView" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+        <div id="messagesArea">
+          <button id="loadMoreBtn" onclick="loadMoreMessages()">⬆ تحميل رسائل أقدم</button>
+        </div>
+        <div id="typingIndicator"></div>
+        <div class="chat-input-wrap">
+          <div class="chat-input-box" style="position:relative">
+            <div class="mention-popup" id="mentionPopup"></div>
+            <div id="replyBar">
+              <span>↩️</span>
+              <div style="flex:1;min-width:0">
+                <div class="rb-name" id="replyName"></div>
+                <div class="rb-text" id="replyText"></div>
+              </div>
+              <span class="rb-close" onclick="clearReply()">✕</span>
+            </div>
+            <div id="mediaPreviewArea"></div>
+            <div class="chat-input-top">
+              <button class="ci-btn" type="button" onclick="document.getElementById('mediaFileInp').click()" title="إرفاق">📎</button>
+              <input type="file" id="mediaFileInp" accept="image/*,video/*" multiple style="display:none" onchange="handleMediaSelect(this)">
+              <textarea class="chat-inp" id="mainChatInp" placeholder="اكتب رسالة... (@ للإشارة)" rows="1" inputmode="text" autocomplete="off"
+                onkeydown="handleChatKeydown(event)"
+                oninput="handleChatInput(this)"
+                style="font-size:16px!important"></textarea>
+              <button class="voice-record-btn" id="voiceRecordBtn" type="button" onclick="toggleVoiceRecording()" title="رسالة صوتية">🎤</button>
+              <button class="ci-btn send" id="sendBtn" type="button" onclick="sendMessage()" title="إرسال">➤</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DM View -->
+      <div id="dmView">
+        <!-- شاشة اختيار محادثة -->
+        <div id="dmPickerScreen" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(200,168,75,0.15)">
+            <span style="font-size:15px;font-weight:800;color:var(--gold)">💬 الرسائل الخاصة</span>
+            <button onclick="openNewDM()" style="background:var(--teal);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer">+ جديد</button>
+          </div>
+          <div id="dmPickerList" style="flex:1;overflow-y:auto;padding:8px"></div>
+        </div>
+        <!-- منطقة المحادثة -->
+        <div id="dmChatArea" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+        <div id="dmMessages"></div>
+        <div id="dmTypingIndicator" style="min-height:22px;padding:2px 16px 4px;font-size:12px;color:var(--muted);font-style:italic"></div>
+        <div class="chat-input-wrap">
+          <div class="chat-input-box">
+            <div id="dmReplyBar" style="display:none;align-items:center;gap:8px;padding:6px 12px;background:rgba(26,95,95,0.1);border-bottom:1px solid rgba(200,168,75,0.2);font-size:12px;color:#5a7a70">
+              <span>↩️</span>
+              <div style="flex:1;min-width:0">
+                <div id="dmReplyName" style="font-weight:800;color:var(--gold)"></div>
+                <div id="dmReplyText" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+              </div>
+              <span style="cursor:pointer;font-size:16px;padding:2px 6px" onclick="clearDmReply()">✕</span>
+            </div>
+            <div class="chat-input-top">
+              <button class="ci-btn" type="button" onclick="document.getElementById('dmMediaInp').click()" title="إرفاق صورة">📎</button>
+              <input type="file" id="dmMediaInp" accept="image/*,video/*" style="display:none" onchange="handleDmMediaSelect(this)">
+              <button class="ci-btn" type="button" id="dmVoiceBtn" onclick="toggleDmVoiceRecording()" title="تسجيل صوتي">🎤</button>
+              <textarea class="chat-inp" id="dmChatInp" placeholder="اكتب رسالة خاصة..." rows="1" inputmode="text" autocomplete="off"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDM()}"
+                oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight,140)+'px';document.getElementById('dmSendBtn').classList.toggle('active',!!this.value.trim());startDmTyping()"
+                onblur="stopDmTyping()"
+                style="font-size:16px!important"></textarea>
+              <button class="ci-btn send" id="dmSendBtn" type="button" onclick="sendDM()">➤</button>
+            </div>
+          </div>
+        </div>
+        </div><!-- end dmChatArea -->
+      </div>
+
+      <!-- Members Panel -->
+      <div id="membersPanel">
+        <div class="members-title">👥 الأعضاء</div>
+        <div id="membersList" style="overflow-y:auto;flex:1;padding:0 6px 12px"></div>
+      </div>
+
+      <!-- Voice View -->
+      <div id="voiceView" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px;background:linear-gradient(135deg,#e8dcc8,#c8d8d0);position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=60 height=60 viewBox=0 0 60 60 xmlns=http://www.w3.org/2000/svg%3E%3Cg fill=none%3E%3Cg fill=%23c8a84b fill-opacity=.05%3E%3Cpath d=M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');z-index:0"></div>
+        <div class="voice-icon-wrap">🎙️</div>
+        <div class="voice-ch-name" id="voiceViewName"></div>
+        <div class="voice-btns">
+          <button class="voice-join-btn" id="voiceJoinBtn" onclick="joinVoice()">🔊 انضمام للقناة</button>
+          <button class="mic-select-btn" id="micSelectBtn" onclick="selectMicrophone()">🎤 اختيار الميكروفون</button>
+          <button class="voice-leave-btn" style="display:none" id="voiceLeaveBtn" onclick="leaveVoice()">📵 مغادرة</button>
+        </div>
+        <div class="voice-status">
+          <div style="font-weight:700;font-size:14px;color:#1a3a3a">👥 المستخدمون في القناة</div>
+          <div class="voice-users" id="voiceUsersList"></div>
+          <div class="voice-log" id="voiceLog">جاهز...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODALS ════ -->
+
+<div class="modal-bg" id="createServerModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('createServerModal')">✕</button>
+    <div class="modal-title">سيرفر جديد</div>
+    <div class="modal-sub">أنشئ مجتمعك الخاص</div>
+    <input class="modal-inp" id="svNameInp" placeholder="اسم السيرفر">
+    <button class="modal-btn" onclick="createServer()">إنشاء</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="joinServerModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('joinServerModal')">✕</button>
+    <div class="modal-title">انضم لسيرفر</div>
+    <div class="modal-sub">أدخل كود الدعوة أو رابط الانضمام</div>
+    <input class="modal-inp" id="joinCodeInp" placeholder="كود الدعوة أو رابط الانضمام">
+    <button class="modal-btn" onclick="joinServer()">انضمام</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="serverSettingsModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('serverSettingsModal')">✕</button>
+    <div class="modal-title" id="svSettingsTitle">إعدادات السيرفر</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      <button class="modal-btn" onclick="openAddChannel()" id="svSettingsAddCh">➕ إضافة قناة</button>
+      <button class="modal-btn secondary" onclick="openServerCustomize()" id="svSettingsCustomize">🎨 تخصيص السيرفر</button>
+      <button class="modal-btn secondary" onclick="openMemberMgmt()" id="svSettingsMemberMgmt">👥 إدارة الأعضاء</button>
+      <button class="modal-btn secondary" onclick="openInvite()" id="svSettingsInvite">🔗 رابط الدعوة</button>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      <button class="modal-btn secondary" id="svLeaveBtn" onclick="confirmLeaveServer()" style="color:#e06060;border-color:rgba(192,64,64,0.3)">🚪 مغادرة السيرفر</button>
+      <button class="modal-btn danger" id="svDeleteBtn" onclick="confirmDeleteServer()" style="display:none">🗑️ حذف السيرفر</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="confirmLeaveModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('confirmLeaveModal')">✕</button>
+    <div class="modal-title" style="color:#e06060">🚪 مغادرة السيرفر</div>
+    <div class="modal-sub" id="confirmLeaveText">هل أنت متأكد أنك تريد مغادرة هذا السيرفر؟</div>
+    <button class="modal-btn danger" onclick="doLeaveServer()">نعم، مغادرة</button>
+    <button class="modal-btn secondary" onclick="closeModal('confirmLeaveModal')">إلغاء</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="confirmDeleteModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('confirmDeleteModal')">✕</button>
+    <div class="modal-title" style="color:#e06060">🗑️ حذف السيرفر</div>
+    <div class="modal-sub" id="confirmDeleteText">سيُحذف السيرفر نهائياً لجميع الأعضاء. هذا الإجراء لا يمكن التراجع عنه.</div>
+    <button class="modal-btn danger" onclick="doDeleteServer()">نعم، احذف</button>
+    <button class="modal-btn secondary" onclick="closeModal('confirmDeleteModal')">إلغاء</button>
+  </div>
+</div>
+
+<!-- Member Management Modal -->
+<div class="modal-bg" id="memberMgmtModal">
+  <div class="modal" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column">
+    <button class="modal-close" onclick="closeModal('memberMgmtModal')">✕</button>
+    <div class="modal-title">👥 إدارة الأعضاء</div>
+    <div id="memberMgmtList" style="overflow-y:auto;flex:1;padding:4px 0;display:flex;flex-direction:column;gap:4px"></div>
+  </div>
+</div>
+
+<!-- Server Customize Modal -->
+<div class="modal-bg" id="serverCustomizeModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('serverCustomizeModal')">✕</button>
+    <div class="modal-title">⚙️ تخصيص السيرفر</div>
+    <div class="sv-avatar-upload" id="svAvatarUpload" onclick="document.getElementById('svAvatarFileInp').click()" title="تغيير الصورة">
+      <span id="svAvatarPreview">🌍</span>
+      <div class="upload-hint">تغيير</div>
+    </div>
+    <input type="file" id="svAvatarFileInp" accept="image/*" style="display:none" onchange="handleSvAvatarUpload(this)">
+    <input class="modal-inp" id="svCustomNameInp" placeholder="اسم السيرفر">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0 10px">
+      <span style="font-size:12px;color:var(--muted);width:100%">اختر إيموجي للسيرفر:</span>
+      <div id="svEmojiPicker" style="display:flex;flex-wrap:wrap;gap:6px">
+      </div>
+    </div>
+    <button class="modal-btn" onclick="saveServerCustomize()">💾 حفظ التغييرات</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="addChannelModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('addChannelModal')">✕</button>
+    <div class="modal-title">قناة جديدة</div>
+    <div class="ch-type-tabs">
+      <div class="ch-type-tab active" id="chTypeText" onclick="selectChType('text')">💬 نصية</div>
+      <div class="ch-type-tab" id="chTypeVoice" onclick="selectChType('voice')">🔊 صوتية</div>
+    </div>
+    <input class="modal-inp" id="chNameInp" placeholder="اسم القناة">
+    <button class="modal-btn" onclick="addChannel()">إضافة</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="inviteModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('inviteModal')">✕</button>
+    <div class="modal-title">دعوة أعضاء</div>
+    <div class="modal-sub">شارك هذا الرابط أو الكود للانضمام</div>
+    <div style="background:rgba(0,0,0,0.25);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:6px">🔗 رابط الانضمام</div>
+      <div style="font-family:monospace;font-size:12px;word-break:break-all;color:var(--text)" id="inviteLink"></div>
+    </div>
+    <div class="profile-code-row" style="margin-bottom:12px">
+      <div>
+        <div class="profile-code-label">كود الدعوة</div>
+        <div class="profile-code-val" id="inviteCodeDisplay">—</div>
+      </div>
+      <button class="profile-code-copy" onclick="copyCode()" title="نسخ الكود">📋</button>
+    </div>
+    <button class="modal-btn" onclick="copyInvite()">📋 نسخ الرابط</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('settingsModal')">✕</button>
+    <div class="modal-title">إعدادات الحساب</div>
+    <input class="modal-inp" id="displayNameInp" placeholder="اسم العرض">
+    <button class="modal-btn" onclick="saveSettings()">💾 حفظ</button>
+    <button class="modal-btn secondary" onclick="doSignOut()">🚪 خروج</button>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal-bg" id="profileModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
+    <div class="modal-title">الملف الشخصي</div>
+    <div class="profile-info-box">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="position:relative;width:52px;height:52px;cursor:pointer" onclick="document.getElementById('avatarUpload').click()" title="اضغط لتغيير الصورة">
+          <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1a6060,#0d4545);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;overflow:hidden" id="profileAvatar">?</div>
+          <div style="position:absolute;bottom:0;right:0;width:18px;height:18px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px">📷</div>
+        </div>
+        <input type="file" id="avatarUpload" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:var(--text)" id="profileName">—</div>
+          <div style="font-size:12px;color:var(--muted)" id="profileTag">#0000</div>
+          <div id="profileRoleBadge"></div>
+        </div>
+      </div>
+      <div class="gold-line"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;margin-top:8px">كود الانضمام الخاص بك (للمشرفين)</div>
+      <div class="profile-code-row">
+        <div>
+          <div class="profile-code-label">كود المشرف</div>
+          <div class="profile-code-val" id="profileAdminCode">—</div>
+        </div>
+        <button class="profile-code-copy" onclick="copyAdminCode()" title="نسخ الكود">📋</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
+        📌 شارك هذا الكود مع الآخرين ليتمكنوا من إضافتك كصديق أو الانضمام عبرك
+      </div>
+    </div>
+    <button class="modal-btn secondary" onclick="closeModal('profileModal');openSettings()">⚙️ تعديل الحساب</button>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+
+
+
+
+
+
+
+
+<!-- PWA Service Worker -->
+
+
+<!-- Image Lightbox -->
+<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;flex-direction:column;gap:12px" onclick="closeLightbox()">
+  <img id="lightboxImg" style="max-width:92vw;max-height:80vh;border-radius:12px;object-fit:contain;display:none">
+  <video id="lightboxVid" controls style="max-width:92vw;max-height:80vh;border-radius:12px;display:none"></video>
+  <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:center">
+    <button id="lightboxSaveInChat" type="button" style="display:none;padding:10px 20px;background:rgba(212,175,90,0.2);color:var(--gold,#d4af5a);border:1px solid var(--gold,#d4af5a);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxSaveInChat()">📌 حفظ في المحادثة</button>
+    <button id="lightboxDl" type="button" style="padding:10px 24px;background:rgba(26,95,95,0.8);color:#fff;border:1px solid var(--gold);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxDownload()">⬇️ حفظ في الجهاز</button>
+    <button type="button" style="padding:10px 20px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="closeLightbox()">✕ إغلاق</button>
+  </div>
+</div>
+
+
+<!-- ════ Image Lightbox ════ -->
+<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;flex-direction:column;gap:12px" onclick="closeLightbox()">
+  <img id="lightboxImg" style="max-width:92vw;max-height:80vh;border-radius:12px;object-fit:contain;display:none">
+  <video id="lightboxVid" controls style="max-width:92vw;max-height:80vh;border-radius:12px;display:none"></video>
+  <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:center">
+    <button id="lightboxSaveInChat" type="button" style="display:none;padding:10px 20px;background:rgba(88,101,242,0.2);color:var(--acc);border:1px solid var(--acc);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer" onclick="event.stopPropagation();lightboxSaveInChat()">📌 حفظ في المحادثة</button>
+    <button type="button" style="padding:10px 24px;background:rgba(26,95,95,0.8);color:#fff;border:1px solid var(--acc);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer" onclick="event.stopPropagation();lightboxDownload()">⬇️ حفظ في الجهاز</button>
+    <button type="button" style="padding:10px 20px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer" onclick="closeLightbox()">✕ إغلاق</button>
+  </div>
+</div>
+
+<!-- ════ Firebase SDKs ════ -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+
+<!-- ════ App Scripts — الترتيب مهم ════ -->
+<script src="js/firebase-config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/servers.js"></script>
+<script src="js/messages.js"></script>
+<script src="js/dm.js"></script>
+
+</body>
+</html>
