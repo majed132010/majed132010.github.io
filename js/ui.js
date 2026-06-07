@@ -119,13 +119,20 @@ function installPWA() {
   }
 }
 
-// Service Worker
+// ════ Service Workers — مُصلح ════
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg=>reg.unregister()));
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then(reg=>console.log('✅ SW registered:', reg.scope))
-      .catch(err=>console.log('SW registration failed:', err));
+  window.addEventListener('load', async () => {
+    try {
+      // سجّل sw.js للكاش والـ PWA
+      const swReg = await navigator.serviceWorker.register('/sw.js');
+      console.log('✅ SW registered:', swReg.scope);
+
+      // سجّل firebase-messaging-sw.js للإشعارات في الخلفية
+      const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('✅ FCM SW registered:', fcmReg.scope);
+    } catch(err) {
+      console.warn('SW registration error:', err);
+    }
   });
 }
 
