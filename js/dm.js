@@ -341,33 +341,64 @@ function renderDmConvList(container) {
   });
 }
 
-// ════ استماع للرسائل الخاصة الجديدة عالمياً ════
+// ════ استماع للرسائل الخاصة الجديدة عالمياً — مُصلح ════
 function listenDMs() {
   if (!currentUser) return;
+
+  // 1. استمع لقائمة المحادثات الموجودة
   db.ref('dms/'+currentUser.uid).on('value', snap => {
     renderDmList();
     if (!snap.exists()) return;
     snap.forEach(ch => {
-      const uid=ch.key;
-      if (_dmGlobalListeners[uid]) return;
-      const dmId=getDmId(currentUser.uid,uid);
-      const path='dm_messages/'+dmId;
-      db.ref(path).limitToLast(1).once('value').then(lastSnap=>{
-        let lastKey=null;
-        lastSnap.forEach(s=>{lastKey=s.key;});
-        const q=lastKey?db.ref(path).orderByKey().startAfter(lastKey):db.ref(path).limitToLast(1);
-        const fn=msgSnap=>{
-          const msg=msgSnap.val();
-          if (!msg||msg.uid===currentUser.uid) return;
-          if (_currentDmUid===uid) return;
-          _dmUnread[uid]=(_dmUnread[uid]||0)+1;
-          updateDmBadge();
-          showDmNotif(msg,uid);
-        };
-        q.on('child_added',fn);
-        _dmGlobalListeners[uid]={q,fn};
-      });
+      const uid = ch.key;
+      _addDmListener(uid);
     });
+  });
+
+  // 2. استمع لـ notifications/ لاستقبال إشعارات من محادثات جديدة
+  // هذا يضمن وصول الإشعار حتى لو لم تكن المحادثة في dms/ بعد
+  db.ref('notifications/'+currentUser.uid).on('child_added', snap => {
+    const notif = snap.val();
+    if (!notif) return;
+    if (Date.now() - notif.ts > 15000) return; // تجاهل القديم
+    if (notif.from === currentUser.uid) return;
+    if (notif.data?.type === 'dm' && notif.data?.fromUid) {
+      const fromUid = notif.data.fromUid;
+      // أضف listener للمحادثة الجديدة
+      _addDmListener(fromUid);
+      // عرض الإشعار إذا لم تكن المحادثة مفتوحة
+      if (_currentDmUid !== fromUid) {
+        _dmUnread[fromUid] = (_dmUnread[fromUid]||0) + 1;
+        updateDmBadge();
+        showDmNotif({ name: notif.title || 'رسالة خاصة', text: notif.body || '' }, fromUid);
+      }
+    }
+    // احذف الإشعار بعد معالجته
+    db.ref('notifications/'+currentUser.uid+'/'+snap.key).remove();
+  });
+}
+
+// دالة مساعدة لإضافة listener لمحادثة خاصة
+function _addDmListener(uid) {
+  if (_dmGlobalListeners[uid]) return;
+  const dmId = getDmId(currentUser.uid, uid);
+  const path = 'dm_messages/' + dmId;
+  db.ref(path).limitToLast(1).once('value').then(lastSnap => {
+    let lastKey = null;
+    lastSnap.forEach(s => { lastKey = s.key; });
+    const q = lastKey
+      ? db.ref(path).orderByKey().startAfter(lastKey)
+      : db.ref(path).limitToLast(1);
+    const fn = msgSnap => {
+      const msg = msgSnap.val();
+      if (!msg || msg.uid === currentUser.uid) return;
+      if (_currentDmUid === uid) return;
+      _dmUnread[uid] = (_dmUnread[uid]||0) + 1;
+      updateDmBadge();
+      showDmNotif(msg, uid);
+    };
+    q.on('child_added', fn);
+    _dmGlobalListeners[uid] = { q, fn };
   });
 }
 
