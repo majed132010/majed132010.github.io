@@ -16,15 +16,25 @@ const messaging = firebase.messaging();
 
 // استقبال إشعارات FCM في الخلفية
 messaging.onBackgroundMessage(payload => {
-  const title = payload.notification?.title || payload.data?.title || 'عوالم 🌍';
-  const body  = payload.notification?.body  || payload.data?.body  || 'رسالة جديدة';
-  const icon  = '/icon-192.png';
+  console.log('Background message received:', payload);
+
+  const title = payload.notification?.title
+    || payload.data?.title
+    || 'عوالم 🌍';
+
+  const body = payload.notification?.body
+    || payload.data?.body
+    || 'رسالة جديدة';
+
+  const isDM = payload.data?.type === 'dm';
 
   self.registration.showNotification(title, {
     body,
-    icon,
+    icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: payload.data?.tag || 'awalem-' + Date.now(),
+    tag: isDM
+      ? 'dm-' + (payload.data?.fromUid || Date.now())
+      : 'msg-' + Date.now(),
     data: payload.data || {},
     vibrate: [200, 100, 200],
     requireInteraction: false,
