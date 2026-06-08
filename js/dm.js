@@ -435,7 +435,7 @@ function handleDmMediaSelect(input) {
   }
   preview.style.display='flex';
   files.forEach(file=>{
-    if (file.size>10*1024*1024){toast('❌ الملف أكبر من 10MB');return;}
+    if (file.size>50*1024*1024){toast('❌ الملف أكبر من 50MB');return;}
     const entry={file,type:file.type.startsWith('video')?'video':'image',name:file.name};
     window._pendingDmMedia.push(entry);
     const wrap=document.createElement('div'); wrap.style.cssText='position:relative;display:inline-flex';
