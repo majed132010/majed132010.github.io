@@ -1,4 +1,4 @@
-// ════ SERVERS & CHANNELS ════
+ // ════ SERVERS & CHANNELS ════
 let servers = {};
 let currentServer = null;
 let currentChannel = null;
@@ -672,16 +672,6 @@ function incrementUnread(sid, cid) {
 function clearUnread(sid, cid) {
   const key = sid + '/' + cid;
   _unreadCounts[key] = 0;
-  if (currentUser) {
-    db.ref('messages/' + sid + '/' + cid).limitToLast(20).once('value').then(snap => {
-      const msgs = snap.val() || {};
-      Object.entries(msgs).forEach(([msgKey, msg]) => {
-        if (msg.uid !== currentUser.uid && (!msg.readBy || !msg.readBy[currentUser.uid])) {
-          db.ref('messages/' + sid + '/' + cid + '/' + msgKey + '/readBy/' + currentUser.uid).set(true);
-        }
-      });
-    });
-  }
   document.querySelectorAll('.ch-item').forEach(el => {
     if (el.dataset.cid === cid) { const badge = el.querySelector('.ch-unread-badge'); if (badge) badge.remove(); }
   });
