@@ -113,7 +113,6 @@ function buildMsgDiv(msg, key) {
   `;
   body.appendChild(meta);
 
-  // رد على رسالة
   if (msg.replyTo) {
     const quote = document.createElement('div');
     quote.className = 'msg-reply-quote';
@@ -125,7 +124,6 @@ function buildMsgDiv(msg, key) {
     body.appendChild(quote);
   }
 
-  // النص
   if (msg.text) {
     const txt = document.createElement('div');
     txt.className = 'msg-content';
@@ -138,14 +136,12 @@ function buildMsgDiv(msg, key) {
     body.appendChild(txt);
   }
 
-  // رسالة صوتية
   if (msg.voiceUrl && !msg.mediaUrl) {
     const vw = document.createElement('div');
     vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
     body.appendChild(vw);
   }
 
-  // وسائط
   if (msg.mediaUrl) {
     const mediaWrap = document.createElement('div');
     mediaWrap.style.cssText = 'margin-top:4px;display:inline-flex;flex-direction:column;gap:0;align-items:flex-start';
@@ -183,10 +179,8 @@ function buildMsgDiv(msg, key) {
     body.appendChild(mediaWrap);
   }
 
-  // التفاعلات
   if (msg.reactions) renderReactions(msg.reactions, key, body);
 
-  // أزرار الإجراءات
   const actions = document.createElement('div');
   actions.className = 'msg-actions';
   const sv = servers[currentServer];
@@ -215,7 +209,6 @@ function buildMsgDiv(msg, key) {
     actions.appendChild(delBtn);
   }
 
-  // Long press للجوال
   let lpTimer;
   div.addEventListener('touchstart', () => { lpTimer = setTimeout(() => { actions.style.display='flex'; }, 500); }, {passive:true});
   div.addEventListener('touchend', () => clearTimeout(lpTimer), {passive:true});
@@ -239,7 +232,6 @@ async function sendMessage() {
   const preview = document.getElementById('mediaPreviewArea');
   if (preview) { preview.innerHTML = ''; preview.style.display = 'none'; }
 
-  // وضع التعديل
   if (_editingKey) {
     const key = _editingKey;
     cancelEdit();
@@ -280,12 +272,22 @@ async function sendMessage() {
   for (const m of media) {
     try {
       toast('⏳ جاري رفع ' + (m.type === 'video' ? 'الفيديو' : 'الصورة') + '...');
-      const mediaUrl = await uploadToCloudinary(m.file);
-      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-      await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-        ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
-      });
-      toast('✅ تم إرسال الصورة');
+      let mediaUrl;
+      if (m.type === 'video') {
+        // فيديو → Firebase Storage (بدون انتهاء صلاحية)
+        mediaUrl = await uploadToStorage(m.file, `media/${currentServer}/${currentChannel}/${Date.now()}_${m.name}`);
+        await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+          ...msgBase, text: '', mediaUrl, mediaType: 'video', mediaName: m.name, saved: true
+        });
+      } else {
+        // صورة → Cloudinary (مع انتهاء صلاحية 24 ساعة)
+        mediaUrl = await uploadToCloudinary(m.file);
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+          ...msgBase, text: '', mediaUrl, mediaType: 'image', mediaName: m.name, expiresAt, saved: false
+        });
+      }
+      toast('✅ تم إرسال ' + (m.type === 'video' ? 'الفيديو' : 'الصورة'));
       setTimeout(() => { const a = document.getElementById('messagesArea'); if (a) a.scrollTop = a.scrollHeight; }, 300);
     } catch(e) { toast('❌ فشل رفع الملف: ' + (e.message || '')); }
   }
@@ -488,8 +490,11 @@ function handleMediaSelect(input) {
   const preview = document.getElementById('mediaPreviewArea');
   if (!preview) return;
   files.forEach(file => {
-    if (file.size > 10*1024*1024) { toast('❌ الملف أكبر من 10MB'); return; }
-    const entry = { file, type: file.type.startsWith('video')?'video':'image', name: file.name };
+    const isVideo = file.type.startsWith('video');
+    const maxSize = isVideo ? 500*1024*1024 : 10*1024*1024;
+    const maxLabel = isVideo ? '500MB' : '10MB';
+    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); return; }
+    const entry = { file, type: isVideo ? 'video' : 'image', name: file.name };
     window._pendingMedia.push(entry);
     preview.style.display = 'flex';
     const wrap = document.createElement('div');
