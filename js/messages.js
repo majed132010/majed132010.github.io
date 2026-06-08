@@ -40,7 +40,8 @@ function showMessages(sid, cid) {
       area.appendChild(div);
     });
     area.scrollTop = area.scrollHeight;
-    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 300);
+    // انتظر ظهور الرسالة الحقيقية ثم احذف الـ preview
+      setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
     setTimeout(() => { area.scrollTop = area.scrollHeight; }, 800);
     if (entries.length > 0) {
       _oldestMsgKey = entries[0][0];
