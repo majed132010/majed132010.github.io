@@ -162,7 +162,7 @@ function showInAppNotif(msg, sid, cid) {
 function showDmNotif(msg, fromUid) {
   if (_currentDmUid === fromUid) return;
 
-  // زيادة العداد
+  // زيادة العداد دائماً
   _dmUnread[fromUid] = (_dmUnread[fromUid] || 0) + 1;
   updateDmBadge();
 
@@ -176,11 +176,12 @@ function showDmNotif(msg, fromUid) {
 
   playMsgSound();
 
+  // إشعار النظام إذا التطبيق في الخلفية — بدون return
   if (Notification.permission === 'granted' && document.hidden) {
     new Notification(senderName, { body: body || '...', icon: '/icon-192.png', tag: 'dm-' + fromUid });
-    return;
   }
 
+  // إشعار داخل التطبيق دائماً
   const old = document.getElementById('notifToast');
   if (old) old.remove();
   clearTimeout(_notifTimeout);
