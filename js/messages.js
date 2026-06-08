@@ -491,8 +491,8 @@ function handleMediaSelect(input) {
   if (!preview) return;
   files.forEach(file => {
     const isVideo = file.type.startsWith('video');
-    const maxSize = isVideo ? 500*1024*1024 : 10*1024*1024;
-    const maxLabel = isVideo ? '500MB' : '10MB';
+    const maxSize = isVideo ? 500*1024*1024 : 50*1024*1024;
+const maxLabel = isVideo ? '500MB' : '50MB';
     if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); return; }
     const entry = { file, type: isVideo ? 'video' : 'image', name: file.name };
     window._pendingMedia.push(entry);
