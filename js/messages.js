@@ -40,8 +40,7 @@ function showMessages(sid, cid) {
       area.appendChild(div);
     });
     area.scrollTop = area.scrollHeight;
-    // انتظر ظهور الرسالة الحقيقية ثم احذف الـ preview
-      setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 300);
     setTimeout(() => { area.scrollTop = area.scrollHeight; }, 800);
     if (entries.length > 0) {
       _oldestMsgKey = entries[0][0];
@@ -271,26 +270,65 @@ async function sendMessage() {
   }
 
   for (const m of media) {
+    const area = document.getElementById('messagesArea');
+    const localUrl = URL.createObjectURL(m.file);
+    const tempKey = 'temp_' + Date.now() + '_' + Math.random();
+
+    // عرض preview فوري
+    const tempDiv = document.createElement('div');
+    tempDiv.className = 'msg-group';
+    tempDiv.dataset.key = tempKey;
+    tempDiv.style.opacity = '0.65';
+    const tempAv = document.createElement('div');
+    tempAv.className = 'msg-av';
+    tempAv.textContent = (msgBase.name||'?')[0];
+    const tempBody = document.createElement('div');
+    tempBody.className = 'msg-body';
+    const tempMeta = document.createElement('div');
+    tempMeta.className = 'msg-meta';
+    tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name||'')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
+    tempBody.appendChild(tempMeta);
+    const tempWrap = document.createElement('div');
+    tempWrap.style.cssText = 'margin-top:4px;position:relative;display:inline-block';
+    if (m.type === 'video') {
+      const vid = document.createElement('video');
+      vid.src = localUrl;
+      vid.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;object-fit:cover';
+      tempWrap.appendChild(vid);
+    } else {
+      const img = document.createElement('img');
+      img.src = localUrl;
+      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;object-fit:cover';
+      tempWrap.appendChild(img);
+    }
+    const indicator = document.createElement('div');
+    indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.55);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap';
+    indicator.textContent = '⏳ جاري الرفع...';
+    tempWrap.appendChild(indicator);
+    tempBody.appendChild(tempWrap);
+    tempDiv.appendChild(tempAv);
+    tempDiv.appendChild(tempBody);
+    if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
+
     try {
-      toast('⏳ جاري رفع ' + (m.type === 'video' ? 'الفيديو' : 'الصورة') + '...');
       let mediaUrl;
       if (m.type === 'video') {
-        // فيديو → Firebase Storage (بدون انتهاء صلاحية)
         mediaUrl = await uploadToStorage(m.file, `media/${currentServer}/${currentChannel}/${Date.now()}_${m.name}`);
         await db.ref('messages/' + currentServer + '/' + currentChannel).push({
           ...msgBase, text: '', mediaUrl, mediaType: 'video', mediaName: m.name, saved: true
         });
       } else {
-        // صورة → Cloudinary (مع انتهاء صلاحية 24 ساعة)
         mediaUrl = await uploadToCloudinary(m.file);
         const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
         await db.ref('messages/' + currentServer + '/' + currentChannel).push({
           ...msgBase, text: '', mediaUrl, mediaType: 'image', mediaName: m.name, expiresAt, saved: false
         });
       }
-      toast('✅ تم إرسال ' + (m.type === 'video' ? 'الفيديو' : 'الصورة'));
-      setTimeout(() => { const a = document.getElementById('messagesArea'); if (a) a.scrollTop = a.scrollHeight; }, 300);
-    } catch(e) { toast('❌ فشل رفع الملف: ' + (e.message || '')); }
+      setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
+    } catch(e) {
+      tempDiv.remove();
+      toast('❌ فشل رفع الملف: ' + (e.message || ''));
+    }
   }
 }
 
@@ -492,8 +530,8 @@ function handleMediaSelect(input) {
   if (!preview) return;
   files.forEach(file => {
     const isVideo = file.type.startsWith('video');
-    const maxSize = isVideo ? 500*1024*1024 : 10*1024*1024;
-    const maxLabel = isVideo ? '500MB' : '10MB';
+    const maxSize = isVideo ? 500*1024*1024 : 50*1024*1024;
+    const maxLabel = isVideo ? '500MB' : '50MB';
     if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); return; }
     const entry = { file, type: isVideo ? 'video' : 'image', name: file.name };
     window._pendingMedia.push(entry);
