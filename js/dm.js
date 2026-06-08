@@ -17,6 +17,23 @@ function openDMScreen() {
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = 'الرسائل الخاصة';
   document.getElementById('searchToggleBtn').style.display = 'none';
+// أزرار المكالمة
+const mhName = document.getElementById('mhName');
+if (mhName && !document.getElementById('dmCallBtns')) {
+  const btns = document.createElement('div');
+  btns.id = 'dmCallBtns';
+  btns.style.cssText = 'display:flex;gap:8px;margin-right:auto';
+  btns.innerHTML = `
+    <button onclick="startCall('${uid}','${name}','audio')" style="background:rgba(35,165,90,0.2);border:1px solid rgba(35,165,90,0.4);color:#23a55a;border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent">📞</button>
+    <button onclick="startCall('${uid}','${name}','video')" style="background:rgba(26,95,95,0.2);border:1px solid rgba(26,95,95,0.4);color:var(--gold);border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent">📹</button>
+  `;
+  const header = document.querySelector('.main-header');
+  if (header) header.appendChild(btns);
+} else if (document.getElementById('dmCallBtns')) {
+  document.getElementById('dmCallBtns').querySelectorAll('button').forEach((btn, i) => {
+    btn.onclick = () => startCall(uid, name, i === 0 ? 'audio' : 'video');
+  });
+}
   document.getElementById('membersToggleBtn').style.display = 'none';
   renderServerList();
   showView('dm');
