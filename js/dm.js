@@ -17,24 +17,10 @@ function openDMScreen() {
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = 'الرسائل الخاصة';
   document.getElementById('searchToggleBtn').style.display = 'none';
-// أزرار المكالمة
-const mhName = document.getElementById('mhName');
-if (mhName && !document.getElementById('dmCallBtns')) {
-  const btns = document.createElement('div');
-  btns.id = 'dmCallBtns';
-  btns.style.cssText = 'display:flex;gap:8px;margin-right:auto';
-  btns.innerHTML = `
-    <button onclick="startCall('${uid}','${name}','audio')" style="background:rgba(35,165,90,0.2);border:1px solid rgba(35,165,90,0.4);color:#23a55a;border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent">📞</button>
-    <button onclick="startCall('${uid}','${name}','video')" style="background:rgba(26,95,95,0.2);border:1px solid rgba(26,95,95,0.4);color:var(--gold);border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent">📹</button>
-  `;
-  const header = document.querySelector('.main-header');
-  if (header) header.appendChild(btns);
-} else if (document.getElementById('dmCallBtns')) {
-  document.getElementById('dmCallBtns').querySelectorAll('button').forEach((btn, i) => {
-    btn.onclick = () => startCall(uid, name, i === 0 ? 'audio' : 'video');
-  });
-}
   document.getElementById('membersToggleBtn').style.display = 'none';
+  // إزالة أزرار المكالمة عند العودة للقائمة
+  const oldBtns = document.getElementById('dmCallBtns');
+  if (oldBtns) oldBtns.remove();
   renderServerList();
   showView('dm');
   document.getElementById('dmPickerScreen').style.display = 'flex';
@@ -82,6 +68,26 @@ function openDM(uid, name) {
   document.getElementById('mhName').textContent = name;
   document.getElementById('searchToggleBtn').style.display = 'none';
   document.getElementById('membersToggleBtn').style.display = 'none';
+
+  // أزرار المكالمة
+  const oldBtns = document.getElementById('dmCallBtns');
+  if (oldBtns) oldBtns.remove();
+  const btns = document.createElement('div');
+  btns.id = 'dmCallBtns';
+  btns.style.cssText = 'display:flex;gap:8px;margin-right:auto';
+  const audioBtn = document.createElement('button');
+  audioBtn.textContent = '📞';
+  audioBtn.style.cssText = 'background:rgba(35,165,90,0.2);border:1px solid rgba(35,165,90,0.4);color:#23a55a;border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent';
+  audioBtn.addEventListener('click', () => startCall(uid, name, 'audio'));
+  const videoBtn = document.createElement('button');
+  videoBtn.textContent = '📹';
+  videoBtn.style.cssText = 'background:rgba(26,95,95,0.2);border:1px solid rgba(26,95,95,0.4);color:var(--gold);border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;-webkit-tap-highlight-color:transparent';
+  videoBtn.addEventListener('click', () => startCall(uid, name, 'video'));
+  btns.appendChild(audioBtn);
+  btns.appendChild(videoBtn);
+  const header = document.querySelector('.main-header');
+  if (header) header.appendChild(btns);
+
   showView('dm');
   document.getElementById('dmPickerScreen').style.display = 'none';
   const chat = document.getElementById('dmChatArea');
@@ -105,7 +111,6 @@ function openDM(uid, name) {
     const div = buildDmMsgDiv(msg, snap.key, uid, name);
     dmArea.appendChild(div);
     dmArea.scrollTop = dmArea.scrollHeight;
-    // إشعار إذا لم تكن المحادثة مفتوحة
     if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
       _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
       updateDmBadge();
@@ -128,7 +133,6 @@ function openDM(uid, name) {
     _dmListener = { path, fn };
   });
 
-  // مؤشر الكتابة
   const typPath = 'dm_typing/' + dmId + '/' + uid;
   _dmTypingListener = typPath;
   db.ref(typPath).on('value', snap => {
@@ -196,7 +200,6 @@ async function sendDM() {
 
   if (text) {
     await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
-    // ═══ إشعار الرسائل الخاصة — مُصلح للجوال ═══
     setTimeout(async () => {
       try {
         const otherName = userProfile.displayName || 'رسالة خاصة';
@@ -230,7 +233,6 @@ async function sendDM() {
     } catch(e) { toast('❌ فشل رفع الملف'); }
   }
 
-  // تتبع المحادثة
   const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
   const otherName = otherSnap.val() || 'مستخدم';
   await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
@@ -335,7 +337,6 @@ function updateDmBadge() {
     if (total>0) { if(!badge){badge=document.createElement('span');badge.className='ch-badge';btn.appendChild(badge);} badge.textContent=total>9?'9+':total; }
     else if (badge) badge.remove();
   }
-  // تحديث قائمة المحادثات في الـ Drawer
   const convList=document.getElementById('dmConvList');
   if (convList) renderDmConvList(convList);
 }
@@ -358,11 +359,9 @@ function renderDmConvList(container) {
   });
 }
 
-// ════ استماع للرسائل الخاصة الجديدة عالمياً — مُصلح ════
+// ════ استماع للرسائل الخاصة الجديدة عالمياً ════
 function listenDMs() {
   if (!currentUser) return;
-
-  // 1. استمع لقائمة المحادثات الموجودة
   db.ref('dms/'+currentUser.uid).on('value', snap => {
     renderDmList();
     if (!snap.exists()) return;
@@ -371,31 +370,24 @@ function listenDMs() {
       _addDmListener(uid);
     });
   });
-
-  // 2. استمع لـ notifications/ لاستقبال إشعارات من محادثات جديدة
-  // هذا يضمن وصول الإشعار حتى لو لم تكن المحادثة في dms/ بعد
   db.ref('notifications/'+currentUser.uid).on('child_added', snap => {
     const notif = snap.val();
     if (!notif) return;
-    if (Date.now() - notif.ts > 15000) return; // تجاهل القديم
+    if (Date.now() - notif.ts > 15000) return;
     if (notif.from === currentUser.uid) return;
     if (notif.data?.type === 'dm' && notif.data?.fromUid) {
       const fromUid = notif.data.fromUid;
-      // أضف listener للمحادثة الجديدة
       _addDmListener(fromUid);
-      // عرض الإشعار إذا لم تكن المحادثة مفتوحة
       if (_currentDmUid !== fromUid) {
         _dmUnread[fromUid] = (_dmUnread[fromUid]||0) + 1;
         updateDmBadge();
         showDmNotif({ name: notif.title || 'رسالة خاصة', text: notif.body || '' }, fromUid);
       }
     }
-    // احذف الإشعار بعد معالجته
     db.ref('notifications/'+currentUser.uid+'/'+snap.key).remove();
   });
 }
 
-// دالة مساعدة لإضافة listener لمحادثة خاصة
 function _addDmListener(uid) {
   if (_dmGlobalListeners[uid]) return;
   const dmId = getDmId(currentUser.uid, uid);
@@ -452,8 +444,11 @@ function handleDmMediaSelect(input) {
   }
   preview.style.display='flex';
   files.forEach(file=>{
-    if (file.size>50*1024*1024){toast('❌ الملف أكبر من 50MB');return;}
-    const entry={file,type:file.type.startsWith('video')?'video':'image',name:file.name};
+    const isVideo=file.type.startsWith('video');
+    const maxSize=isVideo?500*1024*1024:50*1024*1024;
+    const maxLabel=isVideo?'500MB':'50MB';
+    if (file.size>maxSize){toast(`❌ الملف أكبر من ${maxLabel}`);return;}
+    const entry={file,type:isVideo?'video':'image',name:file.name};
     window._pendingDmMedia.push(entry);
     const wrap=document.createElement('div'); wrap.style.cssText='position:relative;display:inline-flex';
     const img=document.createElement('img'); img.src=URL.createObjectURL(file);
