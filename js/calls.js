@@ -373,7 +373,7 @@ function _stopRingtone() {
   if (_ringtoneCtx) { try { _ringtoneCtx.close(); } catch(e) {} _ringtoneCtx = null; }
 }
 
-// CSS للأنيميشن
+// ════ CSS للأنيميشن (معدل ليعمل بعد تحميل الصفحة) ════
 const callStyle = document.createElement('style');
 callStyle.textContent = `
   @keyframes callPulse {
@@ -383,4 +383,7 @@ callStyle.textContent = `
   #activeCallScreen button:hover { opacity: 0.85; }
   #activeCallScreen button.active { background: rgba(255,255,255,0.35) !important; }
 `;
-document.head.appendChild(callStyle);
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.head.appendChild(callStyle);
+});
