@@ -242,6 +242,47 @@ async function endCall(reason = 'ended') {
   else if (reason !== 'silent') toast('📵 انتهت المكالمة');
 }
 
+// ════ كشف متصفّح داخل التطبيقات (in-app WebView) ════
+// هذه المتصفحات (Google app, Facebook, Instagram, ...) تمنع غالباً الكاميرا/الميكروفون
+function _isInAppBrowser() {
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|FB_IAB|Instagram|Line|Twitter|Snapchat|TikTok|MicroMessenger|GSA\//i.test(ua)
+    || /\bwv\b/.test(ua); // Android WebView
+}
+
+// ════ شاشة إرشادية عند منع الكاميرا/الميكروفون ════
+function _showMediaBlockedHelp(type) {
+  _stopRingtone();
+  const inApp = _isInAppBrowser();
+  const need = type === 'video' ? 'الكاميرا والميكروفون' : 'الميكروفون';
+  console.warn('[CALL] 🚫 عرض شاشة منع الوسائط — inAppBrowser =', inApp);
+
+  let scr = document.getElementById('mediaBlockedScreen');
+  if (!scr) { scr = document.createElement('div'); scr.id = 'mediaBlockedScreen'; document.body.appendChild(scr); }
+  scr.style.cssText = 'position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#0d2535,#1a4a4a);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Tajawal,sans-serif;color:#fff;padding:28px;text-align:center';
+  scr.innerHTML = `
+    <div style="font-size:60px">🎤🚫</div>
+    <div style="font-size:20px;font-weight:800">تعذّر الوصول إلى ${need}</div>
+    <div style="font-size:15px;color:rgba(255,255,255,0.85);max-width:340px;line-height:1.8">
+      ${inApp
+        ? 'يبدو أنك فتحت الموقع من متصفّح داخل تطبيق آخر (مثل Google أو فيسبوك)، وهو لا يسمح باستخدام الكاميرا/الميكروفون.<br><br>افتح الرابط في <b>Safari</b> أو <b>Chrome</b> مباشرةً ثم أعد المحاولة.'
+        : 'تأكد من السماح للموقع باستخدام الكاميرا والميكروفون من إعدادات المتصفح، ثم أعد المحاولة.'}
+    </div>
+    <button id="copyCallLinkBtn" style="background:#23a55a;color:#fff;border:none;border-radius:12px;padding:13px 26px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer">📋 نسخ رابط الموقع</button>
+    <button id="closeMediaBlockedBtn" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:12px;padding:11px 24px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer">إغلاق</button>
+  `;
+  scr.style.display = 'flex';
+  const copyBtn = document.getElementById('copyCallLinkBtn');
+  if (copyBtn) copyBtn.onclick = () => {
+    navigator.clipboard?.writeText(location.href).then(
+      () => toast('📋 تم نسخ الرابط — الصقه في Safari أو Chrome'),
+      () => toast('انسخ الرابط يدوياً من شريط العنوان')
+    );
+  };
+  const closeBtn = document.getElementById('closeMediaBlockedBtn');
+  if (closeBtn) closeBtn.onclick = () => scr.remove();
+}
+
 // ════ الانضمام لقناة المكالمة ════
 async function joinCallChannel(channelName, type, otherName, otherUid) {
   console.log('%c[CALL] ▶ joinCallChannel', 'color:#23a55a;font-weight:bold', { channelName, type, otherName, otherUid });
@@ -307,30 +348,38 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
 
     // ④ أنشئ ونشر المسارات المحلية — عنصر #local-video موجود الآن
     const tracks = [];
-    _localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: 'speech_standard' });
-    tracks.push(_localAudioTrack);
+    try {
+      _localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: 'speech_standard' });
+      tracks.push(_localAudioTrack);
 
-    if (type === 'video') {
-      // جودة HD مرنة مع fallback تلقائي لو عجز جوال عن استيعاب الدقة العالية
-      try {
-        _localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-          encoderConfig: {
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            frameRate: { ideal: 30, min: 15 },
-            bitrateMax: 1500
-          }
-        });
-        console.log('[CALL] 🎥 أُنشئ فيديو محلي بجودة HD (1280×720)');
-      } catch(hdErr) {
-        console.warn('[CALL] ⚠ فشلت دقة HD على هذا الجهاز — التحويل للإعداد الافتراضي:', hdErr.message || hdErr);
-        toast('⚠️ تعذّرت الجودة العالية — استخدام الجودة الافتراضية');
-        _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-        console.log('[CALL] 🎥 أُنشئ فيديو محلي بالإعداد الافتراضي (fallback)');
+      if (type === 'video') {
+        // جودة HD مرنة مع fallback تلقائي لو عجز جوال عن استيعاب الدقة العالية
+        try {
+          _localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+            encoderConfig: {
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 },
+              frameRate: { ideal: 30, min: 15 },
+              bitrateMax: 1500
+            }
+          });
+          console.log('[CALL] 🎥 أُنشئ فيديو محلي بجودة HD (1280×720)');
+        } catch(hdErr) {
+          console.warn('[CALL] ⚠ فشلت دقة HD على هذا الجهاز — التحويل للإعداد الافتراضي:', hdErr.message || hdErr);
+          toast('⚠️ تعذّرت الجودة العالية — استخدام الجودة الافتراضية');
+          _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+          console.log('[CALL] 🎥 أُنشئ فيديو محلي بالإعداد الافتراضي (fallback)');
+        }
+        tracks.push(_localVideoTrack);
+        _localVideoTrack.play('local-video');
+        console.log('[CALL] 🎥 تشغيل الفيديو المحلي في #local-video');
       }
-      tracks.push(_localVideoTrack);
-      _localVideoTrack.play('local-video');
-      console.log('[CALL] 🎥 تشغيل الفيديو المحلي في #local-video');
+    } catch(mediaErr) {
+      // فشل الوصول للكاميرا/الميكروفون كلياً — غالباً متصفّح داخل تطبيق يمنع الوسائط
+      console.error('[CALL] ✖ تعذّر الوصول للكاميرا/الميكروفون:', mediaErr.code || '', mediaErr.message || mediaErr);
+      _showMediaBlockedHelp(type);
+      endCall('silent');
+      return;
     }
 
     await _callClient.publish(tracks);
