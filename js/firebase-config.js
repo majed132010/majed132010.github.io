@@ -1,5 +1,25 @@
 'use strict';
 
+// ════ مستمع طوارئ عام — أول ما يُسجَّل لالتقاط أي خطأ يسبّب الشاشة البيضاء (آيفون) ════
+window.onerror = function(message, source, lineno, colno, error) {
+  try {
+    var file = (source || 'غير معروف').split('/').pop();
+    alert('⚠️ خطأ برمجي:\n\n' + message +
+          '\n\n📄 الملف: ' + file +
+          '\n📍 الموقع: سطر ' + lineno + ' عمود ' + colno +
+          (error && error.stack ? '\n\n' + error.stack : ''));
+  } catch(_) {}
+  return false; // اترك المتصفح يسجّل الخطأ في Console أيضاً
+};
+// أخطاء الـ Promise غير المعالَجة (معظم كود التطبيق غير متزامن)
+window.addEventListener('unhandledrejection', function(ev) {
+  try {
+    var r = ev.reason || {};
+    alert('⚠️ خطأ غير معالَج (Promise):\n\n' + (r.message || r) +
+          (r.code ? '\n🔖 الكود: ' + r.code : ''));
+  } catch(_) {}
+});
+
 const FB = firebase.initializeApp({
   apiKey: "AIzaSyCmZPRoEt3IDFxeH-aqvYQIi5dGOmFlS5Y",
   authDomain: "awalim2-5bdb1.firebaseapp.com",
