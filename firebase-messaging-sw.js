@@ -17,25 +17,43 @@ const messaging = firebase.messaging();
 // استقبال إشعارات FCM في الخلفية
 messaging.onBackgroundMessage(payload => {
   console.log('Background message received:', payload);
+  const data = payload.data || {};
 
-  const title = payload.notification?.title
-    || payload.data?.title
-    || 'عوالم 🌍';
+  // ═══ مكالمة واردة — إشعار عالي الأولوية برنين واهتزاز صارم وأزرار قبول/رفض ═══
+  if (data.type === 'call') {
+    const caller = data.fromName || payload.notification?.title || 'مستخدم';
+    const kind = data.callType === 'video' ? 'مكالمة فيديو' : 'مكالمة صوتية';
+    self.registration.showNotification('📞 مكالمة واردة...', {
+      body: caller + ' يتصل بك — ' + kind,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'call-' + (data.callId || data.fromUid || Date.now()),
+      data: data,
+      // اهتزاز صارم مستمر يحاكي الرنين
+      vibrate: [500, 200, 500, 200, 500, 200, 500, 200, 500],
+      requireInteraction: true, // لا يختفي إلا بتفاعل المستخدم
+      renotify: true,
+      dir: 'rtl',
+      lang: 'ar',
+      actions: [
+        { action: 'accept', title: 'قبول ✅' },
+        { action: 'reject', title: 'رفض ❌' }
+      ]
+    });
+    return;
+  }
 
-  const body = payload.notification?.body
-    || payload.data?.body
-    || 'رسالة جديدة';
-
-  const isDM = payload.data?.type === 'dm';
+  // ═══ بقية الإشعارات (رسائل القنوات / الرسائل الخاصة) ═══
+  const title = payload.notification?.title || data.title || 'عوالم 🌍';
+  const body = payload.notification?.body || data.body || 'رسالة جديدة';
+  const isDM = data.type === 'dm';
 
   self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: isDM
-      ? 'dm-' + (payload.data?.fromUid || Date.now())
-      : 'msg-' + Date.now(),
-    data: payload.data || {},
+    tag: isDM ? 'dm-' + (data.fromUid || Date.now()) : 'msg-' + Date.now(),
+    data: data,
     vibrate: [200, 100, 200],
     requireInteraction: false,
     dir: 'rtl',
@@ -43,17 +61,29 @@ messaging.onBackgroundMessage(payload => {
   });
 });
 
-// عند الضغط على الإشعار
+// عند الضغط على الإشعار أو أحد أزراره
 self.addEventListener('notificationclick', event => {
+  const action = event.action; // 'accept' | 'reject' | '' (نقر على جسم الإشعار)
+  const data = event.notification.data || {};
   event.notification.close();
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      // أبلغ أي نافذة مفتوحة بقرار المستخدم (لتنفيذ القبول/الرفض في سياق مصادَق)
+      const msg = { type: 'call_action', action: action || 'open', data };
       for (const client of list) {
-        if (client.url.includes('majed132010.github.io') && 'focus' in client) {
-          return client.focus();
+        if (client.url.includes('majed132010.github.io')) {
+          client.postMessage(msg);
+          // الرفض لا يتطلب فتح/تركيز التطبيق
+          if (action === 'reject') return;
+          if ('focus' in client) return client.focus();
         }
       }
-      return clients.openWindow('https://majed132010.github.io');
+      // لا توجد نافذة مفتوحة: افتح التطبيق (إلا عند الرفض)
+      if (action === 'reject') return;
+      const url = 'https://majed132010.github.io/'
+        + (data.type === 'call' ? '?call=' + (action === 'accept' ? 'accept' : 'open') + '&from=' + (data.fromUid || '') : '');
+      return clients.openWindow(url);
     })
   );
 });
