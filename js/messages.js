@@ -315,19 +315,13 @@ async function sendMessage() {
     if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
 
     try {
-      let mediaUrl;
-      if (m.type === 'video') {
-        mediaUrl = await uploadToStorage(m.file, `media/${currentServer}/${currentChannel}/${Date.now()}_${m.name}`);
-        await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-          ...msgBase, text: '', mediaUrl, mediaType: 'video', mediaName: m.name, saved: true
-        });
-      } else {
-        mediaUrl = await uploadToCloudinary(m.file);
-        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-        await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-          ...msgBase, text: '', mediaUrl, mediaType: 'image', mediaName: m.name, expiresAt, saved: false
-        });
-      }
+      // توحيد سلوك القنوات مع الرسائل الخاصة: كل الوسائط (صور وفيديو) عبر Cloudinary
+      // وتنتهي تلقائياً بعد 24 ساعة (saved: false) لمطابقة نص التنبيه وسلوك الـ DM
+      const mediaUrl = await uploadToCloudinary(m.file);
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+        ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
+      });
       setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
     } catch(e) {
       tempDiv.remove();
