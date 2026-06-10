@@ -171,28 +171,66 @@ async function rejectCall() {
   toast('📵 رفضت المكالمة');
 }
 
+// ════ الاستماع لإنهاء المكالمة من الطرف الآخر ════
+function _listenToCallEnd() {
+  if (!currentUser) return;
+  const endPath = 'calls/' + currentUser.uid + '/end';
+  console.log('[CALL] 👂 الاستماع لإشارة الإنهاء على →', endPath);
+  // أزل أي مستمع سابق لتفادي التكرار
+  db.ref(endPath).off('value');
+  db.ref(endPath).on('value', snap => {
+    const v = snap.val();
+    console.log('[CALL] 📥 حدث على مسار الإنهاء:', v);
+    if (!v) return; // فارغ (أو تم حذفه) — تجاهل
+    console.warn('[CALL] ✖ أنهى الطرف الآخر المكالمة');
+    db.ref(endPath).off('value');
+    // ننهي محلياً فقط دون إعادة الكتابة للطرف الآخر (لتفادي حلقة لا نهائية)
+    endCall('remote');
+  }, err => {
+    console.error('[CALL] ✖ خطأ في مستمع الإنهاء (تحقق من قواعد Firebase):', err.code, err.message);
+  });
+}
+
 // ════ إنهاء المكالمة ════
 async function endCall(reason = 'ended') {
+  console.log('%c[CALL] ▶ endCall', 'color:#e04040;font-weight:bold', { reason, call: _currentCall });
   clearTimeout(_callTimeout);
   clearInterval(_callTimer);
   _callSeconds = 0;
 
+  // أوقف المستمع على عقدتنا فوراً قبل أي تنظيف
+  if (currentUser) { try { db.ref('calls/' + currentUser.uid + '/end').off('value'); } catch(e) {} }
+
+  // أوقف الوسائط المحلية وغادر قناة Agora
   if (_callClient) {
     try {
       if (_localAudioTrack) { _localAudioTrack.stop(); _localAudioTrack.close(); _localAudioTrack = null; }
       if (_localVideoTrack) { _localVideoTrack.stop(); _localVideoTrack.close(); _localVideoTrack = null; }
       await _callClient.leave();
-    } catch(e) {}
+      console.log('[CALL] ✓ غادرت قناة Agora');
+    } catch(e) { console.warn('[CALL] ⚠ خطأ أثناء مغادرة Agora:', e); }
     _callClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
   }
 
-  if (_currentCall) {
+  // أبلغ الطرف الآخر بالإنهاء — إلا إذا كنا ننهي ردّاً على إشارته هو ('remote')
+  if (_currentCall && reason !== 'remote') {
     const { fromUid, toUid, callId, role } = _currentCall;
     const otherUid = role === 'caller' ? toUid : fromUid;
+    const otherEndPath = 'calls/' + otherUid + '/end';
     try {
-      await db.ref('calls/' + otherUid + '/end').set({ callId, ts: Date.now() });
+      await db.ref(otherEndPath).set({ callId, ts: Date.now() });
+      console.log('[CALL] ✓ أبلغت الطرف الآخر بالإنهاء →', otherEndPath);
+    } catch(e) {
+      console.error('[CALL] ✖ فشل إبلاغ الطرف الآخر بالإنهاء:', e.code, e.message);
+    }
+  }
+
+  // نظّف عقدة المكالمة الخاصة بنا في Firebase
+  if (currentUser) {
+    try {
       await db.ref('calls/' + currentUser.uid).remove();
-    } catch(e) {}
+      console.log('[CALL] ✓ حذفت calls/' + currentUser.uid);
+    } catch(e) { console.error('[CALL] ✖ فشل حذف عقدة المكالمة:', e.code, e.message); }
   }
 
   _currentCall = null;
@@ -200,29 +238,48 @@ async function endCall(reason = 'ended') {
 
   if (reason === 'no_answer') toast('📵 لم يرد');
   else if (reason === 'rejected') toast('📵 رفض المكالمة');
+  else if (reason === 'remote') toast('📵 أنهى الطرف الآخر المكالمة');
   else if (reason !== 'silent') toast('📵 انتهت المكالمة');
 }
 
 // ════ الانضمام لقناة المكالمة ════
 async function joinCallChannel(channelName, type, otherName, otherUid) {
+  console.log('%c[CALL] ▶ joinCallChannel', 'color:#23a55a;font-weight:bold', { channelName, type, otherName, otherUid });
+
+  // ① ابنِ شاشة المكالمة النشطة أولاً لضمان وجود عناصر #remote-video و #local-video
+  //    قبل أي استدعاء لـ .play()، وإلا تظهر الشاشة سوداء.
+  showActiveCallScreen(otherName, type);
+
   try {
     _callClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
-    // استمع لإنهاء المكالمة من الطرف الآخر
-    db.ref('calls/' + currentUser.uid + '/end').on('value', snap => {
-      if (!snap.val()) return;
-      db.ref('calls/' + currentUser.uid + '/end').off('value');
-      db.ref('calls/' + currentUser.uid).remove();
-      endCall('silent');
-      toast('📵 أنهى ' + otherName + ' المكالمة');
-    });
+    // عالج حظر التشغيل التلقائي للصوت (شائع لدى المتصِل لأنه ينضم من callback وليس من نقرة)
+    AgoraRTC.onAutoplayFailed = () => {
+      console.warn('[CALL] ⚠ التشغيل التلقائي محظور — في انتظار تفاعل المستخدم');
+      toast('🔈 اضغط على الشاشة لتشغيل الصوت');
+      document.body.addEventListener('click', () => {}, { once: true });
+    };
 
-    // أحداث Agora
+    // ② امسح أي إشارة إنهاء قديمة ثم سجّل المستمع — قبل الانضمام
+    await db.ref('calls/' + currentUser.uid + '/end').remove();
+    _listenToCallEnd();
+
+    // ③ أحداث Agora — استقبال وسائط الطرف الآخر وتوصيلها بعناصر DOM (الموجودة الآن)
     _callClient.on('user-published', async (user, mediaType) => {
-      await _callClient.subscribe(user, mediaType);
-      if (mediaType === 'audio' && user.audioTrack) user.audioTrack.play();
-      if (mediaType === 'video' && user.videoTrack) {
-        user.videoTrack.play('remote-video');
+      console.log('[CALL] 📡 user-published:', mediaType, 'من', user.uid);
+      try {
+        await _callClient.subscribe(user, mediaType);
+        if (mediaType === 'audio' && user.audioTrack) {
+          user.audioTrack.play();
+          console.log('[CALL] 🔊 تشغيل صوت الطرف الآخر');
+        }
+        if (mediaType === 'video' && user.videoTrack) {
+          user.videoTrack.play('remote-video');
+          console.log('[CALL] 🎥 تشغيل فيديو الطرف الآخر في #remote-video');
+        }
+      } catch(err) {
+        console.error('[CALL] ✖ فشل الاشتراك/التشغيل لوسائط الطرف الآخر:', err);
+        toast('⚠️ تعذّر تشغيل وسائط الطرف الآخر');
       }
     });
 
@@ -231,17 +288,24 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
       if (mediaType === 'video' && user.videoTrack) user.videoTrack.stop();
     });
 
+    // إذا غادر الطرف الآخر قناة Agora فجأة (إغلاق التبويب مثلاً)، أنهِ المكالمة هنا أيضاً
+    _callClient.on('user-left', user => {
+      console.log('[CALL] 👋 غادر الطرف الآخر قناة Agora:', user.uid);
+      endCall('remote');
+    });
+
     // احصل على Token
     const uidHash = Math.abs(
       currentUser.uid.split('').reduce((a,c) => (a<<5)-a+c.charCodeAt(0), 0)
     ) % 999999 + 1;
 
     const token = await getAgoraToken(channelName, uidHash);
-    if (!token) { toast('❌ فشل الاتصال'); endCall('silent'); return; }
+    if (!token) { console.error('[CALL] ✖ تعذّر الحصول على token'); toast('❌ فشل الاتصال'); endCall('silent'); return; }
 
     await _callClient.join('3a810a3ea5a24451ab56a6b7429c929c', channelName, token, uidHash);
+    console.log('[CALL] ✓ انضممت لقناة Agora:', channelName, '(uid:', uidHash + ')');
 
-    // أنشئ المسارات
+    // ④ أنشئ ونشر المسارات المحلية — عنصر #local-video موجود الآن
     const tracks = [];
     _localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: 'speech_standard' });
     tracks.push(_localAudioTrack);
@@ -250,14 +314,14 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
       _localVideoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: '480p' });
       tracks.push(_localVideoTrack);
       _localVideoTrack.play('local-video');
+      console.log('[CALL] 🎥 تشغيل الفيديو المحلي في #local-video');
     }
 
     await _callClient.publish(tracks);
-
-    showActiveCallScreen(otherName, type);
+    console.log('%c[CALL] ✓ تم نشر الوسائط المحلية — المكالمة نشطة', 'color:#23a55a;font-weight:bold');
 
   } catch(e) {
-    console.error('Call error:', e);
+    console.error('[CALL] ✖ خطأ في joinCallChannel:', e);
     toast('❌ فشل الاتصال: ' + (e.message || ''));
     endCall('silent');
   }
