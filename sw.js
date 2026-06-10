@@ -1,5 +1,5 @@
 // ════ عوالم — Service Worker v4 ════
-const CACHE_NAME = 'awalem-v4';
+const CACHE_NAME = 'awalem-v5';
 const IMAGE_CACHE = 'awalem-images-v2';
 const CACHE_URLS = [
   '/',
@@ -14,6 +14,8 @@ const CACHE_URLS = [
   '/js/servers.js',
   '/js/messages.js',
   '/js/dm.js',
+  '/js/calls.js',
+  '/js/push.js',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js',
