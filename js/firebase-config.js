@@ -160,13 +160,16 @@ const CLOUDINARY_CLOUD = 'dz9gy0rsr';
 const CLOUDINARY_PRESET = 'awalem_upload';
 
 async function uploadToCloudinary(file, retries = 3) {
+  // Cloudinary يتطلب المسار /video/upload لمقاطع الفيديو، وإلا يفشل أو يعلق الرفع.
+  // غير ذلك نستخدم /auto/ (يتعامل مع الصور والصوت تلقائياً).
+  const resourceType = (file.type || '').startsWith('video') ? 'video' : 'auto';
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('upload_preset', CLOUDINARY_PRESET);
       formData.append('folder', 'awalem');
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`, {
         method: 'POST', body: formData
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Cloudinary upload failed'); }

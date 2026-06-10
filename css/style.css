@@ -841,9 +841,10 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 }
 .toast{
   background:#2e3338;color:#ffffff;
-  border:none;border-radius:8px;
-  padding:10px 20px;font-size:13px;font-weight:600;
-  box-shadow:0 4px 20px rgba(0,0,0,0.25);white-space:nowrap;
+  border:none;border-radius:22px;
+  padding:9px 18px;font-size:13px;font-weight:600;line-height:1.5;
+  max-width:min(90vw,340px);text-align:center;white-space:normal;word-break:break-word;
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);
   animation:toastIn .3s,toastOut .3s 2.5s forwards;
 }
 @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}

@@ -218,7 +218,7 @@ async function sendDM() {
   if (dmPreview) { dmPreview.innerHTML=''; dmPreview.style.display='none'; }
 
   if (media.length) {
-    toast('⏱️ للتنويه: تختفي الصور ومقاطع الفيديو تلقائياً بعد 24 ساعة للحفاظ على الخصوصية والمساحة.');
+    toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
   }
 
   for (const m of media) {
