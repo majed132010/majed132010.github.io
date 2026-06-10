@@ -1,3 +1,23 @@
+// ════ مستمع طوارئ عام — يطبع أي خطأ يمنع تحميل الواجهة (تشخيص الشاشة البيضاء) ════
+window.onerror = function(message, source, lineno, colno, error) {
+  try {
+    var file = (source || 'غير معروف').split('/').pop();
+    alert('⚠️ خطأ برمجي:\n\n' + message +
+          '\n\n📄 الملف: ' + file +
+          '\n📍 الموقع: سطر ' + lineno + ' عمود ' + colno +
+          (error && error.stack ? '\n\n' + error.stack : ''));
+  } catch(_) {}
+  return false; // اترك المتصفح يسجّل الخطأ في Console أيضاً
+};
+// أخطاء الـ Promise غير المعالَجة (معظم كود التطبيق غير متزامن)
+window.addEventListener('unhandledrejection', function(ev) {
+  try {
+    var r = ev.reason || {};
+    alert('⚠️ خطأ غير معالَج (Promise):\n\n' + (r.message || r) +
+          (r.code ? '\n🔖 الكود: ' + r.code : ''));
+  } catch(_) {}
+});
+
 // ════ AUTH & USER ════
 let currentUser = null;
 let userProfile = {};
@@ -52,31 +72,23 @@ function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  // على الجوال: إعادة التوجيه (redirect) أكثر موثوقية من النوافذ المنبثقة (popup)
-  // التي تحجبها متصفحات الجوال غالباً وتترك المستخدم عالقاً على صفحة المُعالِج البيضاء.
-  if (typeof isMobile === 'function' && isMobile()) {
-    console.log('[AUTH] جوال — استخدام signInWithRedirect');
-    auth.signInWithRedirect(provider).catch(e => {
-      console.error('[AUTH] ✖ فشل redirect:', e.code, e.message);
-      _restoreSignInBtn(btn);
-      toast('❌ خطأ في تسجيل الدخول: ' + (e.message || e.code));
-    });
-    return;
-  }
-
-  // سطح المكتب: popup، مع التحويل إلى redirect لو حُجب الـ popup
+  // الأساس: signInWithPopup. وعند حظره/تعذّره من المتصفح: تحويل تلقائي إلى signInWithRedirect.
   auth.signInWithPopup(provider)
     .then(() => { if (btn) btn.disabled = false; })
     .catch(e => {
       console.error('[AUTH] ✖ فشل popup:', e.code, e.message);
       _restoreSignInBtn(btn);
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
-        console.log('[AUTH] حُجب الـ popup — التحويل إلى redirect');
+      const popupFailed = e.code === 'auth/popup-blocked'
+        || e.code === 'auth/operation-not-supported-in-this-environment'
+        || e.code === 'auth/cancelled-popup-request'
+        || e.code === 'auth/web-storage-unsupported';
+      if (popupFailed) {
+        console.log('[AUTH] تعذّر الـ popup — التحويل التلقائي إلى redirect');
         auth.signInWithRedirect(provider).catch(err => {
           console.error('[AUTH] ✖ فشل redirect الاحتياطي:', err.code, err.message);
           toast('⚠️ اضغط مجدداً لتسجيل الدخول');
         });
-      } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      } else if (e.code !== 'auth/popup-closed-by-user') {
         toast('❌ خطأ: ' + (e.message || e.code));
       }
     });
