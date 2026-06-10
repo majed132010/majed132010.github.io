@@ -269,6 +269,10 @@ async function sendMessage() {
     }, 0);
   }
 
+  if (media.length) {
+    toast('⏱️ للتنويه: تختفي الصور ومقاطع الفيديو تلقائياً بعد 24 ساعة للحفاظ على الخصوصية والمساحة.');
+  }
+
   for (const m of media) {
     const area = document.getElementById('messagesArea');
     const localUrl = URL.createObjectURL(m.file);

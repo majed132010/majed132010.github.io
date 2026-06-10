@@ -217,6 +217,10 @@ async function sendDM() {
   const dmPreview = document.getElementById('dmMediaPreview');
   if (dmPreview) { dmPreview.innerHTML=''; dmPreview.style.display='none'; }
 
+  if (media.length) {
+    toast('⏱️ للتنويه: تختفي الصور ومقاطع الفيديو تلقائياً بعد 24 ساعة للحفاظ على الخصوصية والمساحة.');
+  }
+
   for (const m of media) {
     try {
       toast('⏳ جاري رفع الوسائط...');
