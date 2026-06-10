@@ -10,51 +10,94 @@ let _callSeconds = 0;
 
 // ════ بدء مكالمة ════
 async function startCall(toUid, toName, type = 'audio') {
-  if (_currentCall) { toast('⚠️ أنت في مكالمة بالفعل'); return; }
+  console.log('%c[CALL] ▶ startCall', 'color:#23a55a;font-weight:bold', { toUid, toName, type });
+
+  if (!currentUser) {
+    console.error('[CALL] ✖ startCall: لا يوجد مستخدم مسجّل (currentUser = null)');
+    toast('❌ يجب تسجيل الدخول أولاً');
+    return;
+  }
+  if (!toUid) {
+    console.error('[CALL] ✖ startCall: toUid مفقود', { toUid });
+    toast('❌ معرّف الطرف الآخر مفقود');
+    return;
+  }
+  if (_currentCall) {
+    console.warn('[CALL] ⚠ startCall: مكالمة جارية بالفعل', _currentCall);
+    toast('⚠️ أنت في مكالمة بالفعل');
+    return;
+  }
 
   const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
   const channelName = callId.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 64);
+  console.log('[CALL] أنشأت callId/channelName:', { callId, channelName });
 
   _currentCall = { callId, type, fromUid: currentUser.uid, toUid, channelName, role: 'caller' };
 
   // اكتب المكالمة في Firebase
-  await db.ref('calls/' + toUid + '/incoming').set({
-    callId,
-    type,
-    fromUid: currentUser.uid,
-    fromName: userProfile.displayName || 'مستخدم',
-    channelName,
-    ts: Date.now()
-  });
+  const incomingPath = 'calls/' + toUid + '/incoming';
+  console.log('[CALL] ✏ الكتابة في Firebase →', incomingPath);
+  try {
+    await db.ref(incomingPath).set({
+      callId,
+      type,
+      fromUid: currentUser.uid,
+      fromName: userProfile.displayName || 'مستخدم',
+      channelName,
+      ts: Date.now()
+    });
+    console.log('%c[CALL] ✓ نجحت الكتابة في Firebase', 'color:#23a55a', incomingPath);
+  } catch (e) {
+    console.error('[CALL] ✖ فشلت الكتابة في Firebase:', e.code, e.message, '\nالمسار:', incomingPath);
+    toast('❌ فشل إرسال المكالمة (Firebase): ' + (e.code || e.message || ''));
+    _currentCall = null;
+    hideCallScreens();
+    return;
+  }
 
   // أرسل إشعار push
+  console.log('[CALL] 🔔 إرسال إشعار Push إلى', toUid);
   try {
     await sendPushToUser(toUid, userProfile.displayName || 'عوالم',
       type === 'video' ? '📹 مكالمة فيديو واردة' : '📞 مكالمة صوتية واردة',
       { type: 'call', callType: type, fromUid: currentUser.uid, fromName: userProfile.displayName || 'مستخدم', callId, channelName }
     );
-  } catch(e) {}
+    console.log('[CALL] ✓ تم استدعاء sendPushToUser (لا يضمن وصول الإشعار فعلياً)');
+  } catch(e) {
+    console.error('[CALL] ✖ فشل إرسال إشعار Push:', e);
+    toast('⚠️ تعذّر إرسال إشعار الدفع — المكالمة قد تصل فقط إذا كان التطبيق مفتوحاً لدى الطرف الآخر');
+  }
 
   // عرض شاشة الاتصال الصادر
+  console.log('[CALL] 📺 عرض شاشة الاتصال الصادر');
   showOutgoingCallScreen(toName, type);
 
   // انتظر الرد 45 ثانية
   _callTimeout = setTimeout(() => {
+    console.warn('[CALL] ⏱ انتهت مهلة 45 ثانية بدون رد');
     endCall('no_answer');
   }, 45000);
 
   // استمع لرد المتصل به
-  db.ref('calls/' + currentUser.uid + '/response').on('value', async snap => {
+  const responsePath = 'calls/' + currentUser.uid + '/response';
+  console.log('[CALL] 👂 الاستماع لرد الطرف الآخر على →', responsePath);
+  db.ref(responsePath).on('value', async snap => {
     const resp = snap.val();
-    if (!resp || resp.callId !== callId) return;
-    db.ref('calls/' + currentUser.uid + '/response').off('value');
+    console.log('[CALL] 📥 وصل حدث على مسار الرد:', resp);
+    if (!resp || resp.callId !== callId) {
+      console.log('[CALL] … تجاهل الرد (فارغ أو callId غير مطابق)', { got: resp?.callId, expected: callId });
+      return;
+    }
+    db.ref(responsePath).off('value');
     clearTimeout(_callTimeout);
 
     if (resp.status === 'accepted') {
+      console.log('%c[CALL] ✓ قَبِل الطرف الآخر المكالمة', 'color:#23a55a;font-weight:bold');
       toast('✅ تم قبول المكالمة');
       hideCallScreens();
       await joinCallChannel(channelName, type, toName, toUid);
     } else {
+      console.warn('[CALL] ✖ رفض الطرف الآخر المكالمة، status =', resp.status);
       endCall('rejected');
     }
   });
@@ -62,17 +105,35 @@ async function startCall(toUid, toName, type = 'audio') {
 
 // ════ استقبال مكالمة ════
 function listenIncomingCalls() {
-  if (!currentUser) return;
-  db.ref('calls/' + currentUser.uid + '/incoming').on('value', snap => {
+  if (!currentUser) {
+    console.error('[CALL] ✖ listenIncomingCalls: لا يوجد مستخدم مسجّل — لن يتم تسجيل المستمع');
+    return;
+  }
+  const incomingPath = 'calls/' + currentUser.uid + '/incoming';
+  console.log('%c[CALL] 👂 تسجيل مستمع المكالمات الواردة على →', 'color:#1a9fff;font-weight:bold', incomingPath);
+  db.ref(incomingPath).on('value', snap => {
     const call = snap.val();
-    if (!call) return;
-    if (Date.now() - call.ts > 45000) {
-      db.ref('calls/' + currentUser.uid + '/incoming').remove();
+    console.log('[CALL] 📥 حدث على مسار المكالمات الواردة:', call);
+    if (!call) {
+      console.log('[CALL] … لا توجد مكالمة واردة (تم المسح أو فارغ)');
       return;
     }
-    if (_currentCall) return; // مشغول
+    if (Date.now() - call.ts > 45000) {
+      console.warn('[CALL] ⏱ مكالمة واردة قديمة (أكثر من 45 ثانية) — سيتم حذفها', { age: Date.now() - call.ts });
+      db.ref(incomingPath).remove();
+      return;
+    }
+    if (_currentCall) {
+      console.warn('[CALL] ⚠ مشغول بمكالمة أخرى — تجاهل الواردة', _currentCall);
+      return; // مشغول
+    }
+    console.log('%c[CALL] 🔔 مكالمة واردة! عرض شاشة الاستقبال', 'color:#23a55a;font-weight:bold',
+      { from: call.fromName, type: call.type });
     _currentCall = { ...call, toUid: currentUser.uid, role: 'callee' };
     showIncomingCallScreen(call.fromName, call.type, call.fromUid, call.callId, call.channelName);
+  }, err => {
+    console.error('[CALL] ✖ خطأ في مستمع المكالمات الواردة (قد تكون قواعد Firebase تمنع القراءة):', err.code, err.message);
+    toast('❌ تعذّر الاستماع للمكالمات الواردة: ' + (err.code || err.message || ''));
   });
 }
 

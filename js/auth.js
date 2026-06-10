@@ -18,6 +18,13 @@ auth.onAuthStateChanged(user => {
       initApp();
       initFCM(user.uid);
       listenNotifications(user.uid);
+      // تسجيل مستمع المكالمات الواردة — بدونه لا يستقبل الطرف الآخر أي مكالمة
+      if (typeof listenIncomingCalls === 'function') {
+        console.log('[CALL] استدعاء listenIncomingCalls بعد تسجيل الدخول لـ', user.uid);
+        listenIncomingCalls();
+      } else {
+        console.error('[CALL] ✖ الدالة listenIncomingCalls غير معرّفة — تأكد من تحميل js/calls.js');
+      }
     });
   } else {
     currentUser = null;
