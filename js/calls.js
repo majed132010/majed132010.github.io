@@ -311,7 +311,23 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
     tracks.push(_localAudioTrack);
 
     if (type === 'video') {
-      _localVideoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: '480p' });
+      // جودة HD مرنة مع fallback تلقائي لو عجز جوال عن استيعاب الدقة العالية
+      try {
+        _localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+          encoderConfig: {
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            frameRate: { ideal: 30, min: 15 },
+            bitrateMax: 1500
+          }
+        });
+        console.log('[CALL] 🎥 أُنشئ فيديو محلي بجودة HD (1280×720)');
+      } catch(hdErr) {
+        console.warn('[CALL] ⚠ فشلت دقة HD على هذا الجهاز — التحويل للإعداد الافتراضي:', hdErr.message || hdErr);
+        toast('⚠️ تعذّرت الجودة العالية — استخدام الجودة الافتراضية');
+        _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+        console.log('[CALL] 🎥 أُنشئ فيديو محلي بالإعداد الافتراضي (fallback)');
+      }
       tracks.push(_localVideoTrack);
       _localVideoTrack.play('local-video');
       console.log('[CALL] 🎥 تشغيل الفيديو المحلي في #local-video');
