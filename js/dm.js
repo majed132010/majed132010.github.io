@@ -158,15 +158,21 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   }
   if (msg.text) { const txt=document.createElement('div'); txt.className='msg-content'; txt.textContent=msg.text; body.appendChild(txt); }
   if (msg.mediaUrl) {
-    const wrap=document.createElement('div'); wrap.style.cssText='margin-top:4px';
-    if (msg.mediaType==='video') {
-      const vid=document.createElement('video'); vid.src=msg.mediaUrl; vid.controls=true;
-      vid.style.cssText='max-width:220px;max-height:160px;border-radius:10px;display:block'; wrap.appendChild(vid);
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-media-wrap';
+    if (msg.mediaType === 'video') {
+      const vid = document.createElement('video');
+      vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
+      vid.className = 'msg-media-vid';
+      vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
+      wrap.appendChild(vid);
     } else {
-      const img=document.createElement('img');
-      img.style.cssText='max-width:220px;max-height:160px;border-radius:10px;display:block;cursor:pointer;object-fit:cover';
-      img.addEventListener('click',()=>openLightbox(msg.mediaUrl,'image',msg.mediaName));
-      loadCachedImage(msg.mediaUrl,msg.expiresAt,msg.saved).then(src=>{if(src) img.src=src;});
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async';
+      img.className = 'msg-media-img';
+      img.alt = msg.mediaName || '';
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
+      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
       wrap.appendChild(img);
     }
     body.appendChild(wrap);

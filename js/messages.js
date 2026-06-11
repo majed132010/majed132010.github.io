@@ -143,26 +143,28 @@ function buildMsgDiv(msg, key) {
   }
 
   if (msg.mediaUrl) {
-    const mediaWrap = document.createElement('div');
-    mediaWrap.style.cssText = 'margin-top:4px;display:inline-flex;flex-direction:column;gap:0;align-items:flex-start';
-    if (msg.voiceUrl) { const vw = document.createElement('div'); vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration)); body.appendChild(vw); }
-    const now = Date.now();
-    const expired = msg.expiresAt && !msg.saved && now > msg.expiresAt;
+    const expired = msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt;
     if (expired) {
       const expDiv = document.createElement('div');
-      expDiv.style.cssText = 'padding:8px 12px;background:rgba(0,0,0,0.1);border-radius:10px;color:var(--muted);font-size:12px';
+      expDiv.className = 'msg-media-expired';
       expDiv.textContent = '🕐 انتهت صلاحية هذه الصورة';
-      mediaWrap.appendChild(expDiv);
+      body.appendChild(expDiv);
     } else if (msg.mediaType === 'video') {
+      const mediaWrap = document.createElement('div');
+      mediaWrap.className = 'msg-media-wrap';
       const vid = document.createElement('video');
-      vid.src = msg.mediaUrl; vid.controls = true;
-      vid.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer';
+      vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
+      vid.className = 'msg-media-vid';
       vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
       mediaWrap.appendChild(vid);
+      body.appendChild(mediaWrap);
     } else {
+      const mediaWrap = document.createElement('div');
+      mediaWrap.className = 'msg-media-wrap';
       const img = document.createElement('img');
       img.loading = 'lazy'; img.decoding = 'async';
-      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover;background:#eee';
+      img.className = 'msg-media-img';
+      img.alt = msg.mediaName || '';
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
       img.addEventListener('load', () => {
         const a = document.getElementById('messagesArea');
@@ -175,8 +177,8 @@ function buildMsgDiv(msg, key) {
         else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
       });
       mediaWrap.appendChild(img);
+      body.appendChild(mediaWrap);
     }
-    body.appendChild(mediaWrap);
   }
 
   if (msg.reactions) renderReactions(msg.reactions, key, body);
@@ -293,16 +295,16 @@ async function sendMessage() {
     tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name||'')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
     tempBody.appendChild(tempMeta);
     const tempWrap = document.createElement('div');
-    tempWrap.style.cssText = 'margin-top:4px;position:relative;display:inline-block';
+    tempWrap.className = 'msg-media-wrap';
     if (m.type === 'video') {
       const vid = document.createElement('video');
       vid.src = localUrl;
-      vid.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;object-fit:cover';
+      vid.className = 'msg-media-vid';
       tempWrap.appendChild(vid);
     } else {
       const img = document.createElement('img');
       img.src = localUrl;
-      img.style.cssText = 'max-width:260px;max-height:200px;border-radius:10px;display:block;object-fit:cover';
+      img.className = 'msg-media-img';
       tempWrap.appendChild(img);
     }
     const indicator = document.createElement('div');
