@@ -1,4 +1,4 @@
-// ════ SERVERS & CHANNELS ════
+ // ════ SERVERS & CHANNELS ════
 let servers = {};
 let currentServer = null;
 let currentChannel = null;
@@ -6,37 +6,6 @@ let messagesListener = null;
 let _typingListener = null;
 let _collapsedCategories = JSON.parse(localStorage.getItem('collapsed_cats') || '{}');
 const _unreadCounts = {};
-
-// دالة حماية الواجهة والتحكم بالشاشات لمنع أخطاء التعارض
-function showView(name) {
-  const home  = document.getElementById('homeView');
-  const msgs  = document.getElementById('messagesView');
-  const voice = document.getElementById('voiceView');
-  const dm    = document.getElementById('dmView');
-  const searchBtn  = document.getElementById('searchToggleBtn');
-  const membersBtn = document.getElementById('membersToggleBtn');
-  if (home)  home.style.display  = name==='home'     ? 'flex' : 'none';
-  if (msgs)  { msgs.style.display = name==='messages' ? 'flex' : 'none'; msgs.style.flexDirection='column'; msgs.style.overflow='hidden'; }
-  if (voice) voice.style.display = name==='voice'    ? 'flex' : 'none';
-  if (dm)    dm.style.display    = name==='dm'       ? 'flex' : 'none';
-  if (searchBtn)  searchBtn.style.display  = name==='messages' ? '' : 'none';
-  if (membersBtn) membersBtn.style.display = name==='messages' ? '' : 'none';
-  if (name!=='messages') {
-    const bar=document.getElementById('searchBar');
-    if (bar?.classList.contains('show')) toggleSearch();
-    document.getElementById('membersPanel')?.classList.remove('open');
-  }
-}
-// دالة حماية داخلية لمنع توقف النظام إذا لم يتم تحميل ui.js بالترتيب الصحيح
-function closeDrawer() {
-  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
-  document.getElementById('drawerOverlay')?.classList.remove('show');
-}
-
-function closeSidebar() {
-  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
-  document.getElementById('drawerOverlay')?.classList.remove('show');
-}
 
 function initApp() {
   listenServers();
@@ -314,7 +283,7 @@ function renderHomeServers() {
     const makeBtn = (text, bg, border, color, fn) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.style.cssText = `display:block;width:100%;padding:10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation`;
+      b.style.cssText = `flex:1;padding:10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation`;
       b.textContent = text; b.addEventListener('click', fn);
       return b;
     };
@@ -560,14 +529,14 @@ async function openMemberMgmt() {
 }
 
 async function changeMemberRole(uid, name, newRole) {
-  if (!currentServer || !confirm(`تغيير دور "${name}"？`)) return;
+  if (!currentServer || !confirm(`تغيير دور "${name}"؟`)) return;
   await db.ref('servers/' + currentServer + '/members/' + uid + '/role').set(newRole);
   if (servers[currentServer]?.members?.[uid]) servers[currentServer].members[uid].role = newRole;
   toast(`✅ تم تغيير دور ${name}`);
   openMemberMgmt();
 }
 async function kickMember(uid, name) {
-  if (!currentServer || !confirm(`طرد "${name}"？`)) return;
+  if (!currentServer || !confirm(`طرد "${name}"؟`)) return;
   await db.ref('servers/' + currentServer + '/members/' + uid).remove();
   await db.ref('users/' + uid + '/servers/' + currentServer).remove();
   if (servers[currentServer]?.members) delete servers[currentServer].members[uid];
@@ -575,7 +544,7 @@ async function kickMember(uid, name) {
   openMemberMgmt();
 }
 async function banMember(uid, name) {
-  if (!currentServer || !confirm(`حظر "${name}"？`)) return;
+  if (!currentServer || !confirm(`حظر "${name}"؟`)) return;
   await db.ref('servers/' + currentServer + '/banned/' + uid).set({ name, bannedAt: Date.now(), bannedBy: currentUser.uid });
   await db.ref('servers/' + currentServer + '/members/' + uid).remove();
   await db.ref('users/' + uid + '/servers/' + currentServer).remove();
@@ -739,4 +708,94 @@ function restoreLastServer() {
     } else showHome();
   }
   window._restoringSession = false;
+}
+
+// ════ تسجيل رسالة صوتية في المحادثات الخاصة (DM) ════
+// حالة مستقلة عن تسجيل القنوات (voice.js) حتى لا يتعارضا.
+// يدير حالة التسجيل ذاتياً ولا يعتمد على وجود زر معيّن في ملفات الواجهة:
+// كل وصول للـ DOM محميّ بـ (?.) فيعمل المنطق حتى لو لم يوجد عنصر الزر.
+let _dmMediaRecorder = null, _dmAudioChunks = [], _dmRecordingTimer = null;
+let _dmRecordingSeconds = 0, _dmVoiceRecordingBusy = false;
+
+async function toggleDmVoiceRecording() {
+  if (_dmVoiceRecordingBusy) return;
+  if (!_currentDmUid || !currentUser) { toast('⚠️ افتح محادثة خاصة أولاً'); return; }
+  const btn = document.getElementById('dmVoiceRecordBtn');
+
+  // إيقاف التسجيل الجاري وإرساله
+  if (_dmMediaRecorder && _dmMediaRecorder.state === 'recording') {
+    _dmVoiceRecordingBusy = true;
+    clearInterval(_dmRecordingTimer);
+    if (btn) { btn.classList.remove('recording'); btn.textContent = '🎤'; btn.disabled = true; }
+    _dmMediaRecorder.stop();
+    return;
+  }
+
+  // بدء تسجيل جديد
+  if (!_dmMediaRecorder || _dmMediaRecorder.state === 'inactive') {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _dmAudioChunks = []; _dmRecordingSeconds = 0;
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']
+        .find(t => MediaRecorder.isTypeSupported(t)) || '';
+      _dmMediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      _dmMediaRecorder.ondataavailable = e => { if (e.data.size > 0) _dmAudioChunks.push(e.data); };
+      _dmMediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(_dmAudioChunks, { type: mimeType });
+        if (btn) btn.disabled = false;
+        _dmVoiceRecordingBusy = false; _dmMediaRecorder = null;
+        if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
+        await _sendDmVoiceMessage(blob, _dmRecordingSeconds, mimeType);
+      };
+      _dmMediaRecorder.start();
+      if (btn) { btn.classList.add('recording'); btn.textContent = '⏹ 0s'; }
+      _dmRecordingTimer = setInterval(() => {
+        _dmRecordingSeconds++;
+        if (btn) btn.textContent = `⏹ ${_dmRecordingSeconds}s`;
+        if (_dmRecordingSeconds >= 60) toggleDmVoiceRecording(); // حد أقصى 60 ثانية
+      }, 1000);
+      toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال');
+    } catch (e) {
+      _dmVoiceRecordingBusy = false; _dmMediaRecorder = null;
+      toast('❌ لا يمكن الوصول للميكروفون');
+    }
+  }
+}
+
+// رفع الرسالة الصوتية للمحادثة الخاصة الحالية وإرسالها (يطابق نمط dm.js)
+async function _sendDmVoiceMessage(blob, duration, mimeType) {
+  if (!_currentDmUid || !currentUser) return;
+  toast('⏳ جاري إرسال الرسالة الصوتية...');
+  const ct  = (mimeType || 'audio/webm').split(';')[0];
+  const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  try {
+    const url = await uploadToCloudinary(new File([blob], `voice.${ext}`, { type: ct }));
+    await db.ref('dm_messages/' + dmId).push({
+      uid: currentUser.uid,
+      name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(),
+      voiceUrl: url,
+      voiceDuration: duration,
+      text: ''
+    });
+    // حدّث فهرس المحادثات للطرفين
+    const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
+    const otherName = otherSnap.val() || 'مستخدم';
+    await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
+    await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+    // إشعار الطرف الآخر
+    setTimeout(async () => {
+      try {
+        await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية',
+          { type: 'dm', fromUid: currentUser.uid });
+      } catch (e) {}
+    }, 0);
+    toast('✅ تم إرسال الرسالة الصوتية');
+  } catch (e) {
+    toast('❌ فشل إرسال الرسالة الصوتية');
+  }
 }
