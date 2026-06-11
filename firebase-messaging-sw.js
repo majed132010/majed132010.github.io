@@ -15,6 +15,16 @@ firebase.initializeApp({
 });
 const messaging = firebase.messaging();
 
+// كبح تكرار الإشعارات: آخر وقت عرض لكل tag — يمنع الفيضان عند توارد دفعات متلاحقة
+const NOTIF_THROTTLE_MS = 4000;
+const _lastShownByTag = {};
+function _throttled(tag) {
+  const now = Date.now();
+  if (_lastShownByTag[tag] && now - _lastShownByTag[tag] < NOTIF_THROTTLE_MS) return true;
+  _lastShownByTag[tag] = now;
+  return false;
+}
+
 // استقبال الإشعارات عندما يكون التطبيق في الخلفية
 // ملاحظة: الدالة السحابية ترسل رسائل data-only، لذا نقرأ الحقول من payload.data وليس payload.notification.
 messaging.onBackgroundMessage(payload => {
@@ -22,33 +32,39 @@ messaging.onBackgroundMessage(payload => {
   const title = data.title || (payload.notification && payload.notification.title) || '🔥 عوالم';
   const body  = data.body  || (payload.notification && payload.notification.body)  || 'لديك إشعار جديد';
 
-  // مكالمة واردة → إشعار بأزرار [قبول ✅]/[رفض ❌] يبقى ظاهراً حتى يتفاعل المستخدم
+  // مكالمة واردة → إشعار واحد فقط لكل مكالمة، بأزرار [قبول ✅]/[رفض ❌]
   if (data.type === 'call') {
-    self.registration.showNotification(title, {
-      body,
-      icon: '/awalem-game/icon.png',
-      badge: '/awalem-game/icon.png',
-      dir: 'rtl', lang: 'ar',
-      vibrate: [300, 150, 300, 150, 300],
-      tag: 'call_' + (data.callId || ''), // يمنع تكرار إشعارات نفس المكالمة
-      renotify: true,
-      requireInteraction: true,           // لا يختفي تلقائياً
-      data,
-      actions: [
-        { action: 'accept', title: 'قبول ✅' },
-        { action: 'reject', title: 'رفض ❌' }
-      ]
+    const tag = 'call_' + (data.callId || '');
+    // إن كان إشعار نفس المكالمة معروضاً بالفعل → لا إعادة عرض ولا اهتزاز جديد
+    return self.registration.getNotifications({ tag }).then(existing => {
+      if (existing.length || _throttled(tag)) return;
+      return self.registration.showNotification(title, {
+        body,
+        icon: '/awalem-game/icon.png',
+        badge: '/awalem-game/icon.png',
+        dir: 'rtl', lang: 'ar',
+        vibrate: [300, 150, 300, 150, 300],
+        tag,
+        requireInteraction: true,           // لا يختفي تلقائياً حتى يتفاعل المستخدم
+        data,
+        actions: [
+          { action: 'accept', title: 'قبول ✅' },
+          { action: 'reject', title: 'رفض ❌' }
+        ]
+      });
     });
-    return;
   }
 
-  // إشعار عادي
+  // إشعار عادي — tag حسب النوع والمرسل يدمج المتلاحق منها بدل التكديس
+  const tag = (data.type || 'msg') + '_' + (data.fromUid || data.serverId || '');
+  if (_throttled(tag)) return;
   self.registration.showNotification(title, {
     body,
     icon: '/awalem-game/icon.png',
     badge: '/awalem-game/icon.png',
     dir: 'rtl', lang: 'ar',
     vibrate: [200, 100, 200],
+    tag,
     data,
     actions: [
       { action: 'open',  title: 'فتح اللعبة' },

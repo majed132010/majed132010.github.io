@@ -9,15 +9,27 @@ let _notifListener = null;
 function listenNotifications(userId) {
   if (_notifListener) return;
   const ref = db.ref('notifications/' + userId).limitToLast(1);
+  const _lastInPage = {}; // كبح تكرار إشعارات النظام: آخر عرض لكل مرسل/نوع
   const fn = snap => {
     if (!snap.exists()) return;
     const notif = snap.val();
     if (Date.now() - notif.ts > 10000) return;
     if (notif.from === userId) return;
+    // المكالمات لها شاشة رنين داخل التطبيق + إشعار الـ SW بأزرار قبول/رفض — لا داعي لإشعار ثالث
+    if (notif.data?.type === 'call') {
+      db.ref('notifications/' + userId + '/' + snap.key).remove();
+      return;
+    }
     const title = notif.title || 'عوالم';
     const body = notif.body || '';
     if (Notification.permission === 'granted' && document.hidden) {
-      new Notification(title, { body, icon: '/icon-192.png', tag: snap.key });
+      // tag حسب المرسل (لا حسب مفتاح الرسالة) + فاصل 4 ثوانٍ — يمنع تكديس بانرات متلاحقة
+      const tag = (notif.data?.type || 'msg') + '_' + (notif.data?.fromUid || notif.from || '');
+      const now = Date.now();
+      if (!_lastInPage[tag] || now - _lastInPage[tag] >= 4000) {
+        _lastInPage[tag] = now;
+        new Notification(title, { body, icon: '/icon-192.png', tag });
+      }
     } else if (!document.hidden) {
       if (notif.data?.type === 'dm') {
         showDmNotif({ name: title, text: body }, notif.data?.fromUid);

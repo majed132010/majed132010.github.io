@@ -122,19 +122,43 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Push notifications
+// Push notifications — مع كبح التكرار (نفس منطق firebase-messaging-sw.js)
+// tag موحّد لكل مكالمة/مرسل يدمج الإشعارات المتلاحقة بدل تكديسها، وفاصل 4 ثوانٍ كحد أدنى
+const NOTIF_THROTTLE_MS = 4000;
+const _lastShownByTag = {};
+function _throttled(tag) {
+  const now = Date.now();
+  if (_lastShownByTag[tag] && now - _lastShownByTag[tag] < NOTIF_THROTTLE_MS) return true;
+  _lastShownByTag[tag] = now;
+  return false;
+}
+
 self.addEventListener('push', event => {
   if (!event.data) return;
   try {
     const data = event.data.json();
-    self.registration.showNotification(data.title || 'عوالم', {
-      body: data.body || '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      dir: 'rtl',
-      lang: 'ar',
-      data: data.data || {}
-    });
+    const d = data.data || {};
+    const isCall = d.type === 'call';
+    const tag = isCall
+      ? 'call_' + (d.callId || '')
+      : (d.type || 'msg') + '_' + (d.fromUid || d.serverId || '');
+
+    event.waitUntil(
+      self.registration.getNotifications({ tag }).then(existing => {
+        // إشعار بنفس الـ tag معروض بالفعل أو ضمن مهلة الكبح → تجاهل (يمنع الفيضان)
+        if (existing.length || _throttled(tag)) return;
+        return self.registration.showNotification(data.title || 'عوالم', {
+          body: data.body || '',
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          dir: 'rtl',
+          lang: 'ar',
+          tag,
+          requireInteraction: isCall,
+          data: d
+        });
+      })
+    );
   } catch(e) {
     console.error('Push error:', e);
   }
