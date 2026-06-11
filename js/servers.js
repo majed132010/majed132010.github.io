@@ -1,4 +1,4 @@
- // ════ SERVERS & CHANNELS ════
+// ════ SERVERS & CHANNELS ════
 let servers = {};
 let currentServer = null;
 let currentChannel = null;
@@ -6,6 +6,17 @@ let messagesListener = null;
 let _typingListener = null;
 let _collapsedCategories = JSON.parse(localStorage.getItem('collapsed_cats') || '{}');
 const _unreadCounts = {};
+
+// دالة حماية داخلية لمنع توقف النظام إذا لم يتم تحميل ui.js بالترتيب الصحيح
+function closeDrawer() {
+  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
+  document.getElementById('drawerOverlay')?.classList.remove('show');
+}
+
+function closeSidebar() {
+  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
+  document.getElementById('drawerOverlay')?.classList.remove('show');
+}
 
 function initApp() {
   listenServers();
@@ -283,7 +294,7 @@ function renderHomeServers() {
     const makeBtn = (text, bg, border, color, fn) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.style.cssText = `flex:1;padding:10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation`;
+      b.style.cssText = `display:block;width:100%;padding:10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9px;font-family:Tajawal,sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation`;
       b.textContent = text; b.addEventListener('click', fn);
       return b;
     };
@@ -529,14 +540,14 @@ async function openMemberMgmt() {
 }
 
 async function changeMemberRole(uid, name, newRole) {
-  if (!currentServer || !confirm(`تغيير دور "${name}"؟`)) return;
+  if (!currentServer || !confirm(`تغيير دور "${name}"？`)) return;
   await db.ref('servers/' + currentServer + '/members/' + uid + '/role').set(newRole);
   if (servers[currentServer]?.members?.[uid]) servers[currentServer].members[uid].role = newRole;
   toast(`✅ تم تغيير دور ${name}`);
   openMemberMgmt();
 }
 async function kickMember(uid, name) {
-  if (!currentServer || !confirm(`طرد "${name}"؟`)) return;
+  if (!currentServer || !confirm(`طرد "${name}"？`)) return;
   await db.ref('servers/' + currentServer + '/members/' + uid).remove();
   await db.ref('users/' + uid + '/servers/' + currentServer).remove();
   if (servers[currentServer]?.members) delete servers[currentServer].members[uid];
@@ -544,7 +555,7 @@ async function kickMember(uid, name) {
   openMemberMgmt();
 }
 async function banMember(uid, name) {
-  if (!currentServer || !confirm(`حظر "${name}"؟`)) return;
+  if (!currentServer || !confirm(`حظر "${name}"？`)) return;
   await db.ref('servers/' + currentServer + '/banned/' + uid).set({ name, bannedAt: Date.now(), bannedBy: currentUser.uid });
   await db.ref('servers/' + currentServer + '/members/' + uid).remove();
   await db.ref('users/' + uid + '/servers/' + currentServer).remove();
