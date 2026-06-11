@@ -325,7 +325,7 @@ async function sendMessage() {
 
     try {
       const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-      const storagePath = `servers/${currentServer}/media/${currentChannel}/${currentUser.uid}/${Date.now()}.${ext}`;
+      const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
       const mediaUrl = await uploadToStorage(m.file, storagePath);
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       await db.ref('messages/' + currentServer + '/' + currentChannel).push({
