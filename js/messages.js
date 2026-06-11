@@ -272,6 +272,13 @@ async function sendMessage() {
   }
 
   if (media.length) {
+    // Ensure Firebase has an authenticated WebSocket before the first Storage write.
+    // Without this, uploads issued before the SDK finishes auth emit "Failed to fetch"
+    // or storage/unauthorized and fall into the retry loop.
+    if (!_isConnected) {
+      try { await waitForConnection(5000); }
+      catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
+    }
     toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
   }
 
@@ -317,9 +324,9 @@ async function sendMessage() {
     if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
 
     try {
-      // توحيد سلوك القنوات مع الرسائل الخاصة: كل الوسائط (صور وفيديو) عبر Cloudinary
-      // وتنتهي تلقائياً بعد 24 ساعة (saved: false) لمطابقة نص التنبيه وسلوك الـ DM
-      const mediaUrl = await uploadToCloudinary(m.file);
+      const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
+      const storagePath = `media/${currentServer}/${currentChannel}/${currentUser.uid}/${Date.now()}.${ext}`;
+      const mediaUrl = await uploadToStorage(m.file, storagePath);
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       await db.ref('messages/' + currentServer + '/' + currentChannel).push({
         ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
