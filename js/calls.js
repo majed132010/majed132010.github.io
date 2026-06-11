@@ -30,9 +30,11 @@ async function startCall(toUid, toName, type = 'audio') {
 
   const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
   const channelName = callId.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 64);
+  // 🆕 سرّ الرفض: يصل المتلقي في الإشعار، ويُمكّنه من الرفض من الخلفية عبر دالة rejectCall دون توكن
+  const rejectSecret = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
   console.log('[CALL] أنشأت callId/channelName:', { callId, channelName });
 
-  _currentCall = { callId, type, fromUid: currentUser.uid, toUid, channelName, role: 'caller' };
+  _currentCall = { callId, type, fromUid: currentUser.uid, toUid, channelName, role: 'caller', rejectSecret };
 
   // اكتب المكالمة في Firebase
   const incomingPath = 'calls/' + toUid + '/incoming';
@@ -47,6 +49,8 @@ async function startCall(toUid, toName, type = 'audio') {
       ts: Date.now()
     });
     console.log('%c[CALL] ✓ نجحت الكتابة في Firebase', 'color:#23a55a', incomingPath);
+    // 🆕 خزّن سرّ الرفض في عقدة خادمية (تقرأها دالة rejectCall بصلاحيات Admin فقط)
+    await db.ref('call_secrets/' + callId).set({ fromUid: currentUser.uid, toUid, rejectSecret, ts: Date.now() });
   } catch (e) {
     console.error('[CALL] ✖ فشلت الكتابة في Firebase:', e.code, e.message, '\nالمسار:', incomingPath);
     toast('❌ فشل إرسال المكالمة (Firebase): ' + (e.code || e.message || ''));
@@ -60,7 +64,7 @@ async function startCall(toUid, toName, type = 'audio') {
   try {
     await sendPushToUser(toUid, userProfile.displayName || 'عوالم',
       type === 'video' ? '📹 مكالمة فيديو واردة' : '📞 مكالمة صوتية واردة',
-      { type: 'call', callType: type, fromUid: currentUser.uid, fromName: userProfile.displayName || 'مستخدم', callId, channelName }
+      { type: 'call', callType: type, fromUid: currentUser.uid, fromName: userProfile.displayName || 'مستخدم', callId, channelName, rejectSecret }
     );
     console.log('[CALL] ✓ تم استدعاء sendPushToUser (لا يضمن وصول الإشعار فعلياً)');
   } catch(e) {
@@ -131,6 +135,12 @@ function listenIncomingCalls() {
       { from: call.fromName, type: call.type });
     _currentCall = { ...call, toUid: currentUser.uid, role: 'callee' };
     showIncomingCallScreen(call.fromName, call.type, call.fromUid, call.callId, call.channelName);
+    // 🆕 إن كان هناك طلب قبول معلّق من إشعار خارجي لنفس المكالمة → اقبل تلقائياً
+    if (_pendingAcceptCallId && _pendingAcceptCallId === call.callId) {
+      console.log('[CALL] 📲 تنفيذ طلب القبول المعلّق من الإشعار:', call.callId);
+      _pendingAcceptCallId = null;
+      acceptCall();
+    }
   }, err => {
     console.error('[CALL] ✖ خطأ في مستمع المكالمات الواردة (قد تكون قواعد Firebase تمنع القراءة):', err.code, err.message);
     toast('❌ تعذّر الاستماع للمكالمات الواردة: ' + (err.code || err.message || ''));
@@ -141,6 +151,7 @@ function listenIncomingCalls() {
 async function acceptCall() {
   if (!_currentCall) return;
   clearTimeout(_callTimeout);
+  _stopIncomingCancelListener(); // أوقف مستمع الإلغاء — joinCallChannel سيسجّل مستمع الإنهاء الخاص بما بعد الرد
   const { callId, channelName, type, fromUid, fromName } = _currentCall;
 
   // أرسل الرد
@@ -159,12 +170,14 @@ async function acceptCall() {
 async function rejectCall() {
   if (!_currentCall) return;
   clearTimeout(_callTimeout);
+  _stopIncomingCancelListener(); // أوقف مستمع الإلغاء قبل إرسال الرفض
   const { callId, fromUid } = _currentCall;
 
   await db.ref('calls/' + fromUid + '/response').set({
     callId, status: 'rejected', ts: Date.now()
   });
   await db.ref('calls/' + currentUser.uid + '/incoming').remove();
+  db.ref('call_secrets/' + callId).remove().catch(() => {}); // 🆕 نظّف سرّ الرفض
 
   _currentCall = null;
   hideCallScreens();
@@ -233,6 +246,10 @@ async function endCall(reason = 'ended') {
     } catch(e) { console.error('[CALL] ✖ فشل حذف عقدة المكالمة:', e.code, e.message); }
   }
 
+  // 🆕 نظّف سرّ الرفض الخاص بهذه المكالمة
+  if (_currentCall && _currentCall.callId) {
+    db.ref('call_secrets/' + _currentCall.callId).remove().catch(() => {});
+  }
   _currentCall = null;
   hideCallScreens();
 
@@ -447,6 +464,9 @@ function showIncomingCallScreen(name, type, fromUid, callId, channelName) {
   // صوت الرنين
   _playRingtone();
 
+  // 🆕 استمع لإلغاء المتصل للمكالمة *قبل* أن نرد — يغلق شاشة الرنين فوراً ويوقف النغمة
+  _listenIncomingCancel(callId, name);
+
   screen.innerHTML = `
     <div style="font-size:80px;animation:callPulse 1.5s infinite">${type==='video'?'📹':'📞'}</div>
     <div style="font-size:22px;font-weight:800">${escHtml(name)}</div>
@@ -461,11 +481,41 @@ function showIncomingCallScreen(name, type, fromUid, callId, channelName) {
   // أوقف الرنين بعد 45 ثانية
   _callTimeout = setTimeout(() => {
     _stopRingtone();
+    _stopIncomingCancelListener();
     db.ref('calls/' + currentUser.uid + '/incoming').remove();
     _currentCall = null;
     hideCallScreens();
     toast('📵 فاتتك مكالمة من ' + name);
   }, 45000);
+}
+
+// ════ 🆕 الاستماع لإلغاء المتصل أثناء الرنين (cancelled) ════
+// المتصل عند ضغط "إنهاء" قبل الرد يستدعي endCall() التي تكتب في calls/{المتلقي}/end.
+// نلتقط ذلك هنا لنغلق شاشة الرنين ونوقف النغمة فوراً بدل انتظار مهلة الـ 45 ثانية.
+function _listenIncomingCancel(callId, name) {
+  if (!currentUser) return;
+  const endPath = 'calls/' + currentUser.uid + '/end';
+  db.ref(endPath).off('value'); // أزل أي مستمع سابق
+  db.ref(endPath).on('value', snap => {
+    const v = snap.val();
+    if (!v) return; // فارغ/محذوف — تجاهل
+    if (v.callId && callId && v.callId !== callId) return; // إشارة لمكالمة أخرى
+    console.warn('%c[CALL] ✖ ألغى المتصل المكالمة قبل الرد (cancelled)', 'color:#e04040;font-weight:bold');
+    db.ref(endPath).off('value');
+    clearTimeout(_callTimeout);
+    _stopRingtone();
+    db.ref('calls/' + currentUser.uid + '/incoming').remove().catch(() => {});
+    _currentCall = null;
+    hideCallScreens();
+    toast('📵 أُلغيت المكالمة من ' + (name || 'المتصل'));
+  }, err => {
+    console.error('[CALL] ✖ خطأ في مستمع الإلغاء أثناء الرنين:', err.code, err.message);
+  });
+}
+
+// إيقاف مستمع الإلغاء (يُستدعى عند القبول/الرفض لتفادي التعارض مع مستمع الإنهاء بعد الرد)
+function _stopIncomingCancelListener() {
+  if (currentUser) { try { db.ref('calls/' + currentUser.uid + '/end').off('value'); } catch (e) {} }
 }
 
 // ════ عرض شاشة المكالمة النشطة ════
@@ -562,6 +612,43 @@ function _stopRingtone() {
   if (_ringtoneOsc) { clearInterval(_ringtoneOsc); _ringtoneOsc = null; }
   if (_ringtoneCtx) { try { _ringtoneCtx.close(); } catch(e) {} _ringtoneCtx = null; }
 }
+
+// ════ 🆕 قبول المكالمة من إشعار الـ Service Worker الخارجي ════
+// عند ضغط "قبول ✅" في إشعار الخلفية، يرسل الـ SW إما postMessage للنافذة المفتوحة،
+// أو يفتح التطبيق برابط ?acceptCall=callId إن كان مغلقاً. نتعامل مع الحالتين هنا.
+let _pendingAcceptCallId = null;
+
+function acceptCallFromNotification(callId) {
+  if (!callId) return;
+  console.log('%c[CALL] 📲 طلب قبول من إشعار خارجي', 'color:#23a55a;font-weight:bold', callId);
+
+  // المكالمة الواردة جاهزة بالفعل ومطابقة → اقبل فوراً
+  if (_currentCall && _currentCall.callId === callId) {
+    acceptCall();
+    return;
+  }
+  // وإلا خزّن الطلب ريثما يلتقط listenIncomingCalls المكالمة من calls/{uid}/incoming فيقبلها تلقائياً
+  console.log('[CALL] … المكالمة لم تصل بعد — حفظ القبول كـ معلّق');
+  _pendingAcceptCallId = callId;
+}
+
+// (1) التطبيق مفتوح في الخلفية: الـ SW يرسل postMessage
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'acceptCall') acceptCallFromNotification(d.callId);
+  });
+}
+
+// (2) التطبيق كان مغلقاً ففُتح عبر الرابط ?acceptCall=callId
+try {
+  const _qpCall = new URLSearchParams(location.search).get('acceptCall');
+  if (_qpCall) {
+    acceptCallFromNotification(_qpCall);
+    // نظّف الرابط حتى لا يتكرر القبول عند إعادة التحميل
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+} catch (e) { console.warn('[CALL] تعذّر قراءة باراميتر acceptCall:', e); }
 
 // ════ CSS للأنيميشن (معدل ليعمل بعد تحميل الصفحة) ════
 const callStyle = document.createElement('style');
