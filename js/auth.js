@@ -11,7 +11,19 @@ auth.getRedirectResult().then(result => {
   if (e.code && e.code !== 'auth/no-auth-event') console.error('[AUTH] ✖ خطأ في إعادة التوجيه:', e.code, e.message);
 });
 
+// Idempotent — safe to call multiple times; does nothing once splash is gone
+function _dismissSplash() {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  splash.classList.add('splash-out');
+  setTimeout(() => { if (splash.parentNode) splash.remove(); }, 450);
+}
+// Fail-safe: force-dismiss after 2.5 s even if onAuthStateChanged never fires
+// (slow network, Firebase initialisation error, blocked by browser, etc.)
+setTimeout(_dismissSplash, 2500);
+
 auth.onAuthStateChanged(user => {
+  _dismissSplash(); // dismiss immediately on auth resolution (fast path)
   if (user) {
     currentUser = user;
     document.getElementById('loginScreen').style.display = 'none';
