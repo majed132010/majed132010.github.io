@@ -7,6 +7,26 @@ let _typingListener = null;
 let _collapsedCategories = JSON.parse(localStorage.getItem('collapsed_cats') || '{}');
 const _unreadCounts = {};
 
+// دالة حماية الواجهة والتحكم بالشاشات لمنع أخطاء التعارض
+function showView(name) {
+  const home  = document.getElementById('homeView');
+  const msgs  = document.getElementById('messagesView');
+  const voice = document.getElementById('voiceView');
+  const dm    = document.getElementById('dmView');
+  const searchBtn  = document.getElementById('searchToggleBtn');
+  const membersBtn = document.getElementById('membersToggleBtn');
+  if (home)  home.style.display  = name==='home'     ? 'flex' : 'none';
+  if (msgs)  { msgs.style.display = name==='messages' ? 'flex' : 'none'; msgs.style.flexDirection='column'; msgs.style.overflow='hidden'; }
+  if (voice) voice.style.display = name==='voice'    ? 'flex' : 'none';
+  if (dm)    dm.style.display    = name==='dm'       ? 'flex' : 'none';
+  if (searchBtn)  searchBtn.style.display  = name==='messages' ? '' : 'none';
+  if (membersBtn) membersBtn.style.display = name==='messages' ? '' : 'none';
+  if (name!=='messages') {
+    const bar=document.getElementById('searchBar');
+    if (bar?.classList.contains('show')) toggleSearch();
+    document.getElementById('membersPanel')?.classList.remove('open');
+  }
+}
 // دالة حماية داخلية لمنع توقف النظام إذا لم يتم تحميل ui.js بالترتيب الصحيح
 function closeDrawer() {
   document.getElementById('channelSidebar')?.classList.remove('drawer-open');
