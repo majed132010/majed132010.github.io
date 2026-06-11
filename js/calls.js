@@ -150,6 +150,7 @@ function listenIncomingCalls() {
 // ════ قبول المكالمة ════
 async function acceptCall() {
   if (!_currentCall) return;
+  _stopRingtone(); // kill ringing instantly on accept
   clearTimeout(_callTimeout);
   _stopIncomingCancelListener(); // أوقف مستمع الإلغاء — joinCallChannel سيسجّل مستمع الإنهاء الخاص بما بعد الرد
   const { callId, channelName, type, fromUid, fromName } = _currentCall;
@@ -169,6 +170,7 @@ async function acceptCall() {
 // ════ رفض المكالمة ════
 async function rejectCall() {
   if (!_currentCall) return;
+  _stopRingtone(); // kill ringing instantly on reject
   clearTimeout(_callTimeout);
   _stopIncomingCancelListener(); // أوقف مستمع الإلغاء قبل إرسال الرفض
   const { callId, fromUid } = _currentCall;
@@ -207,6 +209,7 @@ function _listenToCallEnd() {
 // ════ إنهاء المكالمة ════
 async function endCall(reason = 'ended') {
   console.log('%c[CALL] ▶ endCall', 'color:#e04040;font-weight:bold', { reason, call: _currentCall });
+  _stopRingtone(); // kill ringing instantly, before any async Firebase/Agora work
   clearTimeout(_callTimeout);
   clearInterval(_callTimer);
   _callSeconds = 0;

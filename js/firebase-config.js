@@ -37,6 +37,26 @@ const storage = FB.storage();
 
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('Persistence error:', e));
 
+// ════ حالة الاتصال بـ Firebase ════
+// True once the SDK has a live, authenticated WebSocket.
+// Write paths check this before touching Firebase so early-load races
+// (auth token not yet applied to the socket) cannot produce permission errors.
+let _isConnected = false;
+db.ref('.info/connected').on('value', snap => { _isConnected = !!snap.val(); });
+
+function waitForConnection(timeoutMs = 4000) {
+  if (_isConnected) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const deadline = setTimeout(
+      () => reject(new Error('لا يوجد اتصال بالإنترنت')),
+      timeoutMs
+    );
+    const poll = setInterval(() => {
+      if (_isConnected) { clearInterval(poll); clearTimeout(deadline); resolve(); }
+    }, 150);
+  });
+}
+
 // ════ UTILITIES ════
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
