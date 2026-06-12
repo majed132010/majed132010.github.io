@@ -164,6 +164,8 @@ function buildMsgDiv(msg, key) {
       const img = document.createElement('img');
       img.loading = 'lazy'; img.decoding = 'async';
       img.className = 'msg-media-img';
+      img.src = '';                // blank immediately — no inherited/default src
+      img.dataset.msgKey = key;   // stamp with message key for async guard
       img.alt = msg.mediaName || '';
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
       img.addEventListener('load', () => {
@@ -173,6 +175,7 @@ function buildMsgDiv(msg, key) {
         if (dist < 300) a.scrollTop = a.scrollHeight;
       });
       loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
+        if (img.dataset.msgKey !== key) return; // stale callback — element was reused, abort
         if (src) img.src = src;
         else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
       });
