@@ -447,27 +447,8 @@ async function _uploadOneMedia(m, msgBase) {
   const _sid = currentServer, _cid = currentChannel;
   const area = document.getElementById('messagesArea');
 
-  // ── بناء URL للمعاينة المحلية ──
-  // فيديو → blob URL فوري (APK/أندرويد لا يعاني من إلغاء blob في الخلفية)
-  // صورة → data URL عبر FileReader (يصمد على iOS) — عند فشله ينتقل تلقائياً لـ blob URL
-  let localUrl, _blobUrl = null;
-  if (m.type === 'video') {
-    _blobUrl = URL.createObjectURL(m.file);
-    localUrl = _blobUrl;
-  } else {
-    try {
-      localUrl = await new Promise((res, rej) => {
-        const fr = new FileReader();
-        fr.onload = (e) => res(e.target.result);
-        fr.onerror = () => rej(new Error('FileReader failed'));
-        fr.readAsDataURL(m.file);
-      });
-    } catch(e) {
-      // FileReader فشل (APK / WebView قديم) → fallback فوري إلى blob URL
-      _blobUrl = URL.createObjectURL(m.file);
-      localUrl = _blobUrl;
-    }
-  }
+  // معاينة blob فورية — بدون FileReader أو تحويلات
+  const _blobUrl = URL.createObjectURL(m.file);
 
   // ── بناء tempDiv وإلحاقه بالمنطقة فوراً ──
   const tempKey = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -496,11 +477,11 @@ async function _uploadOneMedia(m, msgBase) {
   tempWrap.className = 'msg-media-wrap';
   if (m.type === 'video') {
     const vid = document.createElement('video');
-    vid.src = localUrl; vid.className = 'msg-media-vid';
+    vid.src = _blobUrl; vid.className = 'msg-media-vid';
     tempWrap.appendChild(vid);
   } else {
     const img = document.createElement('img');
-    img.src = localUrl; img.className = 'msg-media-img';
+    img.src = _blobUrl; img.className = 'msg-media-img';
     tempWrap.appendChild(img);
   }
 
@@ -513,36 +494,37 @@ async function _uploadOneMedia(m, msgBase) {
   tempDiv.appendChild(tempBody);
   if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
 
-  // ── رفع الملف إلى Storage ثم كتابة السجل في قاعدة البيانات ──
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  // ── رفع مباشر إلى Storage ثم كتابة السجل في قاعدة البيانات ──
   try {
     const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
     const storagePath = `media/${_sid}/${_cid}/${Date.now()}.${ext}`;
-    const mediaUrl = await uploadToStorage(m.file, storagePath, {
-      signal: controller.signal,
-      onProgress: (pct) => { indicator.textContent = `⏳ ${pct}%`; }
+    const uploadTask = storage.ref(storagePath).put(m.file, {
+      contentType: m.file.type || 'application/octet-stream'
     });
-    clearTimeout(timeoutId);
+    const mediaUrl = await new Promise((resolve, reject) => {
+      uploadTask.on('state_changed',
+        (snap) => {
+          if (snap.totalBytes > 0)
+            indicator.textContent = `⏳ ${Math.round((snap.bytesTransferred / snap.totalBytes) * 100)}%`;
+        },
+        reject,
+        async () => {
+          try { resolve(await uploadTask.snapshot.ref.getDownloadURL()); }
+          catch(e) { reject(e); }
+        }
+      );
+    });
     if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
-    if (currentServer !== _sid || currentChannel !== _cid) {
-      tempDiv.remove();
-      if (_blobUrl) URL.revokeObjectURL(_blobUrl);
-      return;
-    }
+    if (currentServer !== _sid || currentChannel !== _cid) return;
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
     await db.ref('messages/' + _sid + '/' + _cid).push({
       ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
     });
-    // حذف فوري وحتمي للـ tempDiv بعد نجاح الكتابة — يمنع تكرار الميديا
     tempDiv.remove();
-    if (_blobUrl) URL.revokeObjectURL(_blobUrl);
     if (area) area.scrollTop = area.scrollHeight;
   } catch(e) {
-    clearTimeout(timeoutId);
-    if (e.code === 'storage/canceled') {
-      toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
-    } else if (e.code === 'storage/unauthorized') {
+    window._sendingMedia = false; // تصفير فوري عند أي فشل شبكي حقيقي
+    if (e.code === 'storage/unauthorized') {
       toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
     } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
       toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
@@ -550,9 +532,8 @@ async function _uploadOneMedia(m, msgBase) {
       toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
   } finally {
-    // حارس الأمان: إزالة المعاينة المؤقتة في أي حالة غير متوقعة
     if (tempDiv.parentNode) tempDiv.remove();
-    if (_blobUrl) { URL.revokeObjectURL(_blobUrl); _blobUrl = null; }
+    URL.revokeObjectURL(_blobUrl);
   }
 }
 
