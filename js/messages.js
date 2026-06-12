@@ -12,6 +12,8 @@ let _searchResults = [], _searchIndex = 0;
 function showMessages(sid, cid) {
   showView('messages');
   if (typeof _currentUserMuted !== 'undefined') _applyMuteState(_currentUserMuted);
+  // ضمان العضوية في كل مسار (استعادة الجلسة، الدعوات، إلخ)
+  if (typeof _ensureMemberRegistered === 'function') _ensureMemberRegistered(sid);
   _oldestMsgKey = null; _allLoaded = false;
   _currentMsgPath = 'messages/' + sid + '/' + cid;
   const area = document.getElementById('messagesArea');

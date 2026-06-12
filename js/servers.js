@@ -9,6 +9,7 @@ const _unreadCounts = {};
 let _membershipListener = null;
 let _restrictionListener = null;
 let _currentUserMuted = false;
+const _registeredServers = new Set(); // سيرفرات تم التحقق منها في هذه الجلسة
 
 function initApp() {
   listenServers();
@@ -586,21 +587,49 @@ async function checkBanned(sid) {
   return snap.exists();
 }
 
-// ════ إصلاح ذاتي: تحديث بيانات العضوية الناقصة ════
-// يُصلح أي سجل عضوية تم إنشاؤه بدون name/avatar (مستخدمون قدامى)
+// ════ ضمان تسجيل العضوية الكاملة ════
+// يقرأ مباشرة من DB (لا يعتمد على الكاش المحلي الذي قد يكون قديماً)،
+// ويكتب السجل كاملاً إن كان غائباً أو ناقصاً، بدون catch صامت.
 async function _ensureMemberRegistered(sid) {
   if (!currentUser || !sid) return;
-  const myEntry = servers[sid]?.members?.[currentUser.uid];
-  if (!myEntry) return;       // غير مسجّل أصلاً — لا تتدخل
-  if (myEntry.name) return;   // البيانات مكتملة
-  const update = {
-    name: userProfile.displayName || currentUser.displayName || 'عضو',
-    avatar: userProfile.avatar || currentUser.photoURL || null
-  };
-  try {
-    await db.ref('servers/' + sid + '/members/' + currentUser.uid).update(update);
-    Object.assign(servers[sid].members[currentUser.uid], update);
-  } catch(e) { console.warn('[MEMBERS] self-heal failed:', e.code || e.message); }
+  if (_registeredServers.has(sid)) return; // تم التحقق مسبقاً في هذه الجلسة
+
+  // استخدام auth.currentUser مباشرة كمرجع أساسي للهوية
+  const authUser = auth.currentUser;
+  if (!authUser) return;
+
+  const displayName = userProfile.displayName
+    || authUser.displayName
+    || authUser.email?.split('@')[0]
+    || 'عضو';
+  const avatar = userProfile.avatar || authUser.photoURL || null;
+
+  const memberRef = db.ref('servers/' + sid + '/members/' + currentUser.uid);
+  const snap = await memberRef.once('value');
+  const entry = snap.val();
+
+  if (!entry) {
+    // لا يوجد سجل عضوية — تحقق أن المستخدم مضاف فعلاً لهذا السيرفر
+    const svSnap = await db.ref('users/' + currentUser.uid + '/servers/' + sid).once('value');
+    if (!svSnap.exists()) return; // ليس عضواً — لا تتدخل
+    const newEntry = { role: 'member', name: displayName, avatar, joinedAt: Date.now() };
+    await memberRef.set(newEntry); // يرفع استثناءً إن رُفضت الصلاحية
+    if (servers[sid]) {
+      if (!servers[sid].members) servers[sid].members = {};
+      servers[sid].members[currentUser.uid] = newEntry;
+    }
+    console.log('[MEMBERS] ✓ تم إنشاء سجل العضوية لـ', currentUser.uid, 'في', sid);
+  } else if (!entry.name || !entry.avatar) {
+    // السجل موجود لكن ناقص — أضف name/avatar دون المساس بالـ role
+    const update = { name: displayName, avatar };
+    await memberRef.update(update); // يرفع استثناءً إن رُفضت الصلاحية
+    if (servers[sid]?.members?.[currentUser.uid]) {
+      Object.assign(servers[sid].members[currentUser.uid], update);
+    }
+    console.log('[MEMBERS] ✓ تم تحديث سجل العضوية لـ', currentUser.uid, 'في', sid);
+  }
+
+  _registeredServers.add(sid); // لا تعيد الاستعلام في هذه الجلسة
 }
 
 // ════ استماع عضوية السيرفر — كشف الطرد الفوري ════
