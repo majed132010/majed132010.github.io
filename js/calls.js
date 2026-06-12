@@ -7,6 +7,8 @@ let _callTimeout = null;
 let _currentCall = null; // { callId, type, fromUid, toUid, channelName }
 let _callTimer = null;
 let _callSeconds = 0;
+let _netStatsInterval = null;   // network-quality polling interval
+let _currentVideoProfile = 'auto'; // 'auto' | '720p' | '480p'
 
 // ════ بدء مكالمة ════
 async function startCall(toUid, toName, type = 'audio') {
@@ -209,7 +211,9 @@ function _listenToCallEnd() {
 // ════ إنهاء المكالمة ════
 async function endCall(reason = 'ended') {
   console.log('%c[CALL] ▶ endCall', 'color:#e04040;font-weight:bold', { reason, call: _currentCall });
-  _stopRingtone(); // kill ringing instantly, before any async Firebase/Agora work
+  _stopRingtone();      // kill ringing instantly, before any async Firebase/Agora work
+  _stopNetworkStats();  // detach network-quality listener and clear ping interval
+  _currentVideoProfile = 'auto';
   clearTimeout(_callTimeout);
   clearInterval(_callTimer);
   _callSeconds = 0;
@@ -431,6 +435,7 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
 
     await _callClient.publish(tracks);
     console.log('%c[CALL] ✓ تم نشر الوسائط المحلية — المكالمة نشطة', 'color:#23a55a;font-weight:bold');
+    _startNetworkStats();
 
   } catch(e) {
     console.error('[CALL] ✖ خطأ في joinCallChannel:', e);
@@ -569,15 +574,27 @@ function showActiveCallScreen(otherName, type) {
       <div style="flex:1;position:relative;background:#000">
         <div id="remote-video" style="width:100%;height:100%;object-fit:cover"></div>
         <div id="local-video" style="position:absolute;bottom:16px;right:16px;width:100px;height:140px;border-radius:12px;overflow:hidden;border:2px solid rgba(255,255,255,0.3);background:#111"></div>
-        <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);text-align:center">
+        <div id="callNetStats">
+          <div id="callNetDot"></div>
+          <span id="callNetPing">— ms</span>
+        </div>
+        <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none">
           <div style="font-size:16px;font-weight:700">${escHtml(otherName)}</div>
           <div id="callTimer" style="font-size:13px;color:rgba(255,255,255,0.7)">00:00</div>
         </div>
       </div>
-      <div style="padding:20px;display:flex;justify-content:center;gap:20px;background:#0d1e28">
+      <div style="padding:20px;display:flex;justify-content:center;align-items:center;gap:16px;background:#0d1e28;position:relative">
         <button id="callMuteBtn" onclick="toggleCallMute()" style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;font-size:24px;cursor:pointer;color:#fff">🎤</button>
         <button id="callCameraBtn" onclick="toggleCallCamera()" style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;font-size:24px;cursor:pointer;color:#fff">📹</button>
-        <button onclick="endCall()" style="width:56px;height:56px;border-radius:50%;background:#e04040;border:none;font-size:24px;cursor:pointer">📵</button>
+        <button onclick="endCall()" style="width:64px;height:64px;border-radius:50%;background:#e04040;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 16px rgba(224,64,64,0.45)">📵</button>
+        <div style="position:relative">
+          <button id="callQualityBtn" onclick="toggleQualityMenu()" style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;font-size:20px;cursor:pointer;color:#fff" title="جودة الفيديو">⚙️</button>
+          <div id="callQualityMenu" style="display:none">
+            <div class="call-profile-opt active" id="callProfile_auto" onclick="setVideoProfile('auto')">🔄 تلقائي</div>
+            <div class="call-profile-opt" id="callProfile_720p" onclick="setVideoProfile('720p')">🎥 HD 720p</div>
+            <div class="call-profile-opt" id="callProfile_480p" onclick="setVideoProfile('480p')">📶 توفير 480p</div>
+          </div>
+        </div>
       </div>
     `;
   } else {
@@ -586,6 +603,10 @@ function showActiveCallScreen(otherName, type) {
         <div style="width:100px;height:100px;border-radius:50%;background:var(--acc,#1a6060);display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800">${(otherName||'?')[0]}</div>
         <div style="font-size:20px;font-weight:800">${escHtml(otherName)}</div>
         <div id="callTimer" style="font-size:14px;color:rgba(255,255,255,0.6)">00:00</div>
+        <div id="callNetStats" style="margin-top:4px">
+          <div id="callNetDot"></div>
+          <span id="callNetPing">— ms</span>
+        </div>
       </div>
       <div style="padding:30px;display:flex;justify-content:center;gap:24px">
         <button id="callMuteBtn" onclick="toggleCallMute()" style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;font-size:26px;cursor:pointer;color:#fff">🎤</button>
@@ -604,6 +625,82 @@ function showActiveCallScreen(otherName, type) {
     const el = document.getElementById('callTimer');
     if (el) el.textContent = m + ':' + s;
   }, 1000);
+
+  // Close quality dropdown when clicking anywhere outside it
+  screen.addEventListener('click', e => {
+    const menu = document.getElementById('callQualityMenu');
+    const btn  = document.getElementById('callQualityBtn');
+    if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && e.target !== btn) {
+      menu.style.display = 'none';
+    }
+  });
+}
+
+// ════ إحصاءات الشبكة اللحظية ════
+function _startNetworkStats() {
+  if (!_callClient) return;
+
+  // Agora fires this every ~2 s — quality 1=excellent … 6=disconnected, 0=unknown
+  _callClient.on('network-quality', stats => {
+    const dot = document.getElementById('callNetDot');
+    if (!dot) return;
+    const q = Math.max(stats.uplinkNetworkQuality || 0, stats.downlinkNetworkQuality || 0);
+    dot.style.background =
+      q === 0           ? '#888888' :
+      q <= 2            ? '#23a55a' :  // excellent / good  → green
+      q <= 4            ? '#f0b429' :  // poor / bad        → amber
+                          '#e04040';   // very bad / lost   → red
+  });
+
+  // Poll getRTCStats() for RTT (ping) — not exposed as an event
+  _netStatsInterval = setInterval(() => {
+    if (!_callClient) return;
+    try {
+      const stats = _callClient.getRTCStats();
+      const el = document.getElementById('callNetPing');
+      if (el && stats && stats.RTT != null) el.textContent = Math.round(stats.RTT) + ' ms';
+    } catch(e) {}
+  }, 2000);
+}
+
+function _stopNetworkStats() {
+  if (_netStatsInterval) { clearInterval(_netStatsInterval); _netStatsInterval = null; }
+  if (_callClient) { try { _callClient.off('network-quality'); } catch(e) {} }
+}
+
+// ════ قائمة جودة الفيديو ════
+function toggleQualityMenu() {
+  const menu = document.getElementById('callQualityMenu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+async function setVideoProfile(profile) {
+  const menu = document.getElementById('callQualityMenu');
+  if (menu) menu.style.display = 'none';
+
+  _currentVideoProfile = profile;
+  ['auto', '720p', '480p'].forEach(p => {
+    const el = document.getElementById('callProfile_' + p);
+    if (el) el.classList.toggle('active', p === profile);
+  });
+
+  if (!_localVideoTrack) return;
+  try {
+    if (profile === '720p') {
+      await _localVideoTrack.setEncoderConfiguration({ width: 1280, height: 720, frameRate: 30, bitrateMin: 400, bitrateMax: 1500 });
+    } else if (profile === '480p') {
+      await _localVideoTrack.setEncoderConfiguration({ width: 854, height: 480, frameRate: 30, bitrateMin: 200, bitrateMax: 800 });
+    } else {
+      await _localVideoTrack.setEncoderConfiguration({ width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 480 }, frameRate: { ideal: 30, min: 15 }, bitrateMax: 1500 });
+    }
+    const label = profile === 'auto' ? 'تلقائي' : profile === '720p' ? 'HD 720p' : 'توفير 480p';
+    toast('✅ جودة الفيديو: ' + label);
+    console.log('[CALL] 🎥 تغيير جودة الفيديو →', profile);
+  } catch(e) {
+    toast('❌ فشل تغيير جودة الفيديو');
+    console.error('[CALL] ✖ setEncoderConfiguration:', e);
+  }
 }
 
 // ════ إخفاء شاشات المكالمة ════
@@ -689,6 +786,70 @@ callStyle.textContent = `
   }
   #activeCallScreen button:hover { opacity: 0.85; }
   #activeCallScreen button.active { background: rgba(255,255,255,0.35) !important; }
+
+  /* ── Network stats pill ── */
+  #callNetStats {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 5px 12px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #callNetDot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #888;
+    flex-shrink: 0;
+    transition: background 0.5s ease;
+  }
+  #callNetPing {
+    font-size: 11px;
+    font-family: Tajawal, sans-serif;
+    color: rgba(255,255,255,0.82);
+    font-variant-numeric: tabular-nums;
+    min-width: 38px;
+  }
+
+  /* ── Video quality dropdown ── */
+  #callQualityMenu {
+    position: absolute;
+    bottom: 68px;
+    right: 50%;
+    transform: translateX(50%);
+    background: #1a2e3d;
+    border-radius: 14px;
+    overflow: hidden;
+    min-width: 172px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    z-index: 200;
+  }
+  .call-profile-opt {
+    padding: 13px 16px;
+    font-size: 14px;
+    font-family: Tajawal, sans-serif;
+    color: rgba(255,255,255,0.82);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .call-profile-opt:last-child { border-bottom: none; }
+  .call-profile-opt:hover     { background: rgba(255,255,255,0.1); }
+  .call-profile-opt.active    { color: #23a55a; font-weight: 700; }
 `;
 
 document.addEventListener('DOMContentLoaded', () => {
