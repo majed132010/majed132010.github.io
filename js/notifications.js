@@ -4,42 +4,69 @@ let fcmMessaging = null;
 let _notifTimeout = null;
 let _dndActive = false;
 
+// مفاتيح الإشعارات التي عالجناها في هذه الجلسة — يمنع المعالجة المزدوجة
+const _notifProcessed = new Set();
+// آخر وقت عرض لكل tag (نوع + مرسل) — يكبح البانرات المتلاحقة
+const _lastShownTag = {};
+
 // ════ استماع للإشعارات الواردة ════
 let _notifListener = null;
 function listenNotifications(userId) {
   if (_notifListener) return;
-  const ref = db.ref('notifications/' + userId).limitToLast(1);
-  const _lastInPage = {}; // كبح تكرار إشعارات النظام: آخر عرض لكل مرسل/نوع
+
+  // نقطة بداية الجلسة — نُعالج فقط الإشعارات الجديدة فعلاً.
+  // استخدام orderByChild('ts').startAt بدلاً من limitToLast(1) يقطع
+  // حلقة cascade الكلاسيكية: حذف الإشعار الأخير يُظهر السابق له →
+  // child_added → delete → child_added ... بلا نهاية.
+  const sessionStart = Date.now();
+  const ref = db.ref('notifications/' + userId)
+    .orderByChild('ts')
+    .startAt(sessionStart - 8000); // تحمّل تأخير الساعة حتى 8 ثوانٍ
+
   const fn = snap => {
     if (!snap.exists()) return;
+    // ──── belt-and-suspenders: لا نعالج نفس المفتاح مرتين في الجلسة ────
+    if (_notifProcessed.has(snap.key)) return;
+    _notifProcessed.add(snap.key);
+
     const notif = snap.val();
-    if (Date.now() - notif.ts > 10000) return;
-    if (notif.from === userId) return;
-    // المكالمات لها شاشة رنين داخل التطبيق + إشعار الـ SW بأزرار قبول/رفض — لا داعي لإشعار ثالث
-    if (notif.data?.type === 'call') {
-      db.ref('notifications/' + userId + '/' + snap.key).remove();
-      return;
-    }
+    if (!notif) return;
+
+    // ──── احذف الإشعار فوراً — يجب أن يكون أول إجراء قبل أي return ────
+    // إن فشل الحذف (صلاحيات) نسجّله فقط ولا نتوقف
+    db.ref('notifications/' + userId + '/' + snap.key)
+      .remove()
+      .catch(e => console.warn('[NOTIF] فشل حذف الإشعار:', snap.key, e.code));
+
+    // ──── فلاتر العرض — الحذف تمّ بالفعل فلا بأس بالخروج المبكر ────
+    if (notif.ts < sessionStart - 8000) return; // قديم جداً — نظّفناه دون عرض
+    if (notif.from === userId) return;           // إشعار ذاتي
+    if (notif.data?.type === 'call') return;     // المكالمات لها قناة عرض خاصة (calls.js)
+
     const title = notif.title || 'عوالم';
-    const body = notif.body || '';
+    const body  = notif.body  || '';
+    const tag   = (notif.data?.type || 'msg') + '_' + (notif.data?.fromUid || notif.from || '');
+    const now   = Date.now();
+
+    // ──── كبح البانرات المتلاحقة — إشعار واحد كل 4 ثوانٍ لنفس tag ────
+    if (_lastShownTag[tag] && now - _lastShownTag[tag] < 4000) return;
+    _lastShownTag[tag] = now;
+
     if (Notification.permission === 'granted' && document.hidden) {
-      // tag حسب المرسل (لا حسب مفتاح الرسالة) + فاصل 4 ثوانٍ — يمنع تكديس بانرات متلاحقة
-      const tag = (notif.data?.type || 'msg') + '_' + (notif.data?.fromUid || notif.from || '');
-      const now = Date.now();
-      if (!_lastInPage[tag] || now - _lastInPage[tag] >= 4000) {
-        _lastInPage[tag] = now;
-        new Notification(title, { body, icon: '/icon-192.png', tag });
-      }
+      new Notification(title, { body, icon: '/icon-192.png', tag });
     } else if (!document.hidden) {
       if (notif.data?.type === 'dm') {
         showDmNotif({ name: title, text: body }, notif.data?.fromUid);
       } else {
-        showInAppNotif({ name: notif.data?.senderName || title, text: body },
-          notif.data?.serverId, notif.data?.channelId);
+        showInAppNotif(
+          { name: notif.data?.senderName || title, text: body },
+          notif.data?.serverId,
+          notif.data?.channelId
+        );
       }
     }
-    db.ref('notifications/' + userId + '/' + snap.key).remove();
   };
+
   ref.on('child_added', fn);
   _notifListener = { ref, fn };
 }
