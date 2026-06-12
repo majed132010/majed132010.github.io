@@ -36,7 +36,18 @@ function showMessages(sid, cid) {
     area.appendChild(div);
     const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
     if (distFromBottom < 300) area.scrollTop = area.scrollHeight;
-    if (msg.uid !== currentUser?.uid) showInAppNotif(msg, sid, cid);
+    if (msg.uid !== currentUser?.uid) {
+      // Belt-and-suspenders: use window.currentServerId / window.currentChannelId
+      // (the explicit global mirrors set by selectChannel/showHome in servers.js)
+      // as the authoritative active-channel signal before delegating to showInAppNotif.
+      const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
+      const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
+      if (activeSid === sid && activeCid === cid) {
+        console.log('[NOTIF] 🔇 fn مُحجوب — القناة النشطة:', sid, '/', cid);
+      } else {
+        showInAppNotif(msg, sid, cid);
+      }
+    }
   };
 
   db.ref(_currentMsgPath).limitToLast(PAGE_SIZE).once('value').then(snap => {

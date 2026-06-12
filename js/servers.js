@@ -243,6 +243,8 @@ function selectServer(sid) {
   cleanupVoiceListener();
   currentServer = sid;
   currentChannel = null;
+  window.currentServerId = sid;
+  window.currentChannelId = null;
   renderServerList();
   renderChannels(sid);
   _listenMembership(sid);
@@ -274,6 +276,7 @@ function showHome() {
   _currentUserMuted = false;
   _applyMuteState(false);
   currentServer = null; currentChannel = null;
+  window.currentServerId = null; window.currentChannelId = null;
   renderServerList();
   document.getElementById('chServerName').textContent = 'الرئيسية';
   document.getElementById('chSettingsBtn').style.display = 'none';
@@ -422,6 +425,7 @@ function selectChannel(sid, cid, ch) {
   localStorage.setItem('awalem_lastServer', sid);
   localStorage.setItem('awalem_lastChannel', cid);
   currentServer = sid; currentChannel = cid;
+  window.currentServerId = sid; window.currentChannelId = cid;
   renderChannels(sid);
   closeSidebar();
   const icon = document.getElementById('mhIcon');
@@ -670,6 +674,7 @@ function _listenMembership(sid) {
       if (_restrictionListener) { db.ref(_restrictionListener.path).off('value', _restrictionListener.fn); _restrictionListener = null; }
       delete servers[sid];
       currentServer = null; currentChannel = null;
+      window.currentServerId = null; window.currentChannelId = null;
       _currentUserMuted = false;
       renderServerList();
       showView('home');

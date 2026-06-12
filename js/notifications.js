@@ -59,7 +59,7 @@ function listenNotifications(userId) {
         showDmNotif({ name: title, text: body }, notif.data?.fromUid);
       } else {
         const _sid = notif.data?.serverId, _cid = notif.data?.channelId;
-        if (_sid && _cid && !(currentServer === _sid && currentChannel === _cid)) {
+        if (_sid && _cid && !_isActiveChannel(_sid, _cid)) {
           showInAppNotif({ name: notif.data?.senderName || title, text: body }, _sid, _cid);
         }
       }
@@ -81,7 +81,7 @@ async function initFCM(userId) {
       if (data.type === 'dm' && data.fromUid) {
         showDmNotif({ name: title || 'رسالة خاصة', text: body || '' }, data.fromUid);
       } else if (data.serverId && data.channelId) {
-        if (currentServer === data.serverId && currentChannel === data.channelId) return;
+        if (_isActiveChannel(data.serverId, data.channelId)) return;
         showInAppNotif({ name: data.senderName || title, text: body || '' }, data.serverId, data.channelId);
       } else {
         toast('🔔 ' + (title || 'عوالم') + ': ' + (body || ''));
@@ -148,6 +148,18 @@ function toggleDND() {
   }
 }
 
+// ════ حارس القناة النشطة ════
+// يستخدم window.currentServerId/currentChannelId (المرايا الصريحة) أولاً،
+// ثم يعود إلى let currentServer/currentChannel من servers.js كـ fallback.
+function _isActiveChannel(sid, cid) {
+  if (!sid || !cid) return false;
+  const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
+  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
+  const blocked = activeSid === sid && activeCid === cid;
+  if (blocked) console.log('[NOTIF] 🔇 مُحجوب — المستخدم في القناة النشطة:', sid, '/', cid);
+  return blocked;
+}
+
 // ════ صوت الإشعار ════
 function playMsgSound() {
   if (_dndActive) return;
@@ -167,7 +179,7 @@ function playMsgSound() {
 // ════ إشعار داخلي للرسائل العامة ════
 function showInAppNotif(msg, sid, cid) {
   if (!sid || !cid) return;
-  if (currentServer === sid && currentChannel === cid) return;
+  if (_isActiveChannel(sid, cid)) return;
   incrementUnread(sid, cid);
   const old = document.getElementById('notifToast');
   if (old) old.remove();
