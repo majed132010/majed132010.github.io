@@ -59,7 +59,7 @@
     <div class="sv-sep"></div>
     <div id="svItems"></div>
     <div class="sv-sep"></div>
-    <div class="sv-item sv-add" onclick="openCreateServer()" title="إنشاء سيرفر">+</div>
+    <div class="sv-item sv-add" onclick="openCreateServer()" title="اصنع عالمك 🌌">🌌</div>
     <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
     <div class="sv-sep"></div>
     <div class="sv-item" id="dmSvBtn" onclick="openDMFromSvBar()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
@@ -118,7 +118,7 @@
       <div id="mobHamburger" onclick="toggleDrawer()" title="القنوات">☰</div>
       <div class="main-header-back" onclick="goBack()" title="رجوع">◀</div>
       <div class="main-header-icon" id="mhIcon">#</div>
-      <div class="main-header-name" id="mhName">اختر قناة</div>
+      <div class="main-header-name" id="mhName">اختر كوكباً</div>
       <button id="searchToggleBtn" type="button" onclick="toggleSearch()"
         style="display:none;width:30px;height:30px;border-radius:8px;background:rgba(200,168,75,0.1);
         border:1px solid rgba(200,168,75,0.2);color:var(--gold);cursor:pointer;font-size:16px;
@@ -153,8 +153,8 @@
         <div id="homeEmpty" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px">
           <div style="font-size:60px">🌍</div>
           <div style="font-size:24px;font-weight:800;color:var(--gold)">عوالم</div>
-          <div style="font-size:15px;color:var(--muted);text-align:center">لا يوجد سيرفرات بعد</div>
-          <button class="voice-join-btn" onclick="openCreateServer()" style="margin-top:8px;font-size:16px;padding:14px 28px">+ إنشاء سيرفر</button>
+          <div style="font-size:15px;color:var(--muted);text-align:center">لا توجد عوالم بعد</div>
+          <button class="voice-join-btn" onclick="openCreateServer()" style="margin-top:8px;font-size:16px;padding:14px 28px">اصنع عالمك 🌌</button>
           <button class="mic-select-btn" onclick="openJoinServer()" style="font-size:15px;padding:12px 24px">🔗 انضمام برابط</button>
         </div>
       </div>
@@ -243,12 +243,12 @@
         <div class="voice-icon-wrap">🎙️</div>
         <div class="voice-ch-name" id="voiceViewName"></div>
         <div class="voice-btns">
-          <button class="voice-join-btn" id="voiceJoinBtn" onclick="joinVoice()">🔊 انضمام للقناة</button>
+          <button class="voice-join-btn" id="voiceJoinBtn" onclick="joinVoice()">🔊 انضمام للكوكب</button>
           <button class="mic-select-btn" id="micSelectBtn" onclick="selectMicrophone()">🎤 اختيار الميكروفون</button>
           <button class="voice-leave-btn" style="display:none" id="voiceLeaveBtn" onclick="leaveVoice()">📵 مغادرة</button>
         </div>
         <div class="voice-status">
-          <div style="font-weight:700;font-size:14px;color:#1a3a3a">👥 المستخدمون في القناة</div>
+          <div style="font-weight:700;font-size:14px;color:#1a3a3a">👥 المستخدمون في الكوكب</div>
           <div class="voice-users" id="voiceUsersList"></div>
           <div class="voice-log" id="voiceLog">جاهز...</div>
         </div>
@@ -263,9 +263,9 @@
 <div class="modal-bg" id="createServerModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('createServerModal')">✕</button>
-    <div class="modal-title">سيرفر جديد</div>
-    <div class="modal-sub">أنشئ مجتمعك الخاص</div>
-    <input class="modal-inp" id="svNameInp" placeholder="اسم السيرفر">
+    <div class="modal-title">عالم جديد 🌌</div>
+    <div class="modal-sub">أنشئ عالمك الخاص</div>
+    <input class="modal-inp" id="svNameInp" placeholder="اسم العالم">
     <button class="modal-btn" onclick="createServer()">إنشاء</button>
   </div>
 </div>
@@ -273,7 +273,7 @@
 <div class="modal-bg" id="joinServerModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('joinServerModal')">✕</button>
-    <div class="modal-title">انضم لسيرفر</div>
+    <div class="modal-title">انضم لعالم 🌍</div>
     <div class="modal-sub">أدخل كود الدعوة أو رابط الانضمام</div>
     <input class="modal-inp" id="joinCodeInp" placeholder="كود الدعوة أو رابط الانضمام">
     <button class="modal-btn" onclick="joinServer()">انضمام</button>
@@ -283,15 +283,15 @@
 <div class="modal-bg" id="serverSettingsModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('serverSettingsModal')">✕</button>
-    <div class="modal-title" id="svSettingsTitle">إعدادات السيرفر</div>
+    <div class="modal-title" id="svSettingsTitle">إعدادات العالم</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-      <button class="modal-btn" onclick="openAddChannel()" id="svSettingsAddCh">➕ إضافة قناة</button>
-      <button class="modal-btn secondary" onclick="openServerCustomize()" id="svSettingsCustomize">🎨 تخصيص السيرفر</button>
+      <button class="modal-btn" onclick="openAddChannel()" id="svSettingsAddCh">➕ إضافة كوكب</button>
+      <button class="modal-btn secondary" onclick="openServerCustomize()" id="svSettingsCustomize">🎨 تخصيص العالم</button>
       <button class="modal-btn secondary" onclick="openMemberMgmt()" id="svSettingsMemberMgmt">👥 إدارة الأعضاء</button>
       <button class="modal-btn secondary" onclick="openInvite()" id="svSettingsInvite">🔗 رابط الدعوة</button>
       <div style="height:1px;background:var(--border);margin:4px 0"></div>
-      <button class="modal-btn secondary" id="svLeaveBtn" onclick="confirmLeaveServer()" style="color:#e06060;border-color:rgba(192,64,64,0.3)">🚪 مغادرة السيرفر</button>
-      <button class="modal-btn danger" id="svDeleteBtn" onclick="confirmDeleteServer()" style="display:none">🗑️ حذف السيرفر</button>
+      <button class="modal-btn secondary" id="svLeaveBtn" onclick="confirmLeaveServer()" style="color:#e06060;border-color:rgba(192,64,64,0.3)">🚪 مغادرة العالم</button>
+      <button class="modal-btn danger" id="svDeleteBtn" onclick="confirmDeleteServer()" style="display:none">🗑️ حذف العالم</button>
     </div>
   </div>
 </div>
@@ -299,8 +299,8 @@
 <div class="modal-bg" id="confirmLeaveModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('confirmLeaveModal')">✕</button>
-    <div class="modal-title" style="color:#e06060">🚪 مغادرة السيرفر</div>
-    <div class="modal-sub" id="confirmLeaveText">هل أنت متأكد أنك تريد مغادرة هذا السيرفر؟</div>
+    <div class="modal-title" style="color:#e06060">🚪 مغادرة العالم</div>
+    <div class="modal-sub" id="confirmLeaveText">هل أنت متأكد أنك تريد مغادرة هذا العالم؟</div>
     <button class="modal-btn danger" onclick="doLeaveServer()">نعم، مغادرة</button>
     <button class="modal-btn secondary" onclick="closeModal('confirmLeaveModal')">إلغاء</button>
   </div>
@@ -309,8 +309,8 @@
 <div class="modal-bg" id="confirmDeleteModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('confirmDeleteModal')">✕</button>
-    <div class="modal-title" style="color:#e06060">🗑️ حذف السيرفر</div>
-    <div class="modal-sub" id="confirmDeleteText">سيُحذف السيرفر نهائياً لجميع الأعضاء. هذا الإجراء لا يمكن التراجع عنه.</div>
+    <div class="modal-title" style="color:#e06060">🗑️ حذف العالم</div>
+    <div class="modal-sub" id="confirmDeleteText">سيُحذف العالم نهائياً لجميع الأعضاء. هذا الإجراء لا يمكن التراجع عنه.</div>
     <button class="modal-btn danger" onclick="doDeleteServer()">نعم، احذف</button>
     <button class="modal-btn secondary" onclick="closeModal('confirmDeleteModal')">إلغاء</button>
   </div>
@@ -329,15 +329,15 @@
 <div class="modal-bg" id="serverCustomizeModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('serverCustomizeModal')">✕</button>
-    <div class="modal-title">⚙️ تخصيص السيرفر</div>
+    <div class="modal-title">⚙️ تخصيص العالم</div>
     <div class="sv-avatar-upload" id="svAvatarUpload" onclick="document.getElementById('svAvatarFileInp').click()" title="تغيير الصورة">
       <span id="svAvatarPreview">🌍</span>
       <div class="upload-hint">تغيير</div>
     </div>
     <input type="file" id="svAvatarFileInp" accept="image/*" style="display:none" onchange="handleSvAvatarUpload(this)">
-    <input class="modal-inp" id="svCustomNameInp" placeholder="اسم السيرفر">
+    <input class="modal-inp" id="svCustomNameInp" placeholder="اسم العالم">
     <div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0 10px">
-      <span style="font-size:12px;color:var(--muted);width:100%">اختر إيموجي للسيرفر:</span>
+      <span style="font-size:12px;color:var(--muted);width:100%">اختر إيموجي للعالم:</span>
       <div id="svEmojiPicker" style="display:flex;flex-wrap:wrap;gap:6px">
       </div>
     </div>
@@ -348,12 +348,12 @@
 <div class="modal-bg" id="addChannelModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('addChannelModal')">✕</button>
-    <div class="modal-title">قناة جديدة</div>
+    <div class="modal-title">كوكب جديد 🪐</div>
     <div class="ch-type-tabs">
       <div class="ch-type-tab active" id="chTypeText" onclick="selectChType('text')">💬 نصية</div>
       <div class="ch-type-tab" id="chTypeVoice" onclick="selectChType('voice')">🔊 صوتية</div>
     </div>
-    <input class="modal-inp" id="chNameInp" placeholder="اسم القناة">
+    <input class="modal-inp" id="chNameInp" placeholder="اسم الكوكب">
     <button class="modal-btn" onclick="addChannel()">إضافة</button>
   </div>
 </div>
@@ -466,13 +466,13 @@
 
 <!-- ════ App Scripts — الترتيب مهم ════ -->
 <script src="js/firebase-config.js?v=9.7"></script>
-<script src="js/ui.js?v=3.0"></script>
+<script src="js/ui.js?v=12.0"></script>
 <script src="js/push.js?v=9.2"></script>
 <script src="js/notifications.js?v=11.4"></script>
-<script src="js/voice.js?v=3.0"></script>
+<script src="js/voice.js?v=12.0"></script>
 <script src="js/auth.js?v=11.4"></script>
-<script src="js/messages.js?v=11.4"></script>
-<script src="js/servers.js?v=9.6"></script>
+<script src="js/messages.js?v=12.0"></script>
+<script src="js/servers.js?v=12.0"></script>
 <script src="js/calls.js?v=10.1"></script>
 <script src="js/dm.js?v=3.0"></script>
 

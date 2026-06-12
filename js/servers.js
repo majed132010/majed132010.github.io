@@ -65,7 +65,7 @@ function initApp() {
       servers[sid].members[currentUser.uid] = _joinMemberData;
       renderServerList();
       selectServer(sid);
-      toast('✅ انضممت للسيرفر!');
+      toast('✅ انضممت للعالم!');
     })();
   }
 }
@@ -199,7 +199,7 @@ async function createServer() {
   closeModal('createServerModal');
   renderServerList();
   selectServer(sid);
-  toast('✅ تم إنشاء السيرفر');
+  toast('✅ تم إنشاء العالم');
 }
 
 // ════ الانضمام لسيرفر ════
@@ -211,10 +211,10 @@ async function joinServer() {
   if (!snap.exists()) { toast('❌ كود خاطئ'); return; }
   const sid = Object.keys(snap.val())[0];
   const isBanned = await checkBanned(sid);
-  if (isBanned) { toast('⛔ أنت محظور من هذا السيرفر'); return; }
+  if (isBanned) { toast('⛔ أنت محظور من هذا العالم'); return; }
   const alreadyMember = await db.ref('servers/' + sid + '/members/' + currentUser.uid).once('value');
   if (alreadyMember.exists() || servers[sid]) {
-    toast('⚠️ أنت بالفعل في هذا السيرفر');
+    toast('⚠️ أنت بالفعل في هذا العالم');
     closeModal('joinServerModal');
     servers[sid] = snap.val()[sid];
     renderServerList(); selectServer(sid); return;
@@ -303,7 +303,7 @@ function renderHomeServers() {
   container.innerHTML = '';
   const hdr = document.createElement('div');
   hdr.style.cssText = 'font-size:13px;color:var(--gold);font-weight:800;padding:0 4px 4px';
-  hdr.textContent = 'سيرفراتك';
+  hdr.textContent = 'عوالمك';
   container.appendChild(hdr);
   svList.forEach(([sid, sv]) => {
     const chs = sv.channels || {};
@@ -318,7 +318,7 @@ function renderHomeServers() {
     avatar.textContent = sv.emoji || '🌍';
     const info = document.createElement('div');
     info.style.cssText = 'flex:1;min-width:0';
-    info.innerHTML = `<div style="font-size:17px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(sv.name||'سيرفر')}</div><div style="font-size:12px;color:var(--muted)">${sorted.length} قناة</div>`;
+    info.innerHTML = `<div style="font-size:17px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(sv.name||'عالم')}</div><div style="font-size:12px;color:var(--muted)">${sorted.length} كوكب</div>`;
     cardHead.appendChild(avatar); cardHead.appendChild(info);
     cardHead.addEventListener('click', () => selectServer(sid));
     const chBody = document.createElement('div');
@@ -339,7 +339,7 @@ function renderHomeServers() {
       b.textContent = text; b.addEventListener('click', fn);
       return b;
     };
-    if (isOwner) actions.appendChild(makeBtn('🗑️ حذف السيرفر','rgba(192,64,64,0.12)','rgba(192,64,64,0.3)','#e06060',() => confirmDeleteServerById(sid)));
+    if (isOwner) actions.appendChild(makeBtn('🗑️ حذف العالم','rgba(192,64,64,0.12)','rgba(192,64,64,0.3)','#e06060',() => confirmDeleteServerById(sid)));
     else actions.appendChild(makeBtn('🚪 مغادرة','rgba(192,64,64,0.08)','rgba(192,64,64,0.25)','#e06060',() => confirmLeaveServerById(sid)));
     card.appendChild(cardHead); card.appendChild(chBody); card.appendChild(actions);
     container.appendChild(card);
@@ -349,7 +349,7 @@ function renderHomeServers() {
   const btnCreate = document.createElement('button');
   btnCreate.type = 'button';
   btnCreate.style.cssText = 'flex:1;padding:13px;background:var(--acc);color:#fff;border:none;border-radius:10px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation';
-  btnCreate.textContent = '+ إنشاء سيرفر';
+  btnCreate.textContent = 'اصنع عالمك 🌌';
   btnCreate.addEventListener('click', () => openCreateServer());
   const btnJoin = document.createElement('button');
   btnJoin.type = 'button';
@@ -453,7 +453,7 @@ async function addChannel() {
   document.getElementById('chNameInp').value = '';
   renderChannels(currentServer);
   closeModal('addChannelModal');
-  toast('✅ تمت إضافة القناة');
+  toast('✅ تمت إضافة الكوكب');
 }
 
 // ════ إعدادات السيرفر ════
@@ -485,7 +485,7 @@ function copyCode() { const code = document.getElementById('inviteCodeDisplay').
 // ════ مغادرة / حذف السيرفر ════
 function confirmLeaveServerById(sid) {
   const sv = servers[sid];
-  document.getElementById('confirmLeaveText').textContent = `هل أنت متأكد أنك تريد مغادرة سيرفر "${sv?.name||''}"؟`;
+  document.getElementById('confirmLeaveText').textContent = `هل أنت متأكد أنك تريد مغادرة عالم "${sv?.name||''}"؟`;
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
   window._pendingLeaveSid = sid;
   closeDrawer(); showView('home');
@@ -502,13 +502,13 @@ async function doLeaveServer() {
     await db.ref('users/' + currentUser.uid + '/servers/' + sid).remove();
     delete servers[sid]; currentServer = null; currentChannel = null;
     renderServerList(); showHome();
-    toast('👋 غادرت السيرفر');
+    toast('👋 غادرت العالم');
   } catch(e) { toast('❌ فشل في المغادرة: ' + e.message); }
 }
 
 function confirmDeleteServerById(sid) {
   const sv = servers[sid];
-  document.getElementById('confirmDeleteText').textContent = `سيُحذف سيرفر "${sv?.name||''}" نهائياً. لا يمكن التراجع.`;
+  document.getElementById('confirmDeleteText').textContent = `سيُحذف عالم "${sv?.name||''}" نهائياً. لا يمكن التراجع.`;
   document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show'));
   window._pendingDeleteSid = sid;
   closeDrawer(); showView('home');
@@ -532,7 +532,7 @@ async function doDeleteServer() {
     await db.ref('voice/' + sid).remove();
     delete servers[sid]; currentServer = null; currentChannel = null;
     renderServerList(); showHome();
-    toast('🗑️ تم حذف السيرفر');
+    toast('🗑️ تم حذف العالم');
   } catch(e) { toast('❌ فشل في الحذف: ' + e.message); }
 }
 
@@ -668,7 +668,7 @@ function _listenMembership(sid) {
   const fn = snap => {
     if (!initialized) { initialized = true; return; }
     if (!snap.exists() && currentServer === sid) {
-      toast('🚫 تم إزالتك من هذا السيرفر');
+      toast('🚫 تم إزالتك من هذا العالم');
       cleanupMessagesListener();
       cleanupVoiceListener();
       if (_restrictionListener) { db.ref(_restrictionListener.path).off('value', _restrictionListener.fn); _restrictionListener = null; }
@@ -714,7 +714,7 @@ function _applyMuteState(isMuted) {
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'mutedNoticeBar';
-      bar.textContent = '🔇 أنت مكتوم في هذا السيرفر — لا يمكنك إرسال رسائل';
+      bar.textContent = '🔇 أنت مكتوم في هذا العالم — لا يمكنك إرسال رسائل';
       const inputBox = document.querySelector('.chat-input-box');
       if (inputBox && inputBox.parentNode) inputBox.parentNode.insertBefore(bar, inputBox);
     }
@@ -774,14 +774,14 @@ async function handleSvAvatarUpload(input) {
 async function saveServerCustomize() {
   if (!currentServer) return;
   const name = document.getElementById('svCustomNameInp').value.trim();
-  if (!name) { toast('❌ أدخل اسم السيرفر'); return; }
+  if (!name) { toast('❌ أدخل اسم العالم'); return; }
   const updates = { name, emoji: _svCustomEmoji };
   if (window._svAvatarPending) { updates.avatarUrl = window._svAvatarPending; window._svAvatarPending = null; }
   await db.ref('servers/' + currentServer).update(updates);
   Object.assign(servers[currentServer], updates);
   closeModal('serverCustomizeModal');
   renderServerList(); renderChannels(currentServer);
-  toast('✅ تم تحديث السيرفر');
+  toast('✅ تم تحديث العالم');
 }
 
 // ════ التصنيفات ════

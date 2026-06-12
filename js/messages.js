@@ -352,7 +352,7 @@ async function _unmuteUser(uid, name) {
 
 async function _kickUserFromChat(uid, name) {
   if (!currentServer || !currentUser) return;
-  if (!confirm('طرد "' + name + '" من السيرفر؟')) return;
+  if (!confirm('طرد "' + name + '" من العالم؟')) return;
   try {
     await db.ref('servers/' + currentServer + '/members/' + uid).remove();
     await db.ref('users/' + uid + '/servers/' + currentServer).remove();
@@ -364,7 +364,7 @@ async function _kickUserFromChat(uid, name) {
 
 // ════ إرسال رسالة ════
 async function sendMessage() {
-  if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا السيرفر'); return; }
+  if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا العالم'); return; }
   const inp = document.getElementById('mainChatInp');
   const text = inp ? inp.value.trim() : '';
   const media = [...(window._pendingMedia || [])];
