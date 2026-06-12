@@ -6,8 +6,6 @@ let _currentMsgPath = null;
 let _replyTo = null;
 let _editingKey = null;
 let _typingTimer = null;
-let _typingListener = null;
-let messagesListener = null;
 let _searchResults = [], _searchIndex = 0;
 
 // ════ عرض الرسائل ════
