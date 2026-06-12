@@ -401,6 +401,9 @@ async function sendMessage() {
     clearReply();
   }
 
+  // ── تجديد التوكن إجبارياً قبل أي كتابة أو رفع ──
+  if (auth.currentUser) { await auth.currentUser.getIdToken(true); }
+
   // ── إرسال النص مباشرة إلى قاعدة البيانات ──
   if (text) {
     await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
@@ -426,7 +429,6 @@ async function sendMessage() {
     catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
   }
   if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
-  try { await auth.currentUser.getIdToken(true); } catch(e) { /* non-fatal */ }
   toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
 
   window._sendingMedia = true;
@@ -534,8 +536,6 @@ async function _uploadOneMedia(m, msgBase) {
     if (area) area.scrollTop = area.scrollHeight;
   } catch(e) {
     clearTimeout(timeoutId);
-    tempDiv.remove();
-    if (_blobUrl) URL.revokeObjectURL(_blobUrl);
     if (e.code === 'storage/canceled') {
       toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
     } else if (e.code === 'storage/unauthorized') {
@@ -545,6 +545,10 @@ async function _uploadOneMedia(m, msgBase) {
     } else {
       toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
+  } finally {
+    // حارس الأمان: إزالة المعاينة المؤقتة في أي حالة غير متوقعة
+    if (tempDiv.parentNode) tempDiv.remove();
+    if (_blobUrl) { URL.revokeObjectURL(_blobUrl); _blobUrl = null; }
   }
 }
 
