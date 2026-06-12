@@ -449,10 +449,9 @@
 <div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;flex-direction:column;gap:12px" onclick="closeLightbox()">
   <img id="lightboxImg" style="max-width:92vw;max-height:80vh;border-radius:12px;object-fit:contain;display:none">
   <video id="lightboxVid" controls style="max-width:92vw;max-height:80vh;border-radius:12px;display:none"></video>
-  <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:center">
-    <button id="lightboxSaveInChat" type="button" style="display:none;padding:10px 20px;background:rgba(212,175,90,0.2);color:var(--gold,#d4af5a);border:1px solid var(--gold,#d4af5a);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxSaveInChat()">📌 حفظ في المحادثة</button>
-    <button id="lightboxDl" type="button" style="padding:10px 24px;background:rgba(26,95,95,0.8);color:#fff;border:1px solid var(--gold);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();lightboxDownload()">⬇️ حفظ في الجهاز</button>
-    <button type="button" style="padding:10px 20px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="closeLightbox()">✕ إغلاق</button>
+  <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:center" onclick="event.stopPropagation()">
+    <button id="lightboxDl" type="button" style="padding:10px 24px;background:rgba(26,95,95,0.8);color:#fff;border:1px solid var(--gold);border-radius:10px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="lightboxDownload()">💾 حفظ في الجهاز</button>
+    <button type="button" style="padding:10px 22px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:10px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="closeLightbox()">❌ إغلاق</button>
   </div>
 </div>
 
@@ -471,7 +470,7 @@
 <script src="js/notifications.js?v=11.4"></script>
 <script src="js/voice.js?v=12.0"></script>
 <script src="js/auth.js?v=11.4"></script>
-<script src="js/messages.js?v=12.0"></script>
+<script src="js/messages.js?v=12.1"></script>
 <script src="js/servers.js?v=12.0"></script>
 <script src="js/calls.js?v=10.1"></script>
 <script src="js/dm.js?v=3.0"></script>

@@ -238,7 +238,7 @@ function buildMsgDiv(msg, key) {
       img.src = '';                // blank immediately — no inherited/default src
       img.dataset.msgKey = key;   // stamp with message key for async guard
       img.alt = msg.mediaName || '';
-      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, msg.expiresAt && !msg.saved ? key : null));
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
       img.addEventListener('load', () => {
         const a = document.getElementById('messagesArea');
         if (!a) return;
@@ -862,31 +862,16 @@ function clearSearchHighlights() {
 }
 
 // ════ Lightbox ════
-let _lightboxUrl='', _lightboxType='', _lightboxName='', _lightboxMsgKey=null;
-function openLightbox(url, type, name, msgKey) {
-  _lightboxUrl=url; _lightboxType=type; _lightboxName=name||'media'; _lightboxMsgKey=msgKey||null;
+let _lightboxUrl='', _lightboxType='', _lightboxName='';
+function openLightbox(url, type, name) {
+  _lightboxUrl=url; _lightboxType=type; _lightboxName=name||'media';
   const bg=document.getElementById('lightboxBg');
   const img=document.getElementById('lightboxImg');
   const vid=document.getElementById('lightboxVid');
-  const saveBtn=document.getElementById('lightboxSaveInChat');
   if (!bg) return;
   bg.style.display='flex';
-  if (saveBtn) saveBtn.style.display=msgKey?'inline-block':'none';
   if (type==='video') { if(img) img.style.display='none'; if(vid){vid.src=url;vid.style.display='block';} }
   else { if(vid){vid.style.display='none';vid.src='';} if(img){img.src=url;img.style.display='block';} }
-}
-async function lightboxSaveInChat() {
-  if (!_lightboxMsgKey) return;
-  const btn=document.getElementById('lightboxSaveInChat');
-  if (btn){btn.disabled=true;btn.textContent='⏳...';}
-  try {
-    await db.ref('messages/'+currentServer+'/'+currentChannel+'/'+_lightboxMsgKey).update({saved:true,expiresAt:null});
-    const cached=await _imgCacheDB.get(_lightboxUrl);
-    if (cached) await _imgCacheDB.set(_lightboxUrl,cached.blob,null,true);
-    toast('📌 تم حفظ الصورة بشكل دائم');
-    if (btn){btn.textContent='✅ تم الحفظ';btn.style.display='none';}
-    _lightboxMsgKey=null;
-  } catch(e) { if(btn){btn.disabled=false;btn.textContent='📌 حفظ في المحادثة';} toast('❌ فشل الحفظ'); }
 }
 function closeLightbox() {
   const bg=document.getElementById('lightboxBg');
