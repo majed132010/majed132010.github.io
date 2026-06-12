@@ -35,9 +35,18 @@ function initApp() {
       if (!snap.exists()) return;
       const sid = Object.keys(snap.val())[0];
       if (servers[sid]) { selectServer(sid); return; }
-      await db.ref('servers/' + sid + '/members/' + currentUser.uid).set({ role: 'member' });
+      const _joinMemberData = {
+        role: 'member',
+        name: userProfile.displayName || currentUser.displayName || 'عضو',
+        avatar: userProfile.avatar || currentUser.photoURL || null,
+        joinedAt: Date.now()
+      };
+      await db.ref('servers/' + sid + '/members/' + currentUser.uid).set(_joinMemberData);
       await db.ref('users/' + currentUser.uid + '/servers/' + sid).set(true);
-      servers[sid] = snap.val()[sid];
+      // Build local cache from snapshot + inject our member entry (snapshot predates the write)
+      servers[sid] = snap.val()[sid] || {};
+      if (!servers[sid].members) servers[sid].members = {};
+      servers[sid].members[currentUser.uid] = _joinMemberData;
       renderServerList();
       selectServer(sid);
       toast('✅ انضممت للسيرفر!');
@@ -156,7 +165,7 @@ async function createServer() {
   const sid = 'sv_' + Date.now();
   const sv = {
     name, emoji: '🌍', inviteCode, ownerId: currentUser.uid,
-    members: { [currentUser.uid]: { role: 'owner' } },
+    members: { [currentUser.uid]: { role: 'owner', name: userProfile.displayName || '', avatar: userProfile.avatar || null } },
     channels: {
       ['ch_' + Date.now()]: { name: 'عام', type: 'text', position: 0 },
       ['ch_' + (Date.now()+1)]: { name: 'صوتي عام', type: 'voice', position: 1 }
@@ -189,9 +198,18 @@ async function joinServer() {
     servers[sid] = snap.val()[sid];
     renderServerList(); selectServer(sid); return;
   }
-  await db.ref('servers/' + sid + '/members/' + currentUser.uid).set({ role: 'member' });
+  const memberData = {
+    role: 'member',
+    name: userProfile.displayName || currentUser.displayName || 'عضو',
+    avatar: userProfile.avatar || currentUser.photoURL || null,
+    joinedAt: Date.now()
+  };
+  await db.ref('servers/' + sid + '/members/' + currentUser.uid).set(memberData);
   await db.ref('users/' + currentUser.uid + '/servers/' + sid).set(true);
-  servers[sid] = snap.val()[sid];
+  // Inject our member entry into the local cache — the snapshot predates the write
+  servers[sid] = snap.val()[sid] || {};
+  if (!servers[sid].members) servers[sid].members = {};
+  servers[sid].members[currentUser.uid] = memberData;
   document.getElementById('joinCodeInp').value = '';
   closeModal('joinServerModal');
   renderServerList(); selectServer(sid);
@@ -208,6 +226,7 @@ function selectServer(sid) {
   renderChannels(sid);
   _listenMembership(sid);
   _listenRestrictions(sid);
+  _ensureMemberRegistered(sid);
   if (isMobile() && !window._restoringSession) openDrawer();
   else {
     const sv = servers[sid];
@@ -565,6 +584,23 @@ async function banMember(uid, name) {
 async function checkBanned(sid) {
   const snap = await db.ref('servers/' + sid + '/banned/' + currentUser.uid).once('value');
   return snap.exists();
+}
+
+// ════ إصلاح ذاتي: تحديث بيانات العضوية الناقصة ════
+// يُصلح أي سجل عضوية تم إنشاؤه بدون name/avatar (مستخدمون قدامى)
+async function _ensureMemberRegistered(sid) {
+  if (!currentUser || !sid) return;
+  const myEntry = servers[sid]?.members?.[currentUser.uid];
+  if (!myEntry) return;       // غير مسجّل أصلاً — لا تتدخل
+  if (myEntry.name) return;   // البيانات مكتملة
+  const update = {
+    name: userProfile.displayName || currentUser.displayName || 'عضو',
+    avatar: userProfile.avatar || currentUser.photoURL || null
+  };
+  try {
+    await db.ref('servers/' + sid + '/members/' + currentUser.uid).update(update);
+    Object.assign(servers[sid].members[currentUser.uid], update);
+  } catch(e) { console.warn('[MEMBERS] self-heal failed:', e.code || e.message); }
 }
 
 // ════ استماع عضوية السيرفر — كشف الطرد الفوري ════
