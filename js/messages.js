@@ -54,7 +54,29 @@ function showMessages(sid, cid) {
       ? db.ref(_currentMsgPath).orderByKey().startAfter(lastKey)
       : db.ref(_currentMsgPath).limitToLast(1);
     query.on('child_added', fn);
-    messagesListener = { path: _currentMsgPath, fn };
+
+    // Live reaction + edit updates for every visible message
+    const changeFn = snap => {
+      const msg = snap.val();
+      if (!msg) return;
+      const el = document.querySelector(`[data-key="${snap.key}"]`);
+      if (!el) return;
+      const body = el.querySelector('.msg-body');
+      if (!body) return;
+      // Re-render reactions in-place
+      renderReactions(msg.reactions || null, snap.key, body);
+      // Sync edited text visible to this client when another tab/user edits
+      if (msg.text !== undefined) {
+        const contentEl = body.querySelector('.msg-content');
+        if (contentEl && contentEl.textContent !== msg.text) contentEl.textContent = msg.text;
+        if (msg.edited && !body.querySelector('.msg-edited')) {
+          const metaEl = body.querySelector('.msg-meta');
+          if (metaEl) metaEl.insertAdjacentHTML('beforeend', '<span class="msg-edited">(معدّل)</span>');
+        }
+      }
+    };
+    db.ref(_currentMsgPath).on('child_changed', changeFn);
+    messagesListener = { path: _currentMsgPath, fn, changeFn };
   });
 }
 
@@ -470,7 +492,7 @@ function clearReply() {
 }
 
 // ════ التفاعلات ════
-const REACTION_EMOJIS = ['👍','❤️','😂','😮','😢','🔥','👏','🎉'];
+const REACTION_EMOJIS = ['👍','😂','🔥','❤️','😮','😢'];
 
 function showReactionPicker(msgKey, anchorEl) {
   const old = document.getElementById('reactionPicker');
@@ -481,15 +503,24 @@ function showReactionPicker(msgKey, anchorEl) {
   REACTION_EMOJIS.forEach(emoji => {
     const span = document.createElement('span');
     span.textContent = emoji;
+    span.title = emoji;
     span.addEventListener('click', e => { e.stopPropagation(); toggleReaction(msgKey, emoji); picker.remove(); });
     picker.appendChild(span);
   });
   document.body.appendChild(picker);
+
+  // Flip-aware positioning: prefer above the button, fall back to below
   const rect = anchorEl.getBoundingClientRect();
-  const pw = picker.offsetWidth || 260;
-  let left = rect.left - pw / 2 + rect.width / 2;
+  const pw = picker.offsetWidth || 232;
+  const ph = picker.offsetHeight || 48;
+  let left = rect.left + rect.width / 2 - pw / 2;
   left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
-  picker.style.cssText += `;position:fixed;left:${left}px;top:${rect.top - 52}px`;
+  const topAbove = rect.top - ph - 6;
+  const top = topAbove >= 8 ? topAbove : rect.bottom + 6;
+  picker.style.position = 'fixed';
+  picker.style.left = left + 'px';
+  picker.style.top  = top  + 'px';
+
   const close = e => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close, true); } };
   setTimeout(() => document.addEventListener('click', close, true), 50);
 }
@@ -505,15 +536,21 @@ async function toggleReaction(msgKey, emoji) {
 function renderReactions(reactions, msgKey, container) {
   const old = container.querySelector('.msg-reactions');
   if (old) old.remove();
-  if (!reactions) return;
+  if (!reactions || !Object.keys(reactions).length) return;
   const wrap = document.createElement('div');
   wrap.className = 'msg-reactions';
   Object.entries(reactions).forEach(([emoji, users]) => {
     const uids = Object.keys(users || {});
     if (!uids.length) return;
+    const isMine = uids.includes(currentUser?.uid);
     const chip = document.createElement('div');
-    chip.className = 'reaction-chip' + (uids.includes(currentUser?.uid) ? ' mine' : '');
-    chip.innerHTML = `<span>${emoji}</span><span class="rc-count">${uids.length}</span>`;
+    chip.className = 'reaction-chip' + (isMine ? ' mine' : '');
+    chip.innerHTML = `<span class="rc-emoji">${emoji}</span><span class="rc-count">${uids.length}</span>`;
+    // Tooltip: first 3 names who reacted
+    const names = uids.slice(0, 3)
+      .map(uid => servers[currentServer]?.members?.[uid]?.name || 'مستخدم')
+      .join('، ');
+    chip.title = names + (uids.length > 3 ? ' +' + (uids.length - 3) : '');
     chip.addEventListener('click', () => toggleReaction(msgKey, emoji));
     wrap.appendChild(chip);
   });
@@ -553,7 +590,11 @@ function listenTyping(sid, cid) {
 
 // ════ تنظيف الـ listener ════
 function cleanupMessagesListener() {
-  if (messagesListener) { db.ref(messagesListener.path).off('child_added', messagesListener.fn); messagesListener = null; }
+  if (messagesListener) {
+    db.ref(messagesListener.path).off('child_added', messagesListener.fn);
+    if (messagesListener.changeFn) db.ref(messagesListener.path).off('child_changed', messagesListener.changeFn);
+    messagesListener = null;
+  }
   stopTyping();
   if (_typingListener) { db.ref(_typingListener).off('value'); _typingListener = null; }
   const el = document.getElementById('typingIndicator');
