@@ -58,11 +58,10 @@ function listenNotifications(userId) {
       if (notif.data?.type === 'dm') {
         showDmNotif({ name: title, text: body }, notif.data?.fromUid);
       } else {
-        showInAppNotif(
-          { name: notif.data?.senderName || title, text: body },
-          notif.data?.serverId,
-          notif.data?.channelId
-        );
+        const _sid = notif.data?.serverId, _cid = notif.data?.channelId;
+        if (_sid && _cid && !(currentServer === _sid && currentChannel === _cid)) {
+          showInAppNotif({ name: notif.data?.senderName || title, text: body }, _sid, _cid);
+        }
       }
     }
   };
@@ -82,6 +81,7 @@ async function initFCM(userId) {
       if (data.type === 'dm' && data.fromUid) {
         showDmNotif({ name: title || 'رسالة خاصة', text: body || '' }, data.fromUid);
       } else if (data.serverId && data.channelId) {
+        if (currentServer === data.serverId && currentChannel === data.channelId) return;
         showInAppNotif({ name: data.senderName || title, text: body || '' }, data.serverId, data.channelId);
       } else {
         toast('🔔 ' + (title || 'عوالم') + ': ' + (body || ''));
@@ -166,6 +166,7 @@ function playMsgSound() {
 
 // ════ إشعار داخلي للرسائل العامة ════
 function showInAppNotif(msg, sid, cid) {
+  if (!sid || !cid) return;
   if (currentServer === sid && currentChannel === cid) return;
   incrementUnread(sid, cid);
   const old = document.getElementById('notifToast');

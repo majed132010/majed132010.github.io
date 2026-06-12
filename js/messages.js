@@ -224,7 +224,7 @@ function buildMsgDiv(msg, key) {
       const mediaWrap = document.createElement('div');
       mediaWrap.className = 'msg-media-wrap';
       const img = document.createElement('img');
-      img.loading = 'lazy'; img.decoding = 'async';
+      img.decoding = 'async';
       img.className = 'msg-media-img';
       img.src = '';                // blank immediately — no inherited/default src
       img.dataset.msgKey = key;   // stamp with message key for async guard
@@ -233,8 +233,11 @@ function buildMsgDiv(msg, key) {
       img.addEventListener('load', () => {
         const a = document.getElementById('messagesArea');
         if (!a) return;
-        const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
-        if (dist < 300) a.scrollTop = a.scrollHeight;
+        // rAF lets the browser reflow the expanded image before measuring scroll distance
+        requestAnimationFrame(() => {
+          const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
+          if (dist < 300) a.scrollTop = a.scrollHeight;
+        });
       });
       loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
         if (img.dataset.msgKey !== key) return; // stale callback — element was reused, abort
@@ -403,13 +406,14 @@ async function sendMessage() {
   }
 
   if (media.length) {
-    // Ensure Firebase has an authenticated WebSocket before the first Storage write.
-    // Without this, uploads issued before the SDK finishes auth emit "Failed to fetch"
-    // or storage/unauthorized and fall into the retry loop.
     if (!_isConnected) {
       try { await waitForConnection(5000); }
       catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
     }
+    if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
+    // Refresh the auth token before Storage upload. On mobile, the token can silently
+    // expire while the app is in background, causing "Failed to fetch" from Storage.
+    try { await auth.currentUser.getIdToken(true); } catch(e) { /* non-fatal */ }
     toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
   }
 
@@ -470,7 +474,14 @@ async function sendMessage() {
       setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
     } catch(e) {
       tempDiv.remove();
-      toast('❌ فشل رفع الملف: ' + (e.message || ''));
+      if (e.code === 'storage/unauthorized') {
+        // already toasted in uploadToStorage — just surface a storage-rules reminder
+        toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage (المسار: media/{sid})');
+      } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
+        toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
+      } else {
+        toast('❌ فشل رفع الملف: ' + (e.message || ''));
+      }
     }
   }
 }
