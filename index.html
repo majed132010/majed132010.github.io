@@ -16,7 +16,7 @@
 <link rel="shortcut icon" href="icon-192.png">
 <title>عوالم</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=5.1">
+<link rel="stylesheet" href="css/style.css?v=5.2">
 </head>
 <body>
 
@@ -98,13 +98,16 @@
     <div class="user-panel">
       <div class="up-av" onclick="openProfile()" id="upAv">?</div>
       <div class="up-info">
-        <div class="up-name" id="upName">—</div>
+        <div class="up-name-row">
+          <div class="up-name" id="upName">—</div>
+          <button class="up-edit-btn" onclick="openEditProfile()" title="تعديل الملف الشخصي">✏️</button>
+        </div>
         <div class="up-tag" id="upTag">#0000</div>
       </div>
       <div class="up-btns">
         <button class="up-btn" id="dndBtn" onclick="toggleDND()" title="وضع عدم الإزعاج">🔔<span class="dnd-tooltip">وضع عدم الإزعاج</span></button>
         <button class="up-btn" onclick="openProfile()" title="الملف الشخصي">👤</button>
-        <button class="up-btn" onclick="openSettings()" title="الإعدادات">⚙️</button>
+        <button class="up-btn" onclick="openEditProfile()" title="تعديل الملف الشخصي">⚙️</button>
       </div>
     </div>
   </div>
@@ -378,10 +381,19 @@
 <div class="modal-bg" id="settingsModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('settingsModal')">✕</button>
-    <div class="modal-title">إعدادات الحساب</div>
+    <div class="modal-title">تعديل الملف الشخصي</div>
+    <div class="modal-sub">اضغط على الصورة لتغييرها</div>
+    <!-- Avatar picker -->
+    <div class="ep-avatar-wrap" onclick="document.getElementById('epAvatarInput').click()" title="اضغط لتغيير الصورة">
+      <div class="ep-avatar" id="epAvatarPreview">?</div>
+      <div class="ep-avatar-overlay">📷</div>
+    </div>
+    <input type="file" id="epAvatarInput" accept="image/*" style="display:none" onchange="previewEditAvatar(this)">
+    <!-- Display name -->
     <input class="modal-inp" id="displayNameInp" placeholder="اسم العرض">
-    <button class="modal-btn" onclick="saveSettings()">💾 حفظ</button>
-    <button class="modal-btn secondary" onclick="doSignOut()">🚪 خروج</button>
+    <button class="modal-btn" onclick="saveSettings()">💾 حفظ التغييرات</button>
+    <div style="height:1px;background:rgba(0,0,0,0.08);margin:10px 0 2px"></div>
+    <button class="modal-btn secondary" onclick="doSignOut()">🚪 تسجيل الخروج</button>
   </div>
 </div>
 
@@ -416,7 +428,7 @@
         📌 شارك هذا الكود مع الآخرين ليتمكنوا من إضافتك كصديق أو الانضمام عبرك
       </div>
     </div>
-    <button class="modal-btn secondary" onclick="closeModal('profileModal');openSettings()">⚙️ تعديل الحساب</button>
+    <button class="modal-btn secondary" onclick="closeModal('profileModal');openEditProfile()">⚙️ تعديل الحساب</button>
   </div>
 </div>
 
@@ -458,7 +470,7 @@
 <script src="js/push.js?v=9.2"></script>
 <script src="js/notifications.js?v=4.0"></script>
 <script src="js/voice.js?v=3.0"></script>
-<script src="js/auth.js?v=3.0"></script>
+<script src="js/auth.js?v=4.0"></script>
 <script src="js/messages.js?v=9.2"></script>
 <script src="js/servers.js?v=9.2"></script>
 <script src="js/calls.js?v=3.0"></script>

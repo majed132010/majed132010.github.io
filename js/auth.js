@@ -144,21 +144,107 @@ async function loadUserProfile() {
 }
 
 function updateUserPanel() {
-  document.getElementById('upAv').textContent = (userProfile.displayName||'?')[0];
+  const av = document.getElementById('upAv');
+  if (av) {
+    if (userProfile.avatar) {
+      av.innerHTML = `<img src="${userProfile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+    } else {
+      av.textContent = (userProfile.displayName || '?')[0];
+    }
+  }
   document.getElementById('upName').textContent = userProfile.displayName || '—';
   document.getElementById('upTag').textContent = '#' + (userProfile.tag || '0000');
   const dni = document.getElementById('displayNameInp');
   if (dni) dni.value = userProfile.displayName || '';
 }
 
+// ════ فتح مودال تعديل الملف الشخصي مع تعبئة القيم الحالية ════
+function openEditProfile() {
+  const nameInp = document.getElementById('displayNameInp');
+  if (nameInp) nameInp.value = userProfile.displayName || '';
+  // إعادة تعيين حقل الملف لمنع عرض ملف انتُقي سابقاً
+  const fileInp = document.getElementById('epAvatarInput');
+  if (fileInp) fileInp.value = '';
+  // تعبئة معاينة الصورة الحالية
+  const prev = document.getElementById('epAvatarPreview');
+  if (prev) {
+    if (userProfile.avatar) {
+      prev.innerHTML = `<img src="${userProfile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+    } else {
+      prev.textContent = (userProfile.displayName || '?')[0];
+    }
+  }
+  openModal('settingsModal');
+}
+
+// معاينة محلية للصورة الجديدة قبل الرفع
+function previewEditAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { toast('❌ الصورة أكبر من 3MB'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('epAvatarPreview');
+    if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ════ مزامنة الاسم والصورة في جميع السيرفرات ════
+async function _syncProfileToServers(name, avatarUrl) {
+  if (!currentUser) return;
+  const snap = await db.ref('users/' + currentUser.uid + '/servers').once('value');
+  const sids = snap.val() || {};
+  const updates = {};
+  Object.keys(sids).forEach(sid => {
+    updates['servers/' + sid + '/members/' + currentUser.uid + '/name'] = name;
+    updates['servers/' + sid + '/members/' + currentUser.uid + '/avatar'] = avatarUrl || null;
+  });
+  if (Object.keys(updates).length) await db.ref().update(updates);
+}
+
+// ════ حفظ الملف الشخصي: رفع الصورة + تحديث Auth + RTDB + جميع السيرفرات ════
 async function saveSettings() {
-  const name = document.getElementById('displayNameInp').value.trim();
-  if (!name) return;
-  userProfile.displayName = name;
-  await db.ref('users/' + currentUser.uid).update({ displayName: name });
-  updateUserPanel();
-  closeModal('settingsModal');
-  toast('✅ تم الحفظ');
+  const name = (document.getElementById('displayNameInp')?.value || '').trim();
+  if (!name) { toast('❌ الاسم لا يمكن أن يكون فارغاً'); return; }
+
+  const btn = document.querySelector('#settingsModal .modal-btn:not(.secondary)');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+
+  try {
+    let avatarUrl = userProfile.avatar || null;
+    const fileInp = document.getElementById('epAvatarInput');
+    const file = fileInp?.files[0];
+
+    if (file) {
+      toast('⏳ جاري رفع الصورة...');
+      avatarUrl = await uploadToStorage(file, `avatars/${currentUser.uid}/avatar.jpg`);
+    }
+
+    // تحديث Firebase Auth profile
+    const profileUpdate = { displayName: name };
+    if (avatarUrl) profileUpdate.photoURL = avatarUrl;
+    await auth.currentUser.updateProfile(profileUpdate);
+
+    // تحديث RTDB
+    await db.ref('users/' + currentUser.uid).update({ displayName: name, avatar: avatarUrl });
+
+    // تحديث الكاش المحلي
+    userProfile.displayName = name;
+    userProfile.avatar = avatarUrl;
+
+    // مزامنة فورية مع جميع السيرفرات
+    await _syncProfileToServers(name, avatarUrl);
+
+    updateUserPanel();
+    closeModal('settingsModal');
+    toast('✅ تم حفظ التغييرات بنجاح');
+  } catch(e) {
+    toast('❌ فشل الحفظ: ' + (e.message || e.code || ''));
+    console.error('[Profile] save error:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ التغييرات'; }
+  }
 }
 
 async function doSignOut() {
@@ -167,20 +253,23 @@ async function doSignOut() {
   await auth.signOut();
 }
 
+// رفع سريع للصورة من مودال الملف الشخصي (مع مزامنة السيرفرات)
 async function uploadAvatar(input) {
   const file = input.files[0];
   if (!file || !currentUser) return;
   if (file.size > 3 * 1024 * 1024) { toast('❌ الصورة أكبر من 3MB'); return; }
   toast('⏳ جاري رفع الصورة...');
   try {
-    const path = `avatars/${currentUser.uid}/avatar.jpg`;
-    const url = await uploadToStorage(file, path);
+    const url = await uploadToStorage(file, `avatars/${currentUser.uid}/avatar.jpg`);
     await db.ref('users/' + currentUser.uid + '/avatar').set(url);
+    await auth.currentUser.updateProfile({ photoURL: url });
     userProfile.avatar = url;
     const av = document.getElementById('profileAvatar');
     if (av) av.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    updateUserPanel();
+    await _syncProfileToServers(userProfile.displayName || '', url);
     toast('✅ تم تحديث الصورة');
-  } catch(e) { toast('❌ فشل رفع الصورة: ' + (e.message||'')); }
+  } catch(e) { toast('❌ فشل رفع الصورة: ' + (e.message || '')); }
 }
 
 function openProfile() {

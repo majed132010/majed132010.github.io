@@ -384,10 +384,19 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   width:10px;height:10px;border-radius:50%;background:#23a55a;
   border:2px solid #ebedef;
 }
-.up-info{flex:1;min-width:0}
-.up-name{font-size:13px;font-weight:500;color:#2e3338;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up-info{flex:1;min-width:0;overflow:hidden}
+.up-name-row{display:flex;align-items:center;gap:3px;overflow:hidden}
+.up-name{font-size:13px;font-weight:500;color:#2e3338;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.up-edit-btn{background:none;border:none;padding:1px 3px;cursor:pointer;font-size:11px;opacity:0;color:#747f8d;transition:opacity .15s;flex-shrink:0;line-height:1}
+.user-panel:hover .up-edit-btn{opacity:0.55}
+.up-edit-btn:hover{opacity:1 !important}
 .up-tag{font-size:11px;color:#747f8d}
 .up-btns{display:flex;gap:1px}
+/* ════ EDIT PROFILE MODAL AVATAR PICKER ════ */
+.ep-avatar-wrap{width:80px;height:80px;border-radius:50%;cursor:pointer;position:relative;margin:4px auto 20px;overflow:hidden;flex-shrink:0}
+.ep-avatar{width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#1a6060,var(--acc));display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff}
+.ep-avatar-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;font-size:22px;opacity:0;transition:opacity .2s;border-radius:50%}
+.ep-avatar-wrap:hover .ep-avatar-overlay{opacity:1}
 .up-btn{
   width:32px;height:32px;border-radius:6px;background:transparent;
   border:none;color:#747f8d;cursor:pointer;transition:.15s;font-size:16px;
