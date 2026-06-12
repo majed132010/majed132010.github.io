@@ -431,12 +431,20 @@ async function sendMessage() {
     try {
       for (const m of media) {
         const area = document.getElementById('messagesArea');
-        const localUrl = await new Promise((res, rej) => {
-          const fr = new FileReader();
-          fr.onload = (e) => res(e.target.result);
-          fr.onerror = () => rej(new Error('FileReader failed'));
-          fr.readAsDataURL(m.file);
-        });
+        // Videos: blob URL is instant and avoids FileReader delay/failure on large files.
+        // Images: data URL via FileReader survives iOS background blob-revocation.
+        let localUrl, _blobUrl = null;
+        if (m.type === 'video') {
+          _blobUrl = URL.createObjectURL(m.file);
+          localUrl = _blobUrl;
+        } else {
+          localUrl = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = (e) => res(e.target.result);
+            fr.onerror = () => rej(new Error('FileReader failed'));
+            fr.readAsDataURL(m.file);
+          });
+        }
         const tempKey = 'temp_' + Date.now() + '_' + Math.random();
 
         // عرض preview فوري
@@ -495,10 +503,13 @@ async function sendMessage() {
           await db.ref('messages/' + currentServer + '/' + currentChannel).push({
             ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
           });
-          setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
+          tempDiv.remove();
+          if (_blobUrl) URL.revokeObjectURL(_blobUrl);
+          if (area) area.scrollTop = area.scrollHeight;
         } catch(e) {
           clearTimeout(uploadTimeout);
           tempDiv.remove();
+          if (_blobUrl) URL.revokeObjectURL(_blobUrl);
           if (e.code === 'storage/canceled') {
             toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
           } else if (e.code === 'storage/unauthorized') {
