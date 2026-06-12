@@ -383,13 +383,40 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
               bitrateMax: 1500
             }
           });
-          console.log('[CALL] 🎥 أُنشئ فيديو محلي بجودة HD (1280×720)');
+          // Lock in 720p@30fps explicitly after creation
+          await _localVideoTrack.setEncoderConfiguration({
+            width: 1280, height: 720, frameRate: 30, bitrateMin: 400, bitrateMax: 1500
+          });
+          console.log('[CALL] 🎥 أُنشئ فيديو محلي بجودة HD (1280×720@30fps)');
         } catch(hdErr) {
           console.warn('[CALL] ⚠ فشلت دقة HD على هذا الجهاز — التحويل للإعداد الافتراضي:', hdErr.message || hdErr);
           toast('⚠️ تعذّرت الجودة العالية — استخدام الجودة الافتراضية');
           _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-          console.log('[CALL] 🎥 أُنشئ فيديو محلي بالإعداد الافتراضي (fallback)');
+          // Stable 480p@30fps for the fallback path
+          await _localVideoTrack.setEncoderConfiguration({
+            width: 854, height: 480, frameRate: 30, bitrateMin: 200, bitrateMax: 800
+          });
+          console.log('[CALL] 🎥 أُنشئ فيديو محلي بإعداد 480p@30fps (fallback)');
         }
+
+        // Prioritise framerate over sharpness — keeps video smooth on slow mobile networks
+        await _localVideoTrack.setOptimizationMode('motion');
+
+        // Low-light beauty enhancement — optional, not available on all SDK builds
+        try {
+          if (typeof _localVideoTrack.setBeautyEffect === 'function') {
+            await _localVideoTrack.setBeautyEffect(true, {
+              lighteningContrastLevel: 1,  // 0–2: moderate contrast boost
+              lighteningLevel: 0.6,        // 0–1: brightens dark environments
+              smoothnessLevel: 0.5,        // 0–1: light skin smoothing
+              sharpnessLevel: 0.1          // 0–1: subtle edge sharpening
+            });
+            console.log('[CALL] ✨ تم تفعيل تأثير التجميل (تعزيز الإضاءة المنخفضة)');
+          }
+        } catch(beautyErr) {
+          console.warn('[CALL] ⚠ تأثير التجميل غير متاح في هذا الإصدار:', beautyErr.message || beautyErr);
+        }
+
         tracks.push(_localVideoTrack);
         _localVideoTrack.play('local-video');
         console.log('[CALL] 🎥 تشغيل الفيديو المحلي في #local-video');
