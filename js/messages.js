@@ -439,6 +439,7 @@ async function sendMessage() {
 
 // ════ رفع ملف واحد مع معاينة فورية ════
 async function _uploadOneMedia(m, msgBase) {
+  const _sid = currentServer, _cid = currentChannel;
   const area = document.getElementById('messagesArea');
 
   // ── بناء URL للمعاينة المحلية ──
@@ -511,15 +512,20 @@ async function _uploadOneMedia(m, msgBase) {
   const timeoutId = setTimeout(() => controller.abort(), 60000);
   try {
     const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-    const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
+    const storagePath = `media/${_sid}/${_cid}/${Date.now()}.${ext}`;
     const mediaUrl = await uploadToStorage(m.file, storagePath, {
       signal: controller.signal,
       onProgress: (pct) => { indicator.textContent = `⏳ ${pct}%`; }
     });
     clearTimeout(timeoutId);
     if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
+    if (currentServer !== _sid || currentChannel !== _cid) {
+      tempDiv.remove();
+      if (_blobUrl) URL.revokeObjectURL(_blobUrl);
+      return;
+    }
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-    await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+    await db.ref('messages/' + _sid + '/' + _cid).push({
       ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
     });
     // حذف فوري وحتمي للـ tempDiv بعد نجاح الكتابة — يمنع تكرار الميديا

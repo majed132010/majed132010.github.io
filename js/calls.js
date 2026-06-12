@@ -9,6 +9,8 @@ let _callTimer = null;
 let _callSeconds = 0;
 let _netStatsInterval = null;   // network-quality polling interval
 let _currentVideoProfile = 'auto'; // 'auto' | '720p' | '480p'
+let _incomingCallsRef = null;  // ref to calls/{uid}/incoming — detached on sign-out
+let _callResponseRef = null;   // ref to calls/{uid}/response — detached after answer or endCall
 
 // ════ بدء مكالمة ════
 async function startCall(toUid, toName, type = 'audio') {
@@ -87,14 +89,15 @@ async function startCall(toUid, toName, type = 'audio') {
   // استمع لرد المتصل به
   const responsePath = 'calls/' + currentUser.uid + '/response';
   console.log('[CALL] 👂 الاستماع لرد الطرف الآخر على →', responsePath);
-  db.ref(responsePath).on('value', async snap => {
+  _callResponseRef = db.ref(responsePath);
+  _callResponseRef.on('value', async snap => {
     const resp = snap.val();
     console.log('[CALL] 📥 وصل حدث على مسار الرد:', resp);
     if (!resp || resp.callId !== callId) {
       console.log('[CALL] … تجاهل الرد (فارغ أو callId غير مطابق)', { got: resp?.callId, expected: callId });
       return;
     }
-    db.ref(responsePath).off('value');
+    _callResponseRef?.off('value'); _callResponseRef = null;
     clearTimeout(_callTimeout);
 
     if (resp.status === 'accepted') {
@@ -117,7 +120,8 @@ function listenIncomingCalls() {
   }
   const incomingPath = 'calls/' + currentUser.uid + '/incoming';
   console.log('%c[CALL] 👂 تسجيل مستمع المكالمات الواردة على →', 'color:#1a9fff;font-weight:bold', incomingPath);
-  db.ref(incomingPath).on('value', snap => {
+  _incomingCallsRef = db.ref(incomingPath);
+  _incomingCallsRef.on('value', snap => {
     const call = snap.val();
     console.log('[CALL] 📥 حدث على مسار المكالمات الواردة:', call);
     if (!call) {
@@ -220,6 +224,8 @@ async function endCall(reason = 'ended') {
 
   // أوقف المستمع على عقدتنا فوراً قبل أي تنظيف
   if (currentUser) { try { db.ref('calls/' + currentUser.uid + '/end').off('value'); } catch(e) {} }
+  _incomingCallsRef?.off('value'); _incomingCallsRef = null;
+  _callResponseRef?.off('value');  _callResponseRef = null;
 
   // أوقف الوسائط المحلية وغادر قناة Agora
   if (_callClient) {
