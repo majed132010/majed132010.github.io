@@ -11,6 +11,7 @@ let _searchResults = [], _searchIndex = 0;
 // ════ عرض الرسائل ════
 function showMessages(sid, cid) {
   showView('messages');
+  if (typeof _currentUserMuted !== 'undefined') _applyMuteState(_currentUserMuted);
   _oldestMsgKey = null; _allLoaded = false;
   _currentMsgPath = 'messages/' + sid + '/' + cid;
   const area = document.getElementById('messagesArea');
@@ -91,6 +92,12 @@ async function loadMoreMessages() {
 function buildMsgDiv(msg, key) {
   const isAdmin = msg.role === 'owner' || msg.role === 'admin';
   const isMine = msg.uid === currentUser?.uid;
+  const sv = servers[currentServer];
+  const myRole = sv?.members?.[currentUser?.uid]?.role;
+  const isAdminUser = myRole === 'owner' || myRole === 'admin';
+  const targetRole = sv?.members?.[msg.uid]?.role;
+  const canModerate = isAdminUser && !isMine &&
+      !(myRole === 'admin' && (targetRole === 'owner' || targetRole === 'admin'));
   const div = document.createElement('div');
   div.className = 'msg-group';
   div.dataset.key = key;
@@ -99,6 +106,18 @@ function buildMsgDiv(msg, key) {
   const av = document.createElement('div');
   av.className = 'msg-av';
   av.textContent = (msg.name||'?')[0];
+  if (canModerate) {
+    av.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); _openModCtx(msg.uid, msg.name, e); });
+    av.style.cursor = 'context-menu';
+    av.title = 'انقر بالزر الأيمن لإجراءات الإشراف';
+    let _avLp;
+    av.addEventListener('touchstart', () => {
+      const r = av.getBoundingClientRect();
+      _avLp = setTimeout(() => _openModCtx(msg.uid, msg.name, { clientX: r.left + r.width / 2, clientY: r.top }), 600);
+    }, {passive: true});
+    av.addEventListener('touchend',  () => clearTimeout(_avLp), {passive: true});
+    av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
+  }
 
   const body = document.createElement('div');
   body.className = 'msg-body';
@@ -188,8 +207,6 @@ function buildMsgDiv(msg, key) {
 
   const actions = document.createElement('div');
   actions.className = 'msg-actions';
-  const sv = servers[currentServer];
-  const isAdminUser = sv?.members?.[currentUser?.uid]?.role === 'owner' || sv?.members?.[currentUser?.uid]?.role === 'admin';
 
   const reactBtn = document.createElement('button');
   reactBtn.className = 'ma-btn'; reactBtn.textContent = '😀'; reactBtn.title = 'تفاعل';
@@ -223,8 +240,76 @@ function buildMsgDiv(msg, key) {
   return div;
 }
 
+// ════ قائمة سياق المشرف ════
+async function _openModCtx(targetUid, targetName, ev) {
+  if (!currentServer || !currentUser) return;
+  document.getElementById('modCtxMenu')?.remove();
+  const snap = await db.ref('servers/' + currentServer + '/restrictions/' + targetUid + '/muted').once('value');
+  const isMuted = !!snap.val();
+  const menu = document.createElement('div');
+  menu.id = 'modCtxMenu';
+  menu.style.cssText = 'position:fixed;z-index:9000;background:linear-gradient(160deg,#122530,#0d1e28);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:6px;min-width:188px;box-shadow:0 8px 30px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif;';
+  const lbl = document.createElement('div');
+  lbl.style.cssText = 'font-size:11px;color:var(--muted);padding:6px 12px 8px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:164px';
+  lbl.textContent = '⚙️ ' + (targetName || 'مستخدم');
+  menu.appendChild(lbl);
+  const mkBtn = (icon, text, color, fn) => {
+    const b = document.createElement('button');
+    b.style.cssText = `display:block;width:100%;padding:10px 14px;background:transparent;border:none;color:${color};font-family:Tajawal,sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-align:right;border-radius:8px;white-space:nowrap`;
+    b.textContent = icon + ' ' + text;
+    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.07)');
+    b.addEventListener('mouseleave', () => b.style.background = 'transparent');
+    b.addEventListener('click', e => { e.stopPropagation(); menu.remove(); fn(); });
+    return b;
+  };
+  menu.appendChild(mkBtn(
+    isMuted ? '🔊' : '🔇',
+    isMuted ? 'رفع الكتم' : 'كتم المستخدم',
+    'var(--text)',
+    () => isMuted ? _unmuteUser(targetUid, targetName) : _muteUser(targetUid, targetName)
+  ));
+  menu.appendChild(mkBtn('🚫', 'طرد المستخدم', '#e06060', () => _kickUserFromChat(targetUid, targetName)));
+  document.body.appendChild(menu);
+  const pw = 200, ph = 120;
+  const px = Math.min(ev.clientX || 0, window.innerWidth  - pw - 8);
+  const py = Math.min(ev.clientY || 0, window.innerHeight - ph - 8);
+  menu.style.left = Math.max(8, px) + 'px';
+  menu.style.top  = Math.max(8, py) + 'px';
+  const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', close, true); } };
+  setTimeout(() => document.addEventListener('click', close, true), 50);
+}
+
+async function _muteUser(uid, name) {
+  if (!currentServer || !currentUser) return;
+  try {
+    await db.ref('servers/' + currentServer + '/restrictions/' + uid).set({ muted: true, mutedBy: currentUser.uid, mutedAt: Date.now() });
+    toast('🔇 تم كتم ' + name);
+  } catch(e) { toast('❌ فشل الكتم: ' + (e.message || '')); }
+}
+
+async function _unmuteUser(uid, name) {
+  if (!currentServer || !currentUser) return;
+  try {
+    await db.ref('servers/' + currentServer + '/restrictions/' + uid).remove();
+    toast('🔊 تم رفع الكتم عن ' + name);
+  } catch(e) { toast('❌ فشل رفع الكتم: ' + (e.message || '')); }
+}
+
+async function _kickUserFromChat(uid, name) {
+  if (!currentServer || !currentUser) return;
+  if (!confirm('طرد "' + name + '" من السيرفر؟')) return;
+  try {
+    await db.ref('servers/' + currentServer + '/members/' + uid).remove();
+    await db.ref('users/' + uid + '/servers/' + currentServer).remove();
+    await db.ref('servers/' + currentServer + '/restrictions/' + uid).remove();
+    if (servers[currentServer]?.members) delete servers[currentServer].members[uid];
+    toast('🚫 تم طرد ' + name);
+  } catch(e) { toast('❌ فشل الطرد: ' + (e.message || '')); }
+}
+
 // ════ إرسال رسالة ════
 async function sendMessage() {
+  if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا السيرفر'); return; }
   const inp = document.getElementById('mainChatInp');
   const text = inp ? inp.value.trim() : '';
   const media = window._pendingMedia || [];

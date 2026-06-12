@@ -6,6 +6,9 @@ let messagesListener = null;
 let _typingListener = null;
 let _collapsedCategories = JSON.parse(localStorage.getItem('collapsed_cats') || '{}');
 const _unreadCounts = {};
+let _membershipListener = null;
+let _restrictionListener = null;
+let _currentUserMuted = false;
 
 function initApp() {
   listenServers();
@@ -203,6 +206,8 @@ function selectServer(sid) {
   currentChannel = null;
   renderServerList();
   renderChannels(sid);
+  _listenMembership(sid);
+  _listenRestrictions(sid);
   if (isMobile() && !window._restoringSession) openDrawer();
   else {
     const sv = servers[sid];
@@ -224,6 +229,10 @@ function showHome() {
   if (overlay) overlay.classList.remove('show');
   cleanupMessagesListener();
   cleanupVoiceListener();
+  if (_membershipListener) { db.ref(_membershipListener.path).off('value', _membershipListener.fn); _membershipListener = null; }
+  if (_restrictionListener) { db.ref(_restrictionListener.path).off('value', _restrictionListener.fn); _restrictionListener = null; }
+  _currentUserMuted = false;
+  _applyMuteState(false);
   currentServer = null; currentChannel = null;
   renderServerList();
   document.getElementById('chServerName').textContent = 'الرئيسية';
@@ -539,6 +548,7 @@ async function kickMember(uid, name) {
   if (!currentServer || !confirm(`طرد "${name}"؟`)) return;
   await db.ref('servers/' + currentServer + '/members/' + uid).remove();
   await db.ref('users/' + uid + '/servers/' + currentServer).remove();
+  await db.ref('servers/' + currentServer + '/restrictions/' + uid).remove();
   if (servers[currentServer]?.members) delete servers[currentServer].members[uid];
   toast(`🚫 تم طرد ${name}`);
   openMemberMgmt();
@@ -555,6 +565,73 @@ async function banMember(uid, name) {
 async function checkBanned(sid) {
   const snap = await db.ref('servers/' + sid + '/banned/' + currentUser.uid).once('value');
   return snap.exists();
+}
+
+// ════ استماع عضوية السيرفر — كشف الطرد الفوري ════
+function _listenMembership(sid) {
+  if (_membershipListener) {
+    db.ref(_membershipListener.path).off('value', _membershipListener.fn);
+    _membershipListener = null;
+  }
+  if (!sid || !currentUser) return;
+  const path = 'servers/' + sid + '/members/' + currentUser.uid;
+  let initialized = false;
+  const fn = snap => {
+    if (!initialized) { initialized = true; return; }
+    if (!snap.exists() && currentServer === sid) {
+      toast('🚫 تم إزالتك من هذا السيرفر');
+      cleanupMessagesListener();
+      cleanupVoiceListener();
+      if (_restrictionListener) { db.ref(_restrictionListener.path).off('value', _restrictionListener.fn); _restrictionListener = null; }
+      delete servers[sid];
+      currentServer = null; currentChannel = null;
+      _currentUserMuted = false;
+      renderServerList();
+      showView('home');
+    }
+  };
+  db.ref(path).on('value', fn);
+  _membershipListener = { path, fn };
+}
+
+// ════ استماع قيود الكتم — تطبيق فوري على المكتوم ════
+function _listenRestrictions(sid) {
+  if (_restrictionListener) {
+    db.ref(_restrictionListener.path).off('value', _restrictionListener.fn);
+    _restrictionListener = null;
+  }
+  if (!sid || !currentUser) return;
+  const path = 'servers/' + sid + '/restrictions/' + currentUser.uid;
+  const fn = snap => {
+    const isMuted = !!(snap.val()?.muted);
+    _currentUserMuted = isMuted;
+    _applyMuteState(isMuted);
+  };
+  db.ref(path).on('value', fn);
+  _restrictionListener = { path, fn };
+}
+
+function _applyMuteState(isMuted) {
+  const inp = document.getElementById('mainChatInp');
+  const sendBtn = document.getElementById('sendBtn');
+  if (inp) {
+    inp.disabled = isMuted;
+    inp.placeholder = isMuted ? '🔇 أنت مكتوم — لا يمكنك إرسال رسائل' : 'اكتب رسالة...';
+  }
+  if (sendBtn) sendBtn.disabled = isMuted;
+  let bar = document.getElementById('mutedNoticeBar');
+  if (isMuted) {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'mutedNoticeBar';
+      bar.textContent = '🔇 أنت مكتوم في هذا السيرفر — لا يمكنك إرسال رسائل';
+      const inputBox = document.querySelector('.chat-input-box');
+      if (inputBox && inputBox.parentNode) inputBox.parentNode.insertBefore(bar, inputBox);
+    }
+    bar.style.display = 'flex';
+  } else {
+    if (bar) bar.style.display = 'none';
+  }
 }
 
 // ════ تخصيص السيرفر ════
