@@ -431,7 +431,12 @@ async function sendMessage() {
     try {
       for (const m of media) {
         const area = document.getElementById('messagesArea');
-        const localUrl = URL.createObjectURL(m.file);
+        const localUrl = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = (e) => res(e.target.result);
+          fr.onerror = () => rej(new Error('FileReader failed'));
+          fr.readAsDataURL(m.file);
+        });
         const tempKey = 'temp_' + Date.now() + '_' + Math.random();
 
         // عرض preview فوري
@@ -490,12 +495,10 @@ async function sendMessage() {
           await db.ref('messages/' + currentServer + '/' + currentChannel).push({
             ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
           });
-          URL.revokeObjectURL(localUrl);
           setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
         } catch(e) {
           clearTimeout(uploadTimeout);
           tempDiv.remove();
-          URL.revokeObjectURL(localUrl);
           if (e.code === 'storage/canceled') {
             toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
           } else if (e.code === 'storage/unauthorized') {
