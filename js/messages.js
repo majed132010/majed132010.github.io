@@ -17,6 +17,8 @@ function showMessages(sid, cid) {
   if (typeof _ensureMemberRegistered === 'function') _ensureMemberRegistered(sid);
   _oldestMsgKey = null; _allLoaded = false;
   _currentMsgPath = 'messages/' + sid + '/' + cid;
+  // Pre-warm the auth token so the first Storage upload never hits a stale credential.
+  if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
   const area = document.getElementById('messagesArea');
   const loadBtn = document.getElementById('loadMoreBtn');
   area.innerHTML = '';
