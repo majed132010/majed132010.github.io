@@ -450,6 +450,9 @@ async function _uploadOneMedia(m, msgBase) {
   // معاينة blob فورية — بدون FileReader أو تحويلات
   const _blobUrl = URL.createObjectURL(m.file);
 
+  // حارس طوارئ: يصفّر _sendingMedia بعد 15 ثانية حتماً في حال تعليق شبكي
+  const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
+
   // ── بناء tempDiv وإلحاقه بالمنطقة فوراً ──
   const tempKey = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   const tempDiv = document.createElement('div');
@@ -494,26 +497,24 @@ async function _uploadOneMedia(m, msgBase) {
   tempDiv.appendChild(tempBody);
   if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
 
-  // ── رفع مباشر إلى Storage ثم كتابة السجل في قاعدة البيانات ──
+  // ── قراءة ArrayBuffer ثم رفع مباشر إلى Storage ──
   try {
+    // قراءة الملف كـ ArrayBuffer — مطلوب لـ WebView/APK
+    const arrayBuffer = await m.file.arrayBuffer();
+
     const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
     const storagePath = `media/${_sid}/${_cid}/${Date.now()}.${ext}`;
-    const uploadTask = storage.ref(storagePath).put(m.file, {
+    const storageRef = storage.ref(storagePath);
+    const uploadTask = storageRef.put(arrayBuffer, {
       contentType: m.file.type || 'application/octet-stream'
     });
-    const mediaUrl = await new Promise((resolve, reject) => {
-      uploadTask.on('state_changed',
-        (snap) => {
-          if (snap.totalBytes > 0)
-            indicator.textContent = `⏳ ${Math.round((snap.bytesTransferred / snap.totalBytes) * 100)}%`;
-        },
-        reject,
-        async () => {
-          try { resolve(await uploadTask.snapshot.ref.getDownloadURL()); }
-          catch(e) { reject(e); }
-        }
-      );
+    uploadTask.on('state_changed', (snap) => {
+      if (snap.totalBytes > 0)
+        indicator.textContent = `⏳ ${Math.round((snap.bytesTransferred / snap.totalBytes) * 100)}%`;
     });
+    const taskSnap = await uploadTask;
+    const mediaUrl = await taskSnap.ref.getDownloadURL();
+
     if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
     if (currentServer !== _sid || currentChannel !== _cid) return;
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -523,7 +524,7 @@ async function _uploadOneMedia(m, msgBase) {
     tempDiv.remove();
     if (area) area.scrollTop = area.scrollHeight;
   } catch(e) {
-    window._sendingMedia = false; // تصفير فوري عند أي فشل شبكي حقيقي
+    window._sendingMedia = false; // تصفير فوري عند أي فشل
     if (e.code === 'storage/unauthorized') {
       toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
     } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
@@ -532,6 +533,7 @@ async function _uploadOneMedia(m, msgBase) {
       toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
   } finally {
+    clearTimeout(_guardTimer); // إلغاء الحارس إن أتمّ الرفع قبل 15 ثانية
     if (tempDiv.parentNode) tempDiv.remove();
     URL.revokeObjectURL(_blobUrl);
   }
