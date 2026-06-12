@@ -65,6 +65,12 @@ function showMessages(sid, cid) {
       if (!body) return;
       // Re-render reactions in-place
       renderReactions(msg.reactions || null, snap.key, body);
+      // If the user is already near the bottom, keep them pinned so the
+      // newly-rendered reaction chip stays visible without manual scrolling
+      const area = document.getElementById('messagesArea');
+      if (area && area.scrollHeight - area.scrollTop - area.clientHeight < 200) {
+        area.scrollTop = area.scrollHeight;
+      }
       // Sync edited text visible to this client when another tab/user edits
       if (msg.text !== undefined) {
         const contentEl = body.querySelector('.msg-content');
