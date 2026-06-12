@@ -203,22 +203,36 @@ async function uploadToCloudinary(file, retries = 3) {
   }
 }
 
-async function uploadToStorage(file, path, retries = 5) {
+async function uploadToStorage(file, path, { retries = 3, onProgress, signal } = {}) {
   const contentType = file.type || 'application/octet-stream';
   for (let attempt = 1; attempt <= retries; attempt++) {
+    if (signal?.aborted) throw Object.assign(new Error('Upload cancelled'), { code: 'storage/canceled' });
     try {
       const ref = storage.ref(path);
       const uploadTask = ref.put(file, { contentType });
+      if (signal) {
+        signal.addEventListener('abort', () => uploadTask.cancel(), { once: true });
+      }
       const snap = await new Promise((resolve, reject) => {
-        uploadTask.on('state_changed', null, reject, () => resolve(uploadTask.snapshot));
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            if (snapshot.totalBytes > 0) {
+              onProgress?.(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+            }
+          },
+          reject,
+          () => resolve(uploadTask.snapshot)
+        );
       });
       const url = await snap.ref.getDownloadURL();
+      if (!url) throw new Error('getDownloadURL returned empty URL');
       try {
         const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
         await _imgCacheDB.set(url, file, expiresAt, false);
       } catch {}
       return url;
     } catch(e) {
+      if (e.code === 'storage/canceled') throw e;
       if (e.code === 'storage/unauthorized') { toast('❌ لا صلاحية للرفع'); throw e; }
       if (attempt === retries) throw e;
       const delay = Math.min(2000 * attempt, 8000);

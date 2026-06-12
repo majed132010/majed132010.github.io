@@ -369,7 +369,8 @@ async function sendMessage() {
   if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا السيرفر'); return; }
   const inp = document.getElementById('mainChatInp');
   const text = inp ? inp.value.trim() : '';
-  const media = window._pendingMedia || [];
+  const media = [...(window._pendingMedia || [])];
+  if (window._sendingMedia && media.length) { toast('⏳ يوجد رفع جارٍ، رجاءً انتظر...'); return; }
   if (!text && !media.length) return;
   if (!currentServer || !currentChannel) return;
   stopTyping();
@@ -426,73 +427,88 @@ async function sendMessage() {
     // expire while the app is in background, causing "Failed to fetch" from Storage.
     try { await auth.currentUser.getIdToken(true); } catch(e) { /* non-fatal */ }
     toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
-  }
-
-  for (const m of media) {
-    const area = document.getElementById('messagesArea');
-    const localUrl = URL.createObjectURL(m.file);
-    const tempKey = 'temp_' + Date.now() + '_' + Math.random();
-
-    // عرض preview فوري
-    const tempDiv = document.createElement('div');
-    tempDiv.className = 'msg-group';
-    tempDiv.dataset.key = tempKey;
-    tempDiv.style.opacity = '0.65';
-    const tempAv = document.createElement('div');
-    tempAv.className = 'msg-av';
-    const _myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
-    if (_myAv) {
-      tempAv.innerHTML = `<img src="${_myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
-    } else {
-      tempAv.textContent = (msgBase.name || '?')[0];
-    }
-    const tempBody = document.createElement('div');
-    tempBody.className = 'msg-body';
-    const tempMeta = document.createElement('div');
-    tempMeta.className = 'msg-meta';
-    tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name||'')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
-    tempBody.appendChild(tempMeta);
-    const tempWrap = document.createElement('div');
-    tempWrap.className = 'msg-media-wrap';
-    if (m.type === 'video') {
-      const vid = document.createElement('video');
-      vid.src = localUrl;
-      vid.className = 'msg-media-vid';
-      tempWrap.appendChild(vid);
-    } else {
-      const img = document.createElement('img');
-      img.src = localUrl;
-      img.className = 'msg-media-img';
-      tempWrap.appendChild(img);
-    }
-    const indicator = document.createElement('div');
-    indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.55);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap';
-    indicator.textContent = '⏳ جاري الرفع...';
-    tempWrap.appendChild(indicator);
-    tempBody.appendChild(tempWrap);
-    tempDiv.appendChild(tempAv);
-    tempDiv.appendChild(tempBody);
-    if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
-
+    window._sendingMedia = true;
     try {
-      const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-      const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
-      const mediaUrl = await uploadToStorage(m.file, storagePath);
-      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-      await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-        ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
-      });
-      setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
-    } catch(e) {
-      tempDiv.remove();
-      if (e.code === 'storage/unauthorized') {
-        // already toasted in uploadToStorage — just surface a storage-rules reminder
-        toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage (المسار: media/{sid})');
-      } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
-        toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
-      } else {
-        toast('❌ فشل رفع الملف: ' + (e.message || ''));
+      for (const m of media) {
+        const area = document.getElementById('messagesArea');
+        const localUrl = URL.createObjectURL(m.file);
+        const tempKey = 'temp_' + Date.now() + '_' + Math.random();
+
+        // عرض preview فوري
+        const tempDiv = document.createElement('div');
+        tempDiv.className = 'msg-group';
+        tempDiv.dataset.key = tempKey;
+        tempDiv.style.opacity = '0.65';
+        const tempAv = document.createElement('div');
+        tempAv.className = 'msg-av';
+        const _myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
+        if (_myAv) {
+          tempAv.innerHTML = `<img src="${_myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+        } else {
+          tempAv.textContent = (msgBase.name || '?')[0];
+        }
+        const tempBody = document.createElement('div');
+        tempBody.className = 'msg-body';
+        const tempMeta = document.createElement('div');
+        tempMeta.className = 'msg-meta';
+        tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name||'')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
+        tempBody.appendChild(tempMeta);
+        const tempWrap = document.createElement('div');
+        tempWrap.className = 'msg-media-wrap';
+        if (m.type === 'video') {
+          const vid = document.createElement('video');
+          vid.src = localUrl;
+          vid.className = 'msg-media-vid';
+          tempWrap.appendChild(vid);
+        } else {
+          const img = document.createElement('img');
+          img.src = localUrl;
+          img.className = 'msg-media-img';
+          tempWrap.appendChild(img);
+        }
+        const indicator = document.createElement('div');
+        indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.55);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap';
+        indicator.textContent = '⏳ جاري الرفع...';
+        tempWrap.appendChild(indicator);
+        tempBody.appendChild(tempWrap);
+        tempDiv.appendChild(tempAv);
+        tempDiv.appendChild(tempBody);
+        if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
+
+        const uploadController = new AbortController();
+        const uploadTimeout = setTimeout(() => uploadController.abort(), 60000);
+        try {
+          const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
+          const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
+          const mediaUrl = await uploadToStorage(m.file, storagePath, {
+            signal: uploadController.signal,
+            onProgress: (pct) => { indicator.textContent = `⏳ ${pct}%`; }
+          });
+          clearTimeout(uploadTimeout);
+          if (!mediaUrl) throw new Error('لم يتم الحصول على رابط الملف بعد اكتمال الرفع');
+          const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+          await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+            ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
+          });
+          URL.revokeObjectURL(localUrl);
+          setTimeout(() => { tempDiv.remove(); if (area) area.scrollTop = area.scrollHeight; }, 1500);
+        } catch(e) {
+          clearTimeout(uploadTimeout);
+          tempDiv.remove();
+          URL.revokeObjectURL(localUrl);
+          if (e.code === 'storage/canceled') {
+            toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
+          } else if (e.code === 'storage/unauthorized') {
+            toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage (المسار: media/{sid})');
+          } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
+            toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
+          } else {
+            toast('❌ فشل رفع الملف: ' + (e.message || ''));
+          }
+        }
       }
+    } finally {
+      window._sendingMedia = false;
     }
   }
 }
@@ -719,6 +735,7 @@ function closeMentionPopup() {
 
 // ════ اختيار الوسائط ════
 window._pendingMedia = [];
+window._sendingMedia = false;
 function handleMediaSelect(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
