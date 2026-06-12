@@ -403,8 +403,8 @@ function renderChannels(sid) {
     if (!collapsed) items.forEach(([cid,ch]) => list.appendChild(buildFn(cid,ch)));
   }
 
-  makeCategory('القنوات النصية', sid+'_text', texts, (cid,ch) => makeChItem(cid,ch,'#'));
-  makeCategory('القنوات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
+  makeCategory('🪐 الكواكب النصية', sid+'_text', texts, (cid,ch) => makeChItem(cid,ch,'#'));
+  makeCategory('📡 المدارات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
 
   // قسم الرسائل الخاصة
   const dmSection = document.createElement('div');
