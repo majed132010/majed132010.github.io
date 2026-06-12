@@ -96,8 +96,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 
 /* ════ TYPING INDICATOR ════ */
 #typingIndicator {
-  min-height: 22px;
-  padding: 2px 16px 4px;
+  padding: 0 16px;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
@@ -105,11 +104,18 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  /* max-height:0 collapses the row to zero when idle — frees space for messages */
+  max-height: 0;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
 }
-#typingIndicator.active { opacity: 1; }
+#typingIndicator.active {
+  max-height: 30px;
+  padding: 2px 16px 4px;
+  opacity: 1;
+}
 #typingIndicator b { font-weight: 700; font-style: normal; color: var(--fg); }
 .typing-dots {
   display: inline-flex;
@@ -464,7 +470,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 }
 #messagesArea{
   flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:8px 0 8px;display:flex;flex-direction:column;gap:0;
+  padding:8px 0 24px;display:flex;flex-direction:column;gap:0;
   position:relative;z-index:1;
 }
 .msg-group{display:flex;gap:14px;padding:4px 16px;border-radius:2px}

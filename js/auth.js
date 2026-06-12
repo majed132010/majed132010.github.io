@@ -134,7 +134,13 @@ async function loadUserProfile() {
     userProfile.displayName = currentUser.displayName || 'مستخدم';
     userProfile.tag = String(Math.floor(1000 + Math.random() * 9000));
     userProfile.adminCode = generateAdminCode();
+    // بذر صورة Google عند أول تسجيل دخول إن لم تُحفظ بعد
+    if (!userProfile.avatar && currentUser.photoURL) userProfile.avatar = currentUser.photoURL;
     await db.ref('users/' + currentUser.uid).update(userProfile);
+  } else if (!userProfile.avatar && currentUser.photoURL) {
+    // مستخدم قديم لم تُحفظ له صورة بعد — نحفظها الآن
+    userProfile.avatar = currentUser.photoURL;
+    db.ref('users/' + currentUser.uid + '/avatar').set(currentUser.photoURL);
   }
   if (!userProfile.adminCode) {
     userProfile.adminCode = generateAdminCode();
@@ -146,8 +152,10 @@ async function loadUserProfile() {
 function updateUserPanel() {
   const av = document.getElementById('upAv');
   if (av) {
-    if (userProfile.avatar) {
-      av.innerHTML = `<img src="${userProfile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+    // RTDB avatar أولاً، ثم صورة Google الحية كاحتياط
+    const src = userProfile.avatar || auth.currentUser?.photoURL || null;
+    if (src) {
+      av.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
     } else {
       av.textContent = (userProfile.displayName || '?')[0];
     }
