@@ -6,6 +6,7 @@ let _currentMsgPath = null;
 let _replyTo = null;
 let _editingKey = null;
 let _typingTimer = null;
+let _msgLoadGen = 0; // يمنع listeners الـ async القديمة من التسجيل بعد تغيير القناة
 let _searchResults = [], _searchIndex = 0;
 
 // ════ عرض الرسائل ════
@@ -24,6 +25,9 @@ function showMessages(sid, cid) {
   clearUnread(sid, cid);
   listenTyping(sid, cid);
 
+  // رقم جيل فريد لهذه الاستدعاءة — يُبطل callbacks الـ async القديمة إن بدّل المستخدم القناة قبل حلّها
+  const gen = ++_msgLoadGen;
+
   const fn = snap => {
     const msg = snap.val();
     if (!msg) return;
@@ -36,6 +40,9 @@ function showMessages(sid, cid) {
   };
 
   db.ref(_currentMsgPath).limitToLast(PAGE_SIZE).once('value').then(snap => {
+    // إن تغيّرت القناة قبل حلّ هذا الـ promise نتجاهله تماماً — لا نسجّل أي listener
+    if (gen !== _msgLoadGen) return;
+
     const msgs = snap.val() || {};
     const entries = Object.entries(msgs).sort((a,b) => a[1].ts - b[1].ts);
     entries.forEach(([key, msg]) => {
@@ -50,10 +57,11 @@ function showMessages(sid, cid) {
       if (loadBtn) loadBtn.style.display = entries.length >= PAGE_SIZE ? 'block' : 'none';
     }
     const lastKey = entries.length > 0 ? entries[entries.length-1][0] : null;
-    let query = lastKey
+    // نحفظ queryRef بدلاً من path فقط — .off() يحتاج نفس ref object الذي استُخدم في .on()
+    const queryRef = lastKey
       ? db.ref(_currentMsgPath).orderByKey().startAfter(lastKey)
       : db.ref(_currentMsgPath).limitToLast(1);
-    query.on('child_added', fn);
+    queryRef.on('child_added', fn);
 
     // Live reaction + edit updates for every visible message
     const changeFn = snap => {
@@ -82,7 +90,7 @@ function showMessages(sid, cid) {
       }
     };
     db.ref(_currentMsgPath).on('child_changed', changeFn);
-    messagesListener = { path: _currentMsgPath, fn, changeFn };
+    messagesListener = { path: _currentMsgPath, queryRef, fn, changeFn };
   });
 }
 
@@ -608,7 +616,8 @@ function listenTyping(sid, cid) {
 // ════ تنظيف الـ listener ════
 function cleanupMessagesListener() {
   if (messagesListener) {
-    db.ref(messagesListener.path).off('child_added', messagesListener.fn);
+    // child_added يجب فصله عبر نفس queryRef المستخدم في .on() — الـ path وحده لا يكفي
+    if (messagesListener.queryRef) messagesListener.queryRef.off('child_added', messagesListener.fn);
     if (messagesListener.changeFn) db.ref(messagesListener.path).off('child_changed', messagesListener.changeFn);
     messagesListener = null;
   }

@@ -1,4 +1,4 @@
- // ════ SERVERS & CHANNELS ════
+// ════ SERVERS & CHANNELS ════
 let servers = {};
 let currentServer = null;
 let currentChannel = null;
@@ -10,6 +10,19 @@ let _membershipListener = null;
 let _restrictionListener = null;
 let _currentUserMuted = false;
 const _registeredServers = new Set(); // سيرفرات تم التحقق منها في هذه الجلسة
+let _serversListenerRef = null; // نحتفظ بـ ref لنتمكن من فصله عند تسجيل الخروج
+
+// ════ انتظار اكتمال التحميل الأول (يُستخدم بدل setTimeout في معالج الدعوة) ════
+function _waitLoaded(maxMs) {
+  if (window._loaded) return Promise.resolve();
+  return new Promise(resolve => {
+    const deadline = Date.now() + (maxMs || 8000);
+    (function check() {
+      if (window._loaded || Date.now() >= deadline) { resolve(); return; }
+      setTimeout(check, 100);
+    })();
+  });
+}
 
 function initApp() {
   listenServers();
@@ -26,15 +39,17 @@ function initApp() {
   }
   initVoice();
 
-  // معالجة رابط الانضمام
+  // معالجة رابط الانضمام — ننتظر اكتمال listenServers بدل setTimeout ثابت
   const params = new URLSearchParams(location.search);
   const joinCode = params.get('join');
   if (joinCode) {
-    setTimeout(async () => {
+    (async () => {
+      await _waitLoaded(8000);
       const code = joinCode.toUpperCase();
       const snap = await db.ref('servers').orderByChild('inviteCode').equalTo(code).once('value');
-      if (!snap.exists()) return;
+      if (!snap.exists()) { toast('❌ رمز الدعوة غير صالح'); history.replaceState({}, '', location.pathname); return; }
       const sid = Object.keys(snap.val())[0];
+      history.replaceState({}, '', location.pathname);
       if (servers[sid]) { selectServer(sid); return; }
       const _joinMemberData = {
         role: 'member',
@@ -51,20 +66,25 @@ function initApp() {
       renderServerList();
       selectServer(sid);
       toast('✅ انضممت للسيرفر!');
-      history.replaceState({}, '', location.pathname);
-    }, 1500);
+    })();
   }
 }
 
 // ════ استماع للسيرفرات ════
 function listenServers() {
   if (!currentUser) return;
-  db.ref('users/' + currentUser.uid + '/servers').on('value', snap => {
+  // فصل الـ listener القديم إن وُجد (يمنع تراكم listeners عند إعادة تسجيل الدخول)
+  if (_serversListenerRef) { _serversListenerRef.off('value'); _serversListenerRef = null; }
+  const ref = db.ref('users/' + currentUser.uid + '/servers');
+  _serversListenerRef = ref;
+  ref.on('value', snap => {
     const sids = snap.val() || {};
-    servers = {};
+    // نبني خريطة جديدة ونُسندها دفعةً واحدة — يمنع أي لحظة تكون فيها servers = {}
+    const newServers = {};
     Promise.all(Object.keys(sids).map(sid =>
-      db.ref('servers/' + sid).once('value').then(s => { if (s.val()) servers[sid] = s.val(); })
+      db.ref('servers/' + sid).once('value').then(s => { if (s.val()) newServers[sid] = s.val(); })
     )).then(() => {
+      servers = newServers;
       renderServerList();
       if (!window._loaded) {
         window._loaded = true;
