@@ -446,23 +446,24 @@ async function _uploadOneMedia(m, msgBase) {
 
   // ── بناء URL للمعاينة المحلية ──
   // فيديو → blob URL فوري (APK/أندرويد لا يعاني من إلغاء blob في الخلفية)
-  // صورة → data URL عبر FileReader (يصمد على iOS حين يُلغى blob في الخلفية)
+  // صورة → data URL عبر FileReader (يصمد على iOS) — عند فشله ينتقل تلقائياً لـ blob URL
   let localUrl, _blobUrl = null;
-  try {
-    if (m.type === 'video') {
-      _blobUrl = URL.createObjectURL(m.file);
-      localUrl = _blobUrl;
-    } else {
+  if (m.type === 'video') {
+    _blobUrl = URL.createObjectURL(m.file);
+    localUrl = _blobUrl;
+  } else {
+    try {
       localUrl = await new Promise((res, rej) => {
         const fr = new FileReader();
         fr.onload = (e) => res(e.target.result);
         fr.onerror = () => rej(new Error('FileReader failed'));
         fr.readAsDataURL(m.file);
       });
+    } catch(e) {
+      // FileReader فشل (APK / WebView قديم) → fallback فوري إلى blob URL
+      _blobUrl = URL.createObjectURL(m.file);
+      localUrl = _blobUrl;
     }
-  } catch(e) {
-    toast('❌ تعذّرت قراءة الملف: ' + (e.message || ''));
-    return; // تخطّي هذا الملف فقط دون إيقاف باقي الدُفعة
   }
 
   // ── بناء tempDiv وإلحاقه بالمنطقة فوراً ──
