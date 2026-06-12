@@ -82,7 +82,6 @@ async function initFCM(userId) {
       if (data.type === 'dm' && data.fromUid) {
         showDmNotif({ name: title || 'رسالة خاصة', text: body || '' }, data.fromUid);
       } else if (data.serverId && data.channelId) {
-        incrementUnread(data.serverId, data.channelId);
         showInAppNotif({ name: data.senderName || title, text: body || '' }, data.serverId, data.channelId);
       } else {
         toast('🔔 ' + (title || 'عوالم') + ': ' + (body || ''));

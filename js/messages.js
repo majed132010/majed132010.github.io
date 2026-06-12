@@ -143,7 +143,12 @@ function buildMsgDiv(msg, key) {
 
   const av = document.createElement('div');
   av.className = 'msg-av';
-  av.textContent = (msg.name||'?')[0];
+  const _memberAv = sv?.members?.[msg.uid]?.avatar || null;
+  if (_memberAv) {
+    av.innerHTML = `<img src="${_memberAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+  } else {
+    av.textContent = (msg.name || '?')[0];
+  }
   if (canModerate) {
     av.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); _openModCtx(msg.uid, msg.name, e); });
     av.style.cursor = 'context-menu';
@@ -420,7 +425,12 @@ async function sendMessage() {
     tempDiv.style.opacity = '0.65';
     const tempAv = document.createElement('div');
     tempAv.className = 'msg-av';
-    tempAv.textContent = (msgBase.name||'?')[0];
+    const _myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
+    if (_myAv) {
+      tempAv.innerHTML = `<img src="${_myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+    } else {
+      tempAv.textContent = (msgBase.name || '?')[0];
+    }
     const tempBody = document.createElement('div');
     tempBody.className = 'msg-body';
     const tempMeta = document.createElement('div');

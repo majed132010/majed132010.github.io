@@ -455,7 +455,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 
 /* ════ MESSAGES ════ */
 #messagesView{
-  flex:1;display:none;flex-direction:column;overflow:hidden;
+  flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;
   background:#efeae2;
   position:relative;
 }
@@ -469,7 +469,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   z-index:0;
 }
 #messagesArea{
-  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:8px 0 24px;display:flex;flex-direction:column;gap:0;
   position:relative;z-index:1;
 }
@@ -477,7 +477,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 .msg-group:hover{background:rgba(0,0,0,0.02)}
 .msg-av{
   width:38px;height:38px;border-radius:50%;flex-shrink:0;
-  background:#5865f2;border:none;
+  background:#5865f2;border:none;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
   font-size:16px;font-weight:800;color:#fff;margin-top:2px;
 }
