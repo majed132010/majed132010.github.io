@@ -30,6 +30,8 @@ function showMessages(sid, cid) {
   cleanupMessagesListener();
   clearUnread(sid, cid);
   listenTyping(sid, cid);
+  // ضمان تفعيل مستمع الإشعارات — يُعيد الربط إن كان مفقوداً (حماية من انقطاع غير متوقع)
+  if (currentUser && !_notifListener) listenNotifications(currentUser.uid);
 
   // جيل فريد يُبطل أي callback async قديم إذا بدّل المستخدم القناة قبل حلّه
   const gen = ++_msgLoadGen;
@@ -401,19 +403,20 @@ async function sendMessage() {
     clearReply();
   }
 
-  // ── تجديد التوكن إجبارياً قبل أي كتابة أو رفع ──
-  if (auth.currentUser) { await auth.currentUser.getIdToken(true); }
+  // ── تجديد التوكن قبل أي كتابة أو رفع (non-fatal: خطأ الشبكة لا يوقف الإرسال) ──
+  if (auth.currentUser) { try { await auth.currentUser.getIdToken(true); } catch(e) {} }
 
   // ── إرسال النص مباشرة إلى قاعدة البيانات ──
   if (text) {
     await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
+    const _pSid = currentServer, _pCid = currentChannel;
     setTimeout(() => {
       try {
-        const members = servers[currentServer]?.members || {};
+        const members = servers[_pSid]?.members || {};
         Object.keys(members).forEach(uid => {
           if (uid !== currentUser.uid) {
             sendPushToUser(uid, userProfile.displayName || 'عوالم', text.slice(0, 80), {
-              serverId: currentServer, channelId: currentChannel,
+              serverId: _pSid, channelId: _pCid,
               senderName: userProfile.displayName, type: 'message'
             });
           }

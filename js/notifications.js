@@ -12,7 +12,11 @@ const _lastShownTag = {};
 // ════ استماع للإشعارات الواردة ════
 let _notifListener = null;
 function listenNotifications(userId) {
-  if (_notifListener) return;
+  // فصل أي مستمع سابق قبل التسجيل — يمنع تسرّب listeners عند إعادة الدخول بدون reload
+  if (_notifListener) {
+    _notifListener.ref.off('child_added', _notifListener.fn);
+    _notifListener = null;
+  }
 
   // نقطة بداية الجلسة — نُعالج فقط الإشعارات الجديدة فعلاً.
   // استخدام orderByChild('ts').startAt بدلاً من limitToLast(1) يقطع
@@ -181,6 +185,7 @@ function showInAppNotif(msg, sid, cid) {
   if (!sid || !cid) return;
   if (_isActiveChannel(sid, cid)) return;
   incrementUnread(sid, cid);
+  playMsgSound();
   const old = document.getElementById('notifToast');
   if (old) old.remove();
   clearTimeout(_notifTimeout);

@@ -43,6 +43,11 @@ auth.onAuthStateChanged(user => {
     });
   } else {
     currentUser = null;
+    // نظّف مستمع الإشعارات فوراً عند تسجيل الخروج — يمنع تلقّي إشعارات الجلسة القديمة
+    if (typeof _notifListener !== 'undefined' && _notifListener) {
+      _notifListener.ref.off('child_added', _notifListener.fn);
+      _notifListener = null;
+    }
     document.getElementById('loginScreen').style.display = 'flex';
     const app = document.getElementById('app');
     if (app) app.style.display = 'none';
