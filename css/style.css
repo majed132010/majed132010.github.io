@@ -105,7 +105,12 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
+#typingIndicator.active { opacity: 1; }
+#typingIndicator b { font-weight: 700; font-style: normal; color: var(--fg); }
 .typing-dots {
   display: inline-flex;
   gap: 3px;

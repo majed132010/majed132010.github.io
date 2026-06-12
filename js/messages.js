@@ -6,6 +6,8 @@ let _currentMsgPath = null;
 let _replyTo = null;
 let _editingKey = null;
 let _typingTimer = null;
+let _typingListener = null;
+let messagesListener = null;
 let _searchResults = [], _searchIndex = 0;
 
 // ════ عرض الرسائل ════
@@ -570,7 +572,7 @@ function startTyping() {
   db.ref(path).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
   db.ref(path).onDisconnect().remove();
   clearTimeout(_typingTimer);
-  _typingTimer = setTimeout(() => db.ref(path).remove(), 4000);
+  _typingTimer = setTimeout(() => db.ref(path).remove(), 3000);
 }
 function stopTyping() {
   if (!currentServer || !currentChannel || !currentUser) return;
@@ -583,14 +585,25 @@ function listenTyping(sid, cid) {
   _typingListener = path;
   db.ref(path).on('value', snap => {
     const users = snap.val() || {};
-    const others = Object.entries(users).filter(([uid]) => uid !== currentUser?.uid).map(([,u]) => u.name);
+    const others = Object.entries(users)
+      .filter(([uid]) => uid !== currentUser?.uid)
+      .map(([, u]) => u.name);
     const el = document.getElementById('typingIndicator');
     if (!el) return;
-    if (!others.length) { el.innerHTML = ''; el.style.opacity='0'; return; }
-    const names = others.slice(0,3).join(' و ');
-    const verb = others.length===1?'يكتب':others.length===2?'يكتبان':'يكتبون';
-    el.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div><span style="font-size:12px;color:var(--muted)">${escHtml(names)} ${verb}...</span>`;
-    el.style.opacity='1';
+    if (!others.length) { el.innerHTML = ''; el.classList.remove('active'); return; }
+
+    let nameStr;
+    if (others.length === 1) {
+      nameStr = `<b>${escHtml(others[0])}</b>`;
+    } else if (others.length === 2) {
+      nameStr = `<b>${escHtml(others[0])}</b> و <b>${escHtml(others[1])}</b>`;
+    } else {
+      nameStr = `<b>${escHtml(others[0])}</b> و <b>${escHtml(others[1])}</b> و${others.length - 2} آخرون`;
+    }
+    const verb = others.length === 1 ? 'يكتب' : others.length === 2 ? 'يكتبان' : 'يكتبون';
+
+    el.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div><span>${nameStr} ${verb}...</span>`;
+    el.classList.add('active');
   });
 }
 
@@ -604,7 +617,7 @@ function cleanupMessagesListener() {
   stopTyping();
   if (_typingListener) { db.ref(_typingListener).off('value'); _typingListener = null; }
   const el = document.getElementById('typingIndicator');
-  if (el) el.innerHTML = '';
+  if (el) { el.innerHTML = ''; el.classList.remove('active'); }
 }
 
 // ════ الإشارة (@mention) ════
