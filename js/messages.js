@@ -11,14 +11,18 @@ let _searchResults = [], _searchIndex = 0;
 
 // ════ عرض الرسائل ════
 function showMessages(sid, cid) {
+  // تصفير حارس الرفع فور تبديل القناة — يمنع أي تعليق من جلسة سابقة
+  window._sendingMedia = false;
+  // تجديد التوكن فوراً حتى يكون جاهزاً قبل أي رفع
+  if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
+
   showView('messages');
   if (typeof _currentUserMuted !== 'undefined') _applyMuteState(_currentUserMuted);
-  // ضمان العضوية في كل مسار (استعادة الجلسة، الدعوات، إلخ)
   if (typeof _ensureMemberRegistered === 'function') _ensureMemberRegistered(sid);
-  _oldestMsgKey = null; _allLoaded = false;
+  _oldestMsgKey = null;
+  _allLoaded = false;
   _currentMsgPath = 'messages/' + sid + '/' + cid;
-  // Pre-warm the auth token so the first Storage upload never hits a stale credential.
-  if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
+
   const area = document.getElementById('messagesArea');
   const loadBtn = document.getElementById('loadMoreBtn');
   area.innerHTML = '';
@@ -27,56 +31,49 @@ function showMessages(sid, cid) {
   clearUnread(sid, cid);
   listenTyping(sid, cid);
 
-  // رقم جيل فريد لهذه الاستدعاءة — يُبطل callbacks الـ async القديمة إن بدّل المستخدم القناة قبل حلّها
+  // جيل فريد يُبطل أي callback async قديم إذا بدّل المستخدم القناة قبل حلّه
   const gen = ++_msgLoadGen;
 
+  // ── listener للرسائل الجديدة ──
   const fn = snap => {
     const msg = snap.val();
     if (!msg) return;
     if (area.querySelector(`[data-key="${snap.key}"]`)) return;
-    const div = buildMsgDiv(msg, snap.key);
-    area.appendChild(div);
-    const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
-    if (distFromBottom < 300) area.scrollTop = area.scrollHeight;
+    area.appendChild(buildMsgDiv(msg, snap.key));
+    if (area.scrollHeight - area.scrollTop - area.clientHeight < 300) area.scrollTop = area.scrollHeight;
     if (msg.uid !== currentUser?.uid) {
-      // Belt-and-suspenders: use window.currentServerId / window.currentChannelId
-      // (the explicit global mirrors set by selectChannel/showHome in servers.js)
-      // as the authoritative active-channel signal before delegating to showInAppNotif.
       const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
       const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
-      if (activeSid === sid && activeCid === cid) {
-        console.log('[NOTIF] 🔇 fn مُحجوب — القناة النشطة:', sid, '/', cid);
-      } else {
-        showInAppNotif(msg, sid, cid);
-      }
+      if (!(activeSid === sid && activeCid === cid)) showInAppNotif(msg, sid, cid);
     }
   };
 
+  // ── تحميل الرسائل الأخيرة ثم تسجيل الـ listeners مباشرة ──
   db.ref(_currentMsgPath).limitToLast(PAGE_SIZE).once('value').then(snap => {
-    // إن تغيّرت القناة قبل حلّ هذا الـ promise نتجاهله تماماً — لا نسجّل أي listener
-    if (gen !== _msgLoadGen) return;
+    if (gen !== _msgLoadGen) return; // القناة تغيّرت — لا نسجّل شيئاً
 
     const msgs = snap.val() || {};
-    const entries = Object.entries(msgs).sort((a,b) => a[1].ts - b[1].ts);
+    const entries = Object.entries(msgs).sort((a, b) => a[1].ts - b[1].ts);
     entries.forEach(([key, msg]) => {
-      const div = buildMsgDiv(msg, key);
-      area.appendChild(div);
+      if (!area.querySelector(`[data-key="${key}"]`)) area.appendChild(buildMsgDiv(msg, key));
     });
     area.scrollTop = area.scrollHeight;
     setTimeout(() => { area.scrollTop = area.scrollHeight; }, 300);
     setTimeout(() => { area.scrollTop = area.scrollHeight; }, 800);
+
     if (entries.length > 0) {
       _oldestMsgKey = entries[0][0];
       if (loadBtn) loadBtn.style.display = entries.length >= PAGE_SIZE ? 'block' : 'none';
     }
-    const lastKey = entries.length > 0 ? entries[entries.length-1][0] : null;
-    // نحفظ queryRef بدلاً من path فقط — .off() يحتاج نفس ref object الذي استُخدم في .on()
+
+    // تحقق ثانٍ مباشر قبل تسجيل الـ listeners لضمان القناة لم تتغير
+    if (gen !== _msgLoadGen) return;
+    const lastKey = entries.length > 0 ? entries[entries.length - 1][0] : null;
     const queryRef = lastKey
       ? db.ref(_currentMsgPath).orderByKey().startAfter(lastKey)
       : db.ref(_currentMsgPath).limitToLast(1);
     queryRef.on('child_added', fn);
 
-    // Live reaction + edit updates for every visible message
     const changeFn = snap => {
       const msg = snap.val();
       if (!msg) return;
@@ -84,15 +81,9 @@ function showMessages(sid, cid) {
       if (!el) return;
       const body = el.querySelector('.msg-body');
       if (!body) return;
-      // Re-render reactions in-place
       renderReactions(msg.reactions || null, snap.key, body);
-      // If the user is already near the bottom, keep them pinned so the
-      // newly-rendered reaction chip stays visible without manual scrolling
-      const area = document.getElementById('messagesArea');
-      if (area && area.scrollHeight - area.scrollTop - area.clientHeight < 200) {
-        area.scrollTop = area.scrollHeight;
-      }
-      // Sync edited text visible to this client when another tab/user edits
+      const a = document.getElementById('messagesArea');
+      if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
       if (msg.text !== undefined) {
         const contentEl = body.querySelector('.msg-content');
         if (contentEl && contentEl.textContent !== msg.text) contentEl.textContent = msg.text;
@@ -104,6 +95,9 @@ function showMessages(sid, cid) {
     };
     db.ref(_currentMsgPath).on('child_changed', changeFn);
     messagesListener = { path: _currentMsgPath, queryRef, fn, changeFn };
+  }).catch(err => {
+    console.error('[showMessages] DB error:', err);
+    if (gen === _msgLoadGen) toast('❌ تعذّر تحميل الرسائل — تحقق من الاتصال');
   });
 }
 
@@ -375,6 +369,7 @@ async function sendMessage() {
   if (window._sendingMedia && media.length) { toast('⏳ يوجد رفع جارٍ، رجاءً انتظر...'); return; }
   if (!text && !media.length) return;
   if (!currentServer || !currentChannel) return;
+
   stopTyping();
   if (inp) { inp.value = ''; inp.style.height = ''; }
   document.getElementById('sendBtn').classList.remove('active');
@@ -382,16 +377,17 @@ async function sendMessage() {
   const preview = document.getElementById('mediaPreviewArea');
   if (preview) { preview.innerHTML = ''; preview.style.display = 'none'; }
 
+  // ── وضع التعديل ──
   if (_editingKey) {
     const key = _editingKey;
     cancelEdit();
-    await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key).update({ text, edited: true, editedAt: Date.now() });
+    await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key)
+      .update({ text, edited: true, editedAt: Date.now() });
     const msgEl = document.querySelector(`[data-key="${key}"] .msg-content`);
     if (msgEl) msgEl.textContent = text;
-    const editedLabel = document.querySelector(`[data-key="${key}"] .msg-edited`);
-    if (!editedLabel) {
+    if (!document.querySelector(`[data-key="${key}"] .msg-edited`)) {
       const metaEl = document.querySelector(`[data-key="${key}"] .msg-meta`);
-      if (metaEl) metaEl.insertAdjacentHTML('beforeend','<span class="msg-edited">(معدّل)</span>');
+      if (metaEl) metaEl.insertAdjacentHTML('beforeend', '<span class="msg-edited">(معدّل)</span>');
     }
     toast('✅ تم تعديل الرسالة');
     return;
@@ -400,8 +396,12 @@ async function sendMessage() {
   const sv = servers[currentServer];
   const role = sv?.members?.[currentUser.uid]?.role || 'member';
   const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), role };
-  if (_replyTo) { msgBase.replyTo = { key: _replyTo.key, name: _replyTo.name, text: _replyTo.text || '' }; clearReply(); }
+  if (_replyTo) {
+    msgBase.replyTo = { key: _replyTo.key, name: _replyTo.name, text: _replyTo.text || '' };
+    clearReply();
+  }
 
+  // ── إرسال النص مباشرة إلى قاعدة البيانات ──
   if (text) {
     await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
     setTimeout(() => {
@@ -419,112 +419,125 @@ async function sendMessage() {
     }, 0);
   }
 
-  if (media.length) {
-    if (!_isConnected) {
-      try { await waitForConnection(5000); }
-      catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
+  // ── رفع الميديا — الحارس _sendingMedia مضمون التصفير في finally ──
+  if (!media.length) return;
+  if (!_isConnected) {
+    try { await waitForConnection(5000); }
+    catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
+  }
+  if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
+  try { await auth.currentUser.getIdToken(true); } catch(e) { /* non-fatal */ }
+  toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
+
+  window._sendingMedia = true;
+  try {
+    for (const m of media) await _uploadOneMedia(m, msgBase);
+  } finally {
+    window._sendingMedia = false; // يتصفر حتماً بغض النظر عن النتيجة
+  }
+}
+
+// ════ رفع ملف واحد مع معاينة فورية ════
+async function _uploadOneMedia(m, msgBase) {
+  const area = document.getElementById('messagesArea');
+
+  // ── بناء URL للمعاينة المحلية ──
+  // فيديو → blob URL فوري (APK/أندرويد لا يعاني من إلغاء blob في الخلفية)
+  // صورة → data URL عبر FileReader (يصمد على iOS حين يُلغى blob في الخلفية)
+  let localUrl, _blobUrl = null;
+  try {
+    if (m.type === 'video') {
+      _blobUrl = URL.createObjectURL(m.file);
+      localUrl = _blobUrl;
+    } else {
+      localUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = (e) => res(e.target.result);
+        fr.onerror = () => rej(new Error('FileReader failed'));
+        fr.readAsDataURL(m.file);
+      });
     }
-    if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
-    // Refresh the auth token before Storage upload. On mobile, the token can silently
-    // expire while the app is in background, causing "Failed to fetch" from Storage.
-    try { await auth.currentUser.getIdToken(true); } catch(e) { /* non-fatal */ }
-    toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
-    window._sendingMedia = true;
-    try {
-      for (const m of media) {
-        const area = document.getElementById('messagesArea');
-        // Videos: blob URL is instant and avoids FileReader delay/failure on large files.
-        // Images: data URL via FileReader survives iOS background blob-revocation.
-        let localUrl, _blobUrl = null;
-        if (m.type === 'video') {
-          _blobUrl = URL.createObjectURL(m.file);
-          localUrl = _blobUrl;
-        } else {
-          localUrl = await new Promise((res, rej) => {
-            const fr = new FileReader();
-            fr.onload = (e) => res(e.target.result);
-            fr.onerror = () => rej(new Error('FileReader failed'));
-            fr.readAsDataURL(m.file);
-          });
-        }
-        const tempKey = 'temp_' + Date.now() + '_' + Math.random();
+  } catch(e) {
+    toast('❌ تعذّرت قراءة الملف: ' + (e.message || ''));
+    return; // تخطّي هذا الملف فقط دون إيقاف باقي الدُفعة
+  }
 
-        // عرض preview فوري
-        const tempDiv = document.createElement('div');
-        tempDiv.className = 'msg-group';
-        tempDiv.dataset.key = tempKey;
-        tempDiv.style.opacity = '0.65';
-        const tempAv = document.createElement('div');
-        tempAv.className = 'msg-av';
-        const _myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
-        if (_myAv) {
-          tempAv.innerHTML = `<img src="${_myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
-        } else {
-          tempAv.textContent = (msgBase.name || '?')[0];
-        }
-        const tempBody = document.createElement('div');
-        tempBody.className = 'msg-body';
-        const tempMeta = document.createElement('div');
-        tempMeta.className = 'msg-meta';
-        tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name||'')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
-        tempBody.appendChild(tempMeta);
-        const tempWrap = document.createElement('div');
-        tempWrap.className = 'msg-media-wrap';
-        if (m.type === 'video') {
-          const vid = document.createElement('video');
-          vid.src = localUrl;
-          vid.className = 'msg-media-vid';
-          tempWrap.appendChild(vid);
-        } else {
-          const img = document.createElement('img');
-          img.src = localUrl;
-          img.className = 'msg-media-img';
-          tempWrap.appendChild(img);
-        }
-        const indicator = document.createElement('div');
-        indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.55);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap';
-        indicator.textContent = '⏳ جاري الرفع...';
-        tempWrap.appendChild(indicator);
-        tempBody.appendChild(tempWrap);
-        tempDiv.appendChild(tempAv);
-        tempDiv.appendChild(tempBody);
-        if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
+  // ── بناء tempDiv وإلحاقه بالمنطقة فوراً ──
+  const tempKey = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const tempDiv = document.createElement('div');
+  tempDiv.className = 'msg-group';
+  tempDiv.dataset.key = tempKey;
+  tempDiv.style.opacity = '0.6';
 
-        const uploadController = new AbortController();
-        const uploadTimeout = setTimeout(() => uploadController.abort(), 60000);
-        try {
-          const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-          const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
-          const mediaUrl = await uploadToStorage(m.file, storagePath, {
-            signal: uploadController.signal,
-            onProgress: (pct) => { indicator.textContent = `⏳ ${pct}%`; }
-          });
-          clearTimeout(uploadTimeout);
-          if (!mediaUrl) throw new Error('لم يتم الحصول على رابط الملف بعد اكتمال الرفع');
-          const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-          await db.ref('messages/' + currentServer + '/' + currentChannel).push({
-            ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
-          });
-          tempDiv.remove();
-          if (_blobUrl) URL.revokeObjectURL(_blobUrl);
-          if (area) area.scrollTop = area.scrollHeight;
-        } catch(e) {
-          clearTimeout(uploadTimeout);
-          tempDiv.remove();
-          if (_blobUrl) URL.revokeObjectURL(_blobUrl);
-          if (e.code === 'storage/canceled') {
-            toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
-          } else if (e.code === 'storage/unauthorized') {
-            toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage (المسار: media/{sid})');
-          } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
-            toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
-          } else {
-            toast('❌ فشل رفع الملف: ' + (e.message || ''));
-          }
-        }
-      }
-    } finally {
-      window._sendingMedia = false;
+  const tempAv = document.createElement('div');
+  tempAv.className = 'msg-av';
+  const myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
+  if (myAv) {
+    tempAv.innerHTML = `<img src="${myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
+  } else {
+    tempAv.textContent = (msgBase.name || '?')[0];
+  }
+
+  const tempBody = document.createElement('div');
+  tempBody.className = 'msg-body';
+  const tempMeta = document.createElement('div');
+  tempMeta.className = 'msg-meta';
+  tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name || '')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
+  tempBody.appendChild(tempMeta);
+
+  const tempWrap = document.createElement('div');
+  tempWrap.className = 'msg-media-wrap';
+  if (m.type === 'video') {
+    const vid = document.createElement('video');
+    vid.src = localUrl; vid.className = 'msg-media-vid';
+    tempWrap.appendChild(vid);
+  } else {
+    const img = document.createElement('img');
+    img.src = localUrl; img.className = 'msg-media-img';
+    tempWrap.appendChild(img);
+  }
+
+  const indicator = document.createElement('div');
+  indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap;pointer-events:none';
+  indicator.textContent = '⏳ جاري الرفع...';
+  tempWrap.appendChild(indicator);
+  tempBody.appendChild(tempWrap);
+  tempDiv.appendChild(tempAv);
+  tempDiv.appendChild(tempBody);
+  if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
+
+  // ── رفع الملف إلى Storage ثم كتابة السجل في قاعدة البيانات ──
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  try {
+    const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
+    const storagePath = `media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`;
+    const mediaUrl = await uploadToStorage(m.file, storagePath, {
+      signal: controller.signal,
+      onProgress: (pct) => { indicator.textContent = `⏳ ${pct}%`; }
+    });
+    clearTimeout(timeoutId);
+    if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    await db.ref('messages/' + currentServer + '/' + currentChannel).push({
+      ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
+    });
+    // حذف فوري وحتمي للـ tempDiv بعد نجاح الكتابة — يمنع تكرار الميديا
+    tempDiv.remove();
+    if (_blobUrl) URL.revokeObjectURL(_blobUrl);
+    if (area) area.scrollTop = area.scrollHeight;
+  } catch(e) {
+    clearTimeout(timeoutId);
+    tempDiv.remove();
+    if (_blobUrl) URL.revokeObjectURL(_blobUrl);
+    if (e.code === 'storage/canceled') {
+      toast('❌ انتهت مهلة الرفع (60 ثانية) — تحقق من الاتصال وأعد المحاولة');
+    } else if (e.code === 'storage/unauthorized') {
+      toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
+    } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
+      toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
+    } else {
+      toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
   }
 }
