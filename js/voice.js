@@ -95,7 +95,7 @@ function showVoiceChannel(sid, cid, ch) {
     if (!ul) return;
     ul.innerHTML = '';
     if (!Object.keys(users).length) {
-      ul.innerHTML = '<div style="text-align:center;padding:16px;color:#6a8a80;font-size:13px">لا يوجد أحد في الكوكب</div>';
+      ul.innerHTML = '<div style="text-align:center;padding:16px;color:#6a8a80;font-size:13px">لا يوجد أحد في القناة</div>';
       return;
     }
     Object.entries(users).forEach(([uid, u]) => {
@@ -231,7 +231,7 @@ async function joinVoice() {
     document.getElementById('voiceLeaveBtn').style.display = '';
     document.getElementById('voiceConnectedBar').classList.add('show');
     document.getElementById('vcChannelName').textContent = voiceChannel.name;
-    toast('🔊 انضممت للكوكب الصوتي!');
+    toast('🔊 انضممت للقناة الصوتية!');
 
   } catch(e) {
     console.error('Voice error:', e);
@@ -263,7 +263,7 @@ async function leaveVoice() {
     voiceChannel = null;
     isMuted = false;
     _resetVoiceUI();
-    toast('📵 غادرت الكوكب');
+    toast('📵 غادرت القناة');
   } catch(e) {
     console.error('leaveVoice error:', e);
   }

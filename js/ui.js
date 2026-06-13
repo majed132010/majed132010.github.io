@@ -24,7 +24,7 @@ function showView(name) {
 function goBack() {
   if (currentChannel) {
     currentChannel=null;
-    if (currentServer) { renderChannels(currentServer); showView('none'); document.getElementById('mhName').textContent=servers[currentServer]?.name||'اختر كوكباً'; document.getElementById('mhIcon').textContent='#'; }
+    if (currentServer) { renderChannels(currentServer); showView('none'); document.getElementById('mhName').textContent=servers[currentServer]?.name||'اختر قناة'; document.getElementById('mhIcon').textContent='#'; }
     else showHome();
   } else if (currentServer) showHome();
   else showHome();

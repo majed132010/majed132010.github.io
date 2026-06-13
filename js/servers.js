@@ -318,7 +318,7 @@ function renderHomeServers() {
     avatar.textContent = sv.emoji || '🌍';
     const info = document.createElement('div');
     info.style.cssText = 'flex:1;min-width:0';
-    info.innerHTML = `<div style="font-size:17px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(sv.name||'عالم')}</div><div style="font-size:12px;color:var(--muted)">${sorted.length} كوكب</div>`;
+    info.innerHTML = `<div style="font-size:17px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(sv.name||'عالم')}</div><div style="font-size:12px;color:var(--muted)">${sorted.length} قناة</div>`;
     cardHead.appendChild(avatar); cardHead.appendChild(info);
     cardHead.addEventListener('click', () => selectServer(sid));
     const chBody = document.createElement('div');
@@ -403,8 +403,8 @@ function renderChannels(sid) {
     if (!collapsed) items.forEach(([cid,ch]) => list.appendChild(buildFn(cid,ch)));
   }
 
-  makeCategory('🪐 الكواكب النصية', sid+'_text', texts, (cid,ch) => makeChItem(cid,ch,'#'));
-  makeCategory('📡 المدارات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
+  makeCategory('💬 القنوات النصية', sid+'_text', texts, (cid,ch) => makeChItem(cid,ch,'#'));
+  makeCategory('🔊 القنوات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
 
   // قسم الرسائل الخاصة
   const dmSection = document.createElement('div');
@@ -453,7 +453,7 @@ async function addChannel() {
   document.getElementById('chNameInp').value = '';
   renderChannels(currentServer);
   closeModal('addChannelModal');
-  toast('✅ تمت إضافة الكوكب');
+  toast('✅ تمت إضافة القناة');
 }
 
 // ════ إعدادات السيرفر ════

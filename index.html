@@ -16,7 +16,7 @@
 <link rel="shortcut icon" href="icon-192.png">
 <title>عوالم</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=12.2">
+<link rel="stylesheet" href="css/style.css?v=12.5">
 </head>
 <body>
 
@@ -118,7 +118,7 @@
       <div id="mobHamburger" onclick="toggleDrawer()" title="القنوات">☰</div>
       <div class="main-header-back" onclick="goBack()" title="رجوع">◀</div>
       <div class="main-header-icon" id="mhIcon">#</div>
-      <div class="main-header-name" id="mhName">اختر كوكباً</div>
+      <div class="main-header-name" id="mhName">اختر قناة</div>
       <button id="searchToggleBtn" type="button" onclick="toggleSearch()"
         style="display:none;width:30px;height:30px;border-radius:8px;background:rgba(200,168,75,0.1);
         border:1px solid rgba(200,168,75,0.2);color:var(--gold);cursor:pointer;font-size:16px;
@@ -243,12 +243,12 @@
         <div class="voice-icon-wrap">🎙️</div>
         <div class="voice-ch-name" id="voiceViewName"></div>
         <div class="voice-btns">
-          <button class="voice-join-btn" id="voiceJoinBtn" onclick="joinVoice()">🔊 انضمام للكوكب</button>
+          <button class="voice-join-btn" id="voiceJoinBtn" onclick="joinVoice()">🔊 انضمام للقناة</button>
           <button class="mic-select-btn" id="micSelectBtn" onclick="selectMicrophone()">🎤 اختيار الميكروفون</button>
           <button class="voice-leave-btn" style="display:none" id="voiceLeaveBtn" onclick="leaveVoice()">📵 مغادرة</button>
         </div>
         <div class="voice-status">
-          <div style="font-weight:700;font-size:14px;color:#1a3a3a">👥 المستخدمون في الكوكب</div>
+          <div style="font-weight:700;font-size:14px;color:#1a3a3a">👥 المستخدمون في القناة</div>
           <div class="voice-users" id="voiceUsersList"></div>
           <div class="voice-log" id="voiceLog">جاهز...</div>
         </div>
@@ -285,7 +285,7 @@
     <button class="modal-close" onclick="closeModal('serverSettingsModal')">✕</button>
     <div class="modal-title" id="svSettingsTitle">إعدادات العالم</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-      <button class="modal-btn" onclick="openAddChannel()" id="svSettingsAddCh">➕ إضافة كوكب</button>
+      <button class="modal-btn" onclick="openAddChannel()" id="svSettingsAddCh">➕ إضافة قناة</button>
       <button class="modal-btn secondary" onclick="openServerCustomize()" id="svSettingsCustomize">🎨 تخصيص العالم</button>
       <button class="modal-btn secondary" onclick="openMemberMgmt()" id="svSettingsMemberMgmt">👥 إدارة الأعضاء</button>
       <button class="modal-btn secondary" onclick="openInvite()" id="svSettingsInvite">🔗 رابط الدعوة</button>
@@ -348,12 +348,12 @@
 <div class="modal-bg" id="addChannelModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('addChannelModal')">✕</button>
-    <div class="modal-title">كوكب جديد 🪐</div>
+    <div class="modal-title">قناة جديدة 💬</div>
     <div class="ch-type-tabs">
       <div class="ch-type-tab active" id="chTypeText" onclick="selectChType('text')">💬 نصية</div>
       <div class="ch-type-tab" id="chTypeVoice" onclick="selectChType('voice')">🔊 صوتية</div>
     </div>
-    <input class="modal-inp" id="chNameInp" placeholder="اسم الكوكب">
+    <input class="modal-inp" id="chNameInp" placeholder="اسم القناة">
     <button class="modal-btn" onclick="addChannel()">إضافة</button>
   </div>
 </div>
@@ -465,13 +465,13 @@
 
 <!-- ════ App Scripts — الترتيب مهم ════ -->
 <script src="js/firebase-config.js?v=9.7"></script>
-<script src="js/ui.js?v=12.0"></script>
+<script src="js/ui.js?v=12.5"></script>
 <script src="js/push.js?v=9.2"></script>
 <script src="js/notifications.js?v=11.4"></script>
-<script src="js/voice.js?v=12.0"></script>
+<script src="js/voice.js?v=12.5"></script>
 <script src="js/auth.js?v=11.4"></script>
 <script src="js/messages.js?v=12.4"></script>
-<script src="js/servers.js?v=12.2"></script>
+<script src="js/servers.js?v=12.5"></script>
 <script src="js/calls.js?v=10.1"></script>
 <script src="js/dm.js?v=3.0"></script>
 
