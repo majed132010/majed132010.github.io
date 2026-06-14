@@ -321,7 +321,7 @@ async function sendDM() {
   await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName||'مستخدم', ts: Date.now() });
 }
 
-// ════ محادثة جديدة ════
+// ════ محادثة جديدة — Grid Cards ════
 async function openNewDM() {
   const allMembers = {};
   Object.values(servers).forEach(sv => {
@@ -329,41 +329,100 @@ async function openNewDM() {
   });
   const otherUids = Object.keys(allMembers);
   if (!otherUids.length) { toast('لا يوجد أعضاء آخرون'); return; }
-  const usersData = await Promise.all(otherUids.map(uid => db.ref('users/'+uid).once('value').then(s=>({uid,data:s.val()||{}}))));
+  const usersData = await Promise.all(
+    otherUids.map(uid => db.ref('users/'+uid).once('value').then(s=>({uid,data:s.val()||{}})))
+  );
 
+  // ── Overlay ──
   const popup = document.createElement('div');
-  popup.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)';
+
+  // ── Modal box ──
   const box = document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:16px;padding:20px;min-width:280px;max-width:340px;width:100%;max-height:70vh;display:flex;flex-direction:column;gap:6px';
-  const title = document.createElement('div');
-  title.style.cssText='font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px;text-align:center';
-  title.textContent='💬 اختر عضواً';
-  box.appendChild(title);
-  const list = document.createElement('div');
-  list.style.cssText='overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px';
-  usersData.forEach(({uid,data}) => {
+  box.style.cssText = 'background:#fff;border-radius:22px;padding:20px 18px 18px;width:100%;max-width:540px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,0.28)';
+
+  // ── Header ──
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0';
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:17px;font-weight:900;color:var(--text);font-family:Tajawal,sans-serif';
+  titleEl.textContent = '💬 اختر عضواً للمحادثة';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.08);border:none;cursor:pointer;font-size:15px;color:#555;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:sans-serif';
+  closeBtn.addEventListener('click', () => popup.remove());
+  header.appendChild(titleEl);
+  header.appendChild(closeBtn);
+  box.appendChild(header);
+
+  // ── Grid ──
+  // auto-fill + minmax(110px,1fr): شاشة 540px → 4 بطاقات، شاشة 320px → 2 بطاقات
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;overflow-y:auto;padding:2px 4px 4px';
+
+  usersData.forEach(({uid, data}) => {
     const name = data.displayName || allMembers[uid]?.name || 'عضو';
-    const btn = document.createElement('div');
-    btn.style.cssText='display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent';
+
+    // ── Card ──
+    const card = document.createElement('div');
+    card.style.cssText = [
+      'display:flex;flex-direction:column;align-items:center;gap:10px',
+      'padding:18px 10px 14px',
+      'border-radius:18px',
+      'background:rgba(0,0,0,0.03)',
+      'border:1.5px solid rgba(0,0,0,0.07)',
+      'cursor:pointer',
+      'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease,border-color 0.15s ease',
+      '-webkit-tap-highlight-color:transparent',
+      'user-select:none'
+    ].join(';');
+
+    // ── Avatar ──
     const av = document.createElement('div');
-    av.style.cssText='width:40px;height:40px;border-radius:50%;flex-shrink:0;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff';
-    if (data.avatar) av.innerHTML=`<img src="${data.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`; else av.textContent=name[0]||'?';
-    const info = document.createElement('div');
-    info.innerHTML=`<div style="font-size:15px;font-weight:700;color:var(--text)">${escHtml(name)}</div>`;
-    btn.appendChild(av); btn.appendChild(info);
-    btn.addEventListener('mouseover',()=>btn.style.background='rgba(0,0,0,0.05)');
-    btn.addEventListener('mouseout',()=>btn.style.background='');
-    btn.addEventListener('click',()=>{popup.remove();openDM(uid,name);});
-    list.appendChild(btn);
+    av.style.cssText = 'width:72px;height:72px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.18);flex-shrink:0';
+    if (data.avatar) {
+      av.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+    } else {
+      av.textContent = (name[0] || '?').toUpperCase();
+    }
+
+    // ── Name ──
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;max-width:100%';
+    nameEl.textContent = name;
+
+    card.appendChild(av);
+    card.appendChild(nameEl);
+
+    // ── Hover / Active ──
+    card.addEventListener('mouseenter', () => {
+      card.style.background = 'rgba(26,95,95,0.07)';
+      card.style.borderColor = 'var(--acc)';
+      card.style.transform = 'translateY(-3px)';
+      card.style.boxShadow = '0 8px 22px rgba(0,0,0,0.12)';
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.background = 'rgba(0,0,0,0.03)';
+      card.style.borderColor = 'rgba(0,0,0,0.07)';
+      card.style.transform = '';
+      card.style.boxShadow = '';
+    });
+    card.addEventListener('touchstart', () => {
+      card.style.background = 'rgba(26,95,95,0.1)';
+      card.style.transform = 'scale(0.96)';
+    }, {passive:true});
+    card.addEventListener('touchend', () => {
+      card.style.background = 'rgba(0,0,0,0.03)';
+      card.style.transform = '';
+    }, {passive:true});
+
+    card.addEventListener('click', () => { popup.remove(); openDM(uid, name); });
+    grid.appendChild(card);
   });
-  box.appendChild(list);
-  const cancel = document.createElement('button');
-  cancel.textContent='إلغاء';
-  cancel.style.cssText='margin-top:10px;width:100%;padding:11px;background:var(--bg2);color:var(--muted);border:none;border-radius:10px;font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer';
-  cancel.addEventListener('click',()=>popup.remove());
-  box.appendChild(cancel);
+
+  box.appendChild(grid);
   popup.appendChild(box);
-  popup.addEventListener('click',e=>{if(e.target===popup)popup.remove();});
+  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
   document.body.appendChild(popup);
 }
 
