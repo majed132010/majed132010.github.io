@@ -113,8 +113,8 @@ self.addEventListener('notificationclick', e => {
 
   // قبول المكالمة أو فتح/الضغط العام → افتح التطبيق (وللقبول نمرّر علامة في الرابط ليكمل التطبيق الانضمام)
   const openUrl = (e.action === 'accept' && data.callId)
-    ? `https://majed132010.github.io/awalem-game?acceptCall=${encodeURIComponent(data.callId)}`
-    : 'https://majed132010.github.io/awalem-game';
+    ? `https://majed132010-github-io.vercel.app?acceptCall=${encodeURIComponent(data.callId)}`
+    : 'https://majed132010-github-io.vercel.app';
 
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {

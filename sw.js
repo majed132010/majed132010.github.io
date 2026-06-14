@@ -169,11 +169,11 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {
-        if (client.url.includes('majed132010.github.io') && 'focus' in client) {
+        if (client.url.includes('majed132010-github-io.vercel.app') && 'focus' in client) {
           return client.focus();
         }
       }
-      return clients.openWindow('https://majed132010.github.io');
+      return clients.openWindow('https://majed132010-github-io.vercel.app');
     })
   );
 });

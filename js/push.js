@@ -19,7 +19,7 @@ async function sendPushToUser(targetUid, title, body, data = {}) {
       await db.ref('fcm_queue').push({
         token: fcmToken,
         title, body,
-        data: { ...data, click_action: 'https://majed132010.github.io' },
+        data: { ...data, click_action: 'https://majed132010-github-io.vercel.app' },
         ts: Date.now()
       });
     }
