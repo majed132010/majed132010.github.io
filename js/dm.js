@@ -229,8 +229,20 @@ async function sendDM() {
 
   for (const m of media) {
     try {
-      toast('⏳ جاري رفع الوسائط...');
-      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }));
+      let _progressToast = null;
+      const onProgress = m.type === 'video' ? (pct) => {
+        if (!_progressToast) {
+          _progressToast = document.createElement('div');
+          _progressToast.className = 'toast show';
+          _progressToast.style.cssText = 'min-width:160px;text-align:center';
+          document.getElementById('toastContainer')?.appendChild(_progressToast);
+        }
+        _progressToast.textContent = `⏳ رفع الفيديو… ${pct}%`;
+        if (pct >= 100 && _progressToast.parentNode) _progressToast.parentNode.removeChild(_progressToast);
+      } : null;
+      if (!onProgress) toast('⏳ جاري رفع الوسائط...');
+      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, onProgress);
+      if (_progressToast?.parentNode) _progressToast.parentNode.removeChild(_progressToast);
       if (m.localUrl) { URL.revokeObjectURL(m.localUrl); m.localUrl = null; }
       const expiresAt = Date.now() + 24*60*60*1000;
       await db.ref('dm_messages/' + dmId).push({ ...msgBase, text:'', mediaUrl:url, mediaType:m.type, mediaName:m.name, expiresAt, saved:false });
@@ -241,7 +253,7 @@ async function sendDM() {
             m.type==='video'?'🎥 فيديو':'🖼️ صورة', { type:'dm', fromUid:currentUser.uid });
         } catch(e) {}
       }, 0);
-    } catch(e) { toast('❌ فشل رفع الملف'); }
+    } catch(e) { toast('❌ فشل رفع الملف: ' + (e.message || '')); }
   }
 
   const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');

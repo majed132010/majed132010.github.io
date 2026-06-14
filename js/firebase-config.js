@@ -179,21 +179,87 @@ async function loadCachedImage(url, expiresAt, saved) {
 const CLOUDINARY_CLOUD = 'dz9gy0rsr';
 const CLOUDINARY_PRESET = 'awalem_upload';
 
-async function uploadToCloudinary(file, retries = 3) {
+// تحويل نص public_id إلى رابط فيديو محسَّن (720p، جودة auto، MP4)
+function _cloudinaryVideoUrl(publicId) {
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4/${publicId}.mp4`;
+}
+
+// رفع مجزَّأ (chunks) للفيديوهات الكبيرة — يتجنب انقطاع الاتصال على الشبكات البطيئة
+async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
+  const CHUNK = 6 * 1024 * 1024; // 6MB لكل قطعة
+  const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const total = file.size;
+  let offset = 0;
+  let result = null;
+
+  while (offset < total) {
+    const end = Math.min(offset + CHUNK, total);
+    const chunk = file.slice(offset, end);
+    const formData = new FormData();
+    formData.append('file', chunk);
+    formData.append('upload_preset', CLOUDINARY_PRESET);
+    formData.append('folder', 'awalem');
+    // نطلب التحويل المتزامن في الجزء الأخير فقط
+    if (end === total) {
+      formData.append('eager', 'q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4');
+      formData.append('eager_async', 'true');
+    }
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Unique-Upload-Id': uploadId,
+          'Content-Range': `bytes ${offset}-${end - 1}/${total}`
+        },
+        body: formData
+      }
+    );
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'chunk upload failed'); }
+    const data = await res.json();
+    if (data.public_id || data.secure_url) result = data;
+    offset = end;
+    if (onProgress) onProgress(Math.round((offset / total) * 100));
+  }
+  return result;
+}
+
+async function uploadToCloudinary(file, retries = 3, onProgress) {
   // Cloudinary يتطلب المسار /video/upload لمقاطع الفيديو، وإلا يفشل أو يعلق الرفع.
-  // غير ذلك نستخدم /auto/ (يتعامل مع الصور والصوت تلقائياً).
   const resourceType = (file.type || '').startsWith('video') ? 'video' : 'auto';
+  const isVideo = resourceType === 'video';
+  const CHUNK_THRESHOLD = 20 * 1024 * 1024; // فيديو > 20MB يُرفع مجزَّأً
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', CLOUDINARY_PRESET);
-      formData.append('folder', 'awalem');
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`, {
-        method: 'POST', body: formData
-      });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Cloudinary upload failed'); }
-      const data = await res.json();
+      let data;
+
+      if (isVideo && file.size > CHUNK_THRESHOLD) {
+        // رفع مجزَّأ للفيديوهات الكبيرة
+        data = await _cloudinaryChunkedUpload(file, resourceType, onProgress);
+      } else {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_PRESET);
+        formData.append('folder', 'awalem');
+        if (isVideo) {
+          // Cloudinary يولّد نسخة مضغوطة في الخلفية بعد اكتمال الرفع
+          formData.append('eager', 'q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4');
+          formData.append('eager_async', 'true');
+        }
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`,
+          { method: 'POST', body: formData }
+        );
+        if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Cloudinary upload failed'); }
+        data = await res.json();
+      }
+
+      // للفيديو: نُعيد رابط التحويل المباشر (720p، auto-quality، MP4)
+      // Cloudinary يولّده عند أول طلب ويخزّنه في CDN بعدها
+      if (isVideo && data && data.public_id) {
+        return _cloudinaryVideoUrl(data.public_id);
+      }
       return data.secure_url;
     } catch(e) {
       if (attempt === retries) throw e;
