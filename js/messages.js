@@ -33,73 +33,70 @@ function showMessages(sid, cid) {
   // ضمان تفعيل مستمع الإشعارات — يُعيد الربط إن كان مفقوداً (حماية من انقطاع غير متوقع)
   if (currentUser && !_notifListener) listenNotifications(currentUser.uid);
 
-  // جيل فريد يُبطل أي callback async قديم إذا بدّل المستخدم القناة قبل حلّه
+  // جيل فريد يُبطل أي callback قديم إذا بدّل المستخدم القناة
   const gen = ++_msgLoadGen;
+  let _initialDone = false; // يصبح true بعد اكتمال الدفعة الأولى
 
-  // ── listener للرسائل الجديدة ──
+  // fn واحدة تتولى التحميل الأولي والرسائل الحية على حدٍّ سواء
   const fn = snap => {
+    if (gen !== _msgLoadGen) return;
     const msg = snap.val();
     if (!msg) return;
-    if (area.querySelector(`[data-key="${snap.key}"]`)) return;
+    if (area.querySelector(`[data-key="${snap.key}"]`)) return; // dedup
     area.appendChild(buildMsgDiv(msg, snap.key));
-    if (area.scrollHeight - area.scrollTop - area.clientHeight < 300) area.scrollTop = area.scrollHeight;
-    if (msg.uid !== currentUser?.uid) {
-      const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
-      const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
-      if (!(activeSid === sid && activeCid === cid)) showInAppNotif(msg, sid, cid);
+    // تتبع المفتاح الأقدم للـ pagination
+    if (!_oldestMsgKey || snap.key < _oldestMsgKey) _oldestMsgKey = snap.key;
+    if (_initialDone) {
+      // رسالة حية — تمرير تلقائي ذكي
+      const dist = area.scrollHeight - area.scrollTop - area.clientHeight;
+      if (dist < 250 || msg.uid === currentUser?.uid) {
+        area.scrollTop = area.scrollHeight;
+      }
+      // إشعار داخلي إذا كان المستخدم في قناة أخرى
+      if (msg.uid !== currentUser?.uid) {
+        const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
+        const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
+        if (!(activeSid === sid && activeCid === cid)) showInAppNotif(msg, sid, cid);
+      }
     }
   };
 
-  // ── تحميل الرسائل الأخيرة ثم تسجيل الـ listeners مباشرة ──
-  db.ref(_currentMsgPath).limitToLast(PAGE_SIZE).once('value').then(snap => {
-    if (gen !== _msgLoadGen) return; // القناة تغيّرت — لا نسجّل شيئاً
-
-    const msgs = snap.val() || {};
-    const entries = Object.entries(msgs).sort((a, b) => a[1].ts - b[1].ts);
-    entries.forEach(([key, msg]) => {
-      if (!area.querySelector(`[data-key="${key}"]`)) area.appendChild(buildMsgDiv(msg, key));
-    });
-    area.scrollTop = area.scrollHeight;
-    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 300);
-    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 800);
-
-    if (entries.length > 0) {
-      _oldestMsgKey = entries[0][0];
-      if (loadBtn) loadBtn.style.display = entries.length >= PAGE_SIZE ? 'block' : 'none';
-    }
-
-    // تحقق ثانٍ مباشر قبل تسجيل الـ listeners لضمان القناة لم تتغير
-    if (gen !== _msgLoadGen) return;
-    const lastKey = entries.length > 0 ? entries[entries.length - 1][0] : null;
-    const queryRef = lastKey
-      ? db.ref(_currentMsgPath).orderByKey().startAfter(lastKey)
-      : db.ref(_currentMsgPath).limitToLast(1);
-    queryRef.on('child_added', fn);
-
-    const changeFn = snap => {
-      const msg = snap.val();
-      if (!msg) return;
-      const el = document.querySelector(`[data-key="${snap.key}"]`);
-      if (!el) return;
-      const body = el.querySelector('.msg-body');
-      if (!body) return;
-      renderReactions(msg.reactions || null, snap.key, body);
-      const a = document.getElementById('messagesArea');
-      if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
-      if (msg.text !== undefined) {
-        const contentEl = body.querySelector('.msg-content');
-        if (contentEl && contentEl.textContent !== msg.text) contentEl.textContent = msg.text;
-        if (msg.edited && !body.querySelector('.msg-edited')) {
-          const metaEl = body.querySelector('.msg-meta');
-          if (metaEl) metaEl.insertAdjacentHTML('beforeend', '<span class="msg-edited">(معدّل)</span>');
-        }
+  const changeFn = snap => {
+    const msg = snap.val();
+    if (!msg) return;
+    const el = document.querySelector(`[data-key="${snap.key}"]`);
+    if (!el) return;
+    const body = el.querySelector('.msg-body');
+    if (!body) return;
+    renderReactions(msg.reactions || null, snap.key, body);
+    const a = document.getElementById('messagesArea');
+    if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
+    if (msg.text !== undefined) {
+      const contentEl = body.querySelector('.msg-content');
+      if (contentEl && contentEl.textContent !== msg.text) contentEl.textContent = msg.text;
+      if (msg.edited && !body.querySelector('.msg-edited')) {
+        const metaEl = body.querySelector('.msg-meta');
+        if (metaEl) metaEl.insertAdjacentHTML('beforeend', '<span class="msg-edited">(معدّل)</span>');
       }
-    };
-    db.ref(_currentMsgPath).on('child_changed', changeFn);
-    messagesListener = { path: _currentMsgPath, queryRef, fn, changeFn };
-  }).catch(err => {
-    console.error('[showMessages] DB error:', err);
-    if (gen === _msgLoadGen) toast('❌ تعذّر تحميل الرسائل — تحقق من الاتصال');
+    }
+  };
+
+  // ── تسجيل مستمع واحد: يحمّل الدفعة الأولى ثم يستمر حياً ──
+  // limitToLast يُعيد المزامنة تلقائياً عند إعادة الاتصال — لا يفوّت رسائل
+  const mainRef = db.ref(_currentMsgPath).limitToLast(PAGE_SIZE);
+  mainRef.on('child_added', fn);
+  db.ref(_currentMsgPath).on('child_changed', changeFn);
+  messagesListener = { path: _currentMsgPath, mainRef, fn, changeFn };
+
+  // 'value' يُطلَق بعد انتهاء كل child_added الأولية — نستغله لقفل حالة التحميل
+  mainRef.once('value', snap => {
+    if (gen !== _msgLoadGen) return;
+    _initialDone = true;
+    const count = snap.numChildren ? snap.numChildren() : Object.keys(snap.val() || {}).length;
+    if (loadBtn) loadBtn.style.display = count >= PAGE_SIZE ? 'block' : 'none';
+    area.scrollTop = area.scrollHeight;
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 150);
+    setTimeout(() => { area.scrollTop = area.scrollHeight; }, 500);
   });
 }
 
@@ -688,8 +685,9 @@ function listenTyping(sid, cid) {
 // ════ تنظيف الـ listener ════
 function cleanupMessagesListener() {
   if (messagesListener) {
-    // child_added يجب فصله عبر نفس queryRef المستخدم في .on() — الـ path وحده لا يكفي
-    if (messagesListener.queryRef) messagesListener.queryRef.off('child_added', messagesListener.fn);
+    // فصل الـ listener عبر نفس الـ ref المُسجَّل — الـ path وحده لا يكفي
+    const ref = messagesListener.mainRef || messagesListener.queryRef;
+    if (ref) ref.off('child_added', messagesListener.fn);
     if (messagesListener.changeFn) db.ref(messagesListener.path).off('child_changed', messagesListener.changeFn);
     messagesListener = null;
   }

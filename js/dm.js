@@ -98,39 +98,41 @@ function openDM(uid, name) {
   const dmArea = document.getElementById('dmMessages');
   dmArea.innerHTML = '';
 
-  if (_dmListener) { db.ref(_dmListener.path).off('child_added', _dmListener.fn); _dmListener = null; }
+  if (_dmListener) {
+    const _r = _dmListener.mainRef || null;
+    if (_r) _r.off('child_added', _dmListener.fn);
+    else db.ref(_dmListener.path).off('child_added', _dmListener.fn);
+    _dmListener = null;
+  }
   if (_dmTypingListener) { db.ref(_dmTypingListener).off('value'); _dmTypingListener = null; }
 
   const dmId = getDmId(currentUser.uid, uid);
   const path = 'dm_messages/' + dmId;
+  let _dmInitialDone = false;
 
   const fn = snap => {
     const msg = snap.val();
-    if (!msg) return;
-    if (dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
-    const div = buildDmMsgDiv(msg, snap.key, uid, name);
-    dmArea.appendChild(div);
-    dmArea.scrollTop = dmArea.scrollHeight;
-    if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
-      _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
-      updateDmBadge();
-      renderDmList();
-      showDmNotif(msg, uid);
+    if (!msg || dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
+    dmArea.appendChild(buildDmMsgDiv(msg, snap.key, uid, name));
+    if (_dmInitialDone) {
+      dmArea.scrollTop = dmArea.scrollHeight;
+      if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
+        _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
+        updateDmBadge();
+        renderDmList();
+        showDmNotif(msg, uid);
+      }
     }
   };
 
-  db.ref(path).limitToLast(40).once('value').then(snap => {
-    const msgs = snap.val() || {};
-    Object.entries(msgs).sort((a,b)=>a[1].ts-b[1].ts).forEach(([key,msg]) => {
-      dmArea.appendChild(buildDmMsgDiv(msg, key, uid, name));
-    });
-    dmArea.scrollTop = dmArea.scrollHeight;
-    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 300);
+  const dmRef = db.ref(path).limitToLast(40);
+  dmRef.on('child_added', fn);
+  _dmListener = { path, mainRef: dmRef, fn };
 
-    const lastKey = Object.keys(msgs).sort().pop();
-    let q = lastKey ? db.ref(path).orderByKey().startAfter(lastKey) : db.ref(path).limitToLast(1);
-    q.on('child_added', fn);
-    _dmListener = { path, fn };
+  dmRef.once('value', () => {
+    _dmInitialDone = true;
+    dmArea.scrollTop = dmArea.scrollHeight;
+    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 150);
   });
 
   const typPath = 'dm_typing/' + dmId + '/' + uid;
