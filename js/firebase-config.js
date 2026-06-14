@@ -203,6 +203,31 @@ async function uploadToCloudinary(file, retries = 3) {
   }
 }
 
+// ════ IMAGE COMPRESSION (canvas, max 1920px, JPEG 85%) ════
+async function compressImage(blob) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+      const MAX = 1920;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(blob); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(b => resolve(b && b.size < blob.size ? b : blob), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(blob); };
+    img.src = blobUrl;
+  });
+}
+
 async function uploadToStorage(file, path, { retries = 3, onProgress, signal } = {}) {
   const contentType = file.type || 'application/octet-stream';
   for (let attempt = 1; attempt <= retries; attempt++) {

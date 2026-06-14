@@ -447,8 +447,8 @@ async function _uploadOneMedia(m, msgBase) {
   const _sid = currentServer, _cid = currentChannel;
   const area = document.getElementById('messagesArea');
 
-  // معاينة blob فورية — بدون FileReader أو تحويلات
-  const _blobUrl = URL.createObjectURL(m.file);
+  // استخدام رابط الـ Blob المُعَدّ مسبقاً وقت الاختيار — لا خطر من فقدان صلاحية الملف
+  const _blobUrl = m.localUrl;
 
   // حارس طوارئ: يصفّر _sendingMedia بعد 15 ثانية حتماً في حال تعليق شبكي
   const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
@@ -497,16 +497,13 @@ async function _uploadOneMedia(m, msgBase) {
   tempDiv.appendChild(tempBody);
   if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
 
-  // ── قراءة ArrayBuffer ثم رفع مباشر إلى Storage ──
+  // ── رفع الـ Blob مباشرةً (قُرئ وقت الاختيار — بلا مشاكل صلاحية) ──
   try {
-    // قراءة الملف كـ ArrayBuffer — مطلوب لـ WebView/APK
-    const arrayBuffer = await m.file.arrayBuffer();
-
-    const ext = (m.file.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
+    const ext = (m.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
     const storagePath = `media/${_sid}/${_cid}/${Date.now()}.${ext}`;
     const storageRef = storage.ref(storagePath);
-    const uploadTask = storageRef.put(arrayBuffer, {
-      contentType: m.file.type || 'application/octet-stream'
+    const uploadTask = storageRef.put(m.blob, {
+      contentType: m.mimeType || 'application/octet-stream'
     });
     uploadTask.on('state_changed', (snap) => {
       if (snap.totalBytes > 0)
@@ -524,7 +521,7 @@ async function _uploadOneMedia(m, msgBase) {
     tempDiv.remove();
     if (area) area.scrollTop = area.scrollHeight;
   } catch(e) {
-    window._sendingMedia = false; // تصفير فوري عند أي فشل
+    window._sendingMedia = false;
     if (e.code === 'storage/unauthorized') {
       toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
     } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
@@ -533,9 +530,10 @@ async function _uploadOneMedia(m, msgBase) {
       toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
   } finally {
-    clearTimeout(_guardTimer); // إلغاء الحارس إن أتمّ الرفع قبل 15 ثانية
+    clearTimeout(_guardTimer);
     if (tempDiv.parentNode) tempDiv.remove();
     URL.revokeObjectURL(_blobUrl);
+    m.localUrl = null;
   }
 }
 
@@ -762,44 +760,74 @@ function closeMentionPopup() {
 // ════ اختيار الوسائط ════
 window._pendingMedia = [];
 window._sendingMedia = false;
-function handleMediaSelect(input) {
+async function handleMediaSelect(input) {
   const files = Array.from(input.files);
+  input.value = '';
   if (!files.length) return;
   const preview = document.getElementById('mediaPreviewArea');
   if (!preview) return;
-  files.forEach(file => {
+
+  for (const file of files) {
     const isVideo = file.type.startsWith('video');
     const maxSize = isVideo ? 500*1024*1024 : 50*1024*1024;
     const maxLabel = isVideo ? '500MB' : '50MB';
-    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); return; }
-    const entry = { file, type: isVideo ? 'video' : 'image', name: file.name };
-    window._pendingMedia.push(entry);
-    preview.style.display = 'flex';
+    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); continue; }
+
+    // بناء wrap مؤقت مع مؤشر تحميل فوري
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative;display:inline-flex;flex-shrink:0';
-    const localUrl = URL.createObjectURL(file);
-    if (entry.type === 'video') {
-      const vid = document.createElement('video');
-      vid.src = localUrl; vid.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
-      wrap.appendChild(vid);
-    } else {
-      const img = document.createElement('img');
-      img.src = localUrl; img.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
-      wrap.appendChild(img);
-    }
-    const rm = document.createElement('button');
-    rm.type='button'; rm.textContent='✕';
-    rm.style.cssText = 'position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2';
-    rm.addEventListener('click', () => {
-      window._pendingMedia = window._pendingMedia.filter(e => e!==entry);
+    wrap.style.cssText = 'position:relative;display:inline-flex;flex-shrink:0;align-items:center;justify-content:center';
+    const loadingEl = document.createElement('div');
+    loadingEl.style.cssText = 'width:72px;height:72px;border-radius:8px;background:#23272a;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;font-family:Tajawal,sans-serif';
+    loadingEl.textContent = '⏳';
+    wrap.appendChild(loadingEl);
+    preview.style.display = 'flex';
+    preview.appendChild(wrap);
+
+    try {
+      // قراءة الملف كاملاً الآن — قبل أن يفقد المتصفح صلاحيته
+      const arrayBuffer = await file.arrayBuffer();
+      let blob = new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' });
+
+      // ضغط الصور فقط (الفيديو يُرفع كما هو)
+      if (!isVideo) {
+        blob = await compressImage(blob);
+      }
+
+      const mimeType = blob.type || file.type || 'application/octet-stream';
+      const localUrl = URL.createObjectURL(blob);
+      const entry = { blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl };
+      window._pendingMedia.push(entry);
+
+      // استبدال مؤشر التحميل بالمعاينة الفعلية
+      loadingEl.remove();
+      if (isVideo) {
+        const vid = document.createElement('video');
+        vid.src = localUrl; vid.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
+        wrap.appendChild(vid);
+      } else {
+        const img = document.createElement('img');
+        img.src = localUrl; img.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
+        wrap.appendChild(img);
+      }
+
+      const rm = document.createElement('button');
+      rm.type='button'; rm.textContent='✕';
+      rm.style.cssText = 'position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2';
+      rm.addEventListener('click', () => {
+        if (entry.localUrl) { URL.revokeObjectURL(entry.localUrl); entry.localUrl = null; }
+        window._pendingMedia = window._pendingMedia.filter(e => e!==entry);
+        wrap.remove();
+        if (!window._pendingMedia.length) preview.style.display='none';
+        document.getElementById('sendBtn').classList.toggle('active', !!(window._pendingMedia.length||document.getElementById('mainChatInp')?.value.trim()));
+      });
+      wrap.appendChild(rm);
+      document.getElementById('sendBtn').classList.add('active');
+    } catch(e) {
       wrap.remove();
       if (!window._pendingMedia.length) preview.style.display='none';
-      document.getElementById('sendBtn').classList.toggle('active', !!(window._pendingMedia.length||document.getElementById('mainChatInp')?.value.trim()));
-    });
-    wrap.appendChild(rm); preview.appendChild(wrap);
-    document.getElementById('sendBtn').classList.add('active');
-  });
-  input.value = '';
+      toast('❌ تعذّر قراءة الملف: ' + (e.message || ''));
+    }
+  }
 }
 
 // ════ البحث ════

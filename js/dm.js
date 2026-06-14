@@ -230,7 +230,8 @@ async function sendDM() {
   for (const m of media) {
     try {
       toast('⏳ جاري رفع الوسائط...');
-      const url = await uploadToCloudinary(m.file);
+      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }));
+      if (m.localUrl) { URL.revokeObjectURL(m.localUrl); m.localUrl = null; }
       const expiresAt = Date.now() + 24*60*60*1000;
       await db.ref('dm_messages/' + dmId).push({ ...msgBase, text:'', mediaUrl:url, mediaType:m.type, mediaName:m.name, expiresAt, saved:false });
       toast('✅ تم الإرسال');
@@ -441,8 +442,9 @@ function renderDmList() {
 
 // ════ اختيار وسائط في الرسائل الخاصة ════
 window._pendingDmMedia=[];
-function handleDmMediaSelect(input) {
+async function handleDmMediaSelect(input) {
   const files=Array.from(input.files);
+  input.value='';
   if (!files.length) return;
   if (!window._pendingDmMedia) window._pendingDmMedia=[];
   let preview=document.getElementById('dmMediaPreview');
@@ -453,21 +455,49 @@ function handleDmMediaSelect(input) {
     if (dmInput) dmInput.insertBefore(preview,dmInput.firstChild);
   }
   preview.style.display='flex';
-  files.forEach(file=>{
+
+  for (const file of files) {
     const isVideo=file.type.startsWith('video');
     const maxSize=isVideo?500*1024*1024:50*1024*1024;
     const maxLabel=isVideo?'500MB':'50MB';
-    if (file.size>maxSize){toast(`❌ الملف أكبر من ${maxLabel}`);return;}
-    const entry={file,type:isVideo?'video':'image',name:file.name};
-    window._pendingDmMedia.push(entry);
-    const wrap=document.createElement('div'); wrap.style.cssText='position:relative;display:inline-flex';
-    const img=document.createElement('img'); img.src=URL.createObjectURL(file);
-    img.style.cssText='height:60px;max-width:90px;border-radius:6px;object-fit:cover';
-    const rm=document.createElement('button'); rm.textContent='✕';
-    rm.style.cssText='position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:9px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center';
-    rm.onclick=()=>{window._pendingDmMedia=window._pendingDmMedia.filter(e=>e!==entry);wrap.remove();if(!window._pendingDmMedia.length)preview.style.display='none';};
-    wrap.appendChild(img);wrap.appendChild(rm);preview.appendChild(wrap);
-  });
-  input.value='';
-  document.getElementById('dmSendBtn').classList.add('active');
+    if (file.size>maxSize){toast(`❌ الملف أكبر من ${maxLabel}`);continue;}
+
+    const wrap=document.createElement('div'); wrap.style.cssText='position:relative;display:inline-flex;align-items:center;justify-content:center';
+    const loadingEl=document.createElement('div');
+    loadingEl.style.cssText='width:60px;height:60px;border-radius:6px;background:#23272a;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px';
+    loadingEl.textContent='⏳';
+    wrap.appendChild(loadingEl);
+    preview.appendChild(wrap);
+
+    try {
+      const arrayBuffer=await file.arrayBuffer();
+      let blob=new Blob([arrayBuffer],{type:file.type||'application/octet-stream'});
+      if (!isVideo) blob=await compressImage(blob);
+      const mimeType=blob.type||file.type||'application/octet-stream';
+      const localUrl=URL.createObjectURL(blob);
+      const entry={blob,type:isVideo?'video':'image',name:file.name,mimeType,localUrl};
+      window._pendingDmMedia.push(entry);
+
+      loadingEl.remove();
+      const thumb=document.createElement(isVideo?'video':'img');
+      thumb.src=localUrl;
+      thumb.style.cssText='height:60px;max-width:90px;border-radius:6px;object-fit:cover;display:block';
+      wrap.appendChild(thumb);
+
+      const rm=document.createElement('button'); rm.textContent='✕';
+      rm.style.cssText='position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:9px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center';
+      rm.onclick=()=>{
+        if (entry.localUrl){URL.revokeObjectURL(entry.localUrl);entry.localUrl=null;}
+        window._pendingDmMedia=window._pendingDmMedia.filter(e=>e!==entry);
+        wrap.remove();
+        if(!window._pendingDmMedia.length)preview.style.display='none';
+      };
+      wrap.appendChild(rm);
+      document.getElementById('dmSendBtn').classList.add('active');
+    } catch(e) {
+      wrap.remove();
+      if(!window._pendingDmMedia.length)preview.style.display='none';
+      toast('❌ تعذّر قراءة الملف: '+(e.message||''));
+    }
+  }
 }
