@@ -16,10 +16,14 @@ async function sendPushToUser(targetUid, title, body, data = {}) {
     const tokenSnap = await db.ref('users/' + targetUid + '/fcmToken').once('value');
     const fcmToken = tokenSnap.val();
     if (fcmToken) {
+      // إذا كان المرسِل داخل التطبيق المثبّت (PWA) لا نضع نطاقاً كاملاً في click_action
+      // لتفادي فتح Chrome الخارجي على جهاز المستقبِل — نترك الـ Service Worker يتولى الفتح
+      const _pwa = window.matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
+      const clickAction = _pwa ? location.origin : 'https://majed132010-github-io.vercel.app';
       await db.ref('fcm_queue').push({
         token: fcmToken,
         title, body,
-        data: { ...data, click_action: 'https://majed132010-github-io.vercel.app' },
+        data: { ...data, click_action: clickAction },
         ts: Date.now()
       });
     }

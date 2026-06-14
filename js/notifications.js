@@ -75,7 +75,10 @@ function listenNotifications(userId) {
 }
 
 // ════ تهيئة FCM ════
+let _fcmInitialized = false;
 async function initFCM(userId) {
+  if (_fcmInitialized) return;
+  _fcmInitialized = true;
   try {
     if (!('Notification' in window)) return;
     fcmMessaging = FB.messaging();

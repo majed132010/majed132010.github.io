@@ -72,6 +72,7 @@ function renderDmPickerList() {
       })
     )
   ).then(list => {
+    container.innerHTML = '';
     const grid = document.createElement('div');
     grid.id = 'dmPickerGrid';
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:8px 4px 16px';
@@ -597,7 +598,10 @@ function renderDmConvList(container) {
 // ════ استماع للرسائل الخاصة الجديدة عالمياً ════
 function listenDMs() {
   if (!currentUser) return;
-  db.ref('dms/'+currentUser.uid).on('value', snap => {
+  // .off() إجباري قبل أي .on() جديد لقطع تكرار المستمعات عند إعادة التهيئة
+  const dmsRef = db.ref('dms/'+currentUser.uid);
+  dmsRef.off('value');
+  dmsRef.on('value', snap => {
     renderDmList();
     if (!snap.exists()) return;
     snap.forEach(ch => {
@@ -605,7 +609,9 @@ function listenDMs() {
       _addDmListener(uid);
     });
   });
-  db.ref('notifications/'+currentUser.uid).on('child_added', snap => {
+  const notifRef = db.ref('notifications/'+currentUser.uid);
+  notifRef.off('child_added');
+  notifRef.on('child_added', snap => {
     const notif = snap.val();
     if (!notif) return;
     if (Date.now() - notif.ts > 15000) return;
@@ -631,7 +637,13 @@ function listenDMs() {
 }
 
 function _addDmListener(uid) {
-  if (_dmGlobalListeners[uid]) return;
+  // فسخ المستمع القديم صراحةً قبل أي تسجيل جديد — يقطع أي تراكم محتمل في المستمعات
+  if (_dmGlobalListeners[uid]) {
+    const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
+    try { oldQ.off('child_added', oldFn); } catch(e) {}
+    delete _dmGlobalListeners[uid];
+    return; // المستمع كان قائماً وسليماً — فُكّ ربطه ولا داعي لإعادة التسجيل
+  }
   const dmId = getDmId(currentUser.uid, uid);
   const path = 'dm_messages/' + dmId;
   const q = db.ref(path).limitToLast(1);

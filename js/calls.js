@@ -114,6 +114,7 @@ async function startCall(toUid, toName, type = 'audio') {
 
 // ════ استقبال مكالمة ════
 function listenIncomingCalls() {
+  if (_incomingCallsRef) return; // مستمع نشط مسبقاً — لا إعادة تسجيل
   if (!currentUser) {
     console.error('[CALL] ✖ listenIncomingCalls: لا يوجد مستخدم مسجّل — لن يتم تسجيل المستمع');
     return;
@@ -235,7 +236,13 @@ async function endCall(reason = 'ended') {
       await _callClient.leave();
       console.log('[CALL] ✓ غادرت قناة Agora');
     } catch(e) { console.warn('[CALL] ⚠ خطأ أثناء مغادرة Agora:', e); }
-    _callClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+    // إعادة إنشاء Client للمكالمة التالية — داخل try/catch لحماية من أخطاء CORS/SDK
+    try {
+      _callClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+    } catch(e) {
+      console.warn('[CALL] ⚠ فشل إعادة إنشاء Agora client (CORS أو تحميل SDK):', e);
+      _callClient = null;
+    }
   }
 
   // أبلغ الطرف الآخر بالإنهاء — إلا إذا كنا ننهي ردّاً على إشارته هو ('remote')
@@ -494,6 +501,7 @@ function showOutgoingCallScreen(name, type) {
 
 // ════ عرض شاشة المكالمة الواردة ════
 function showIncomingCallScreen(name, type, fromUid, callId, channelName) {
+  // ① أنشئ عنصر الشاشة إن لم يكن موجوداً
   let screen = document.getElementById('incomingCallScreen');
   if (!screen) {
     screen = document.createElement('div');
@@ -502,12 +510,7 @@ function showIncomingCallScreen(name, type, fromUid, callId, channelName) {
     document.body.appendChild(screen);
   }
 
-  // صوت الرنين
-  _playRingtone();
-
-  // 🆕 استمع لإلغاء المتصل للمكالمة *قبل* أن نرد — يغلق شاشة الرنين فوراً ويوقف النغمة
-  _listenIncomingCancel(callId, name);
-
+  // ② اعرض أزرار القبول/الرفض فوراً قبل أي عمليات صوت أو شبكة
   screen.innerHTML = `
     <div style="font-size:80px;animation:callPulse 1.5s infinite">${type==='video'?'📹':'📞'}</div>
     <div style="font-size:22px;font-weight:800">${escHtml(name)}</div>
@@ -519,7 +522,13 @@ function showIncomingCallScreen(name, type, fromUid, callId, channelName) {
   `;
   screen.style.display = 'flex';
 
-  // أوقف الرنين بعد 45 ثانية
+  // ③ ثم صوت الرنين (قد يُرفض بدون تفاعل مستخدم على بعض المتصفحات — لا يؤثر على الشاشة)
+  _playRingtone();
+
+  // ④ ثم مستمع إلغاء المتصل (Firebase) — بعد ظهور الشاشة كاملاً
+  _listenIncomingCancel(callId, name);
+
+  // ⑤ أوقف الرنين بعد 45 ثانية
   _callTimeout = setTimeout(() => {
     _stopRingtone();
     _stopIncomingCancelListener();
