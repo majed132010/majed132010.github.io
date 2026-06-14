@@ -186,7 +186,7 @@ async function createServer() {
   const sid = 'sv_' + Date.now();
   const sv = {
     name, emoji: '🌍', inviteCode, ownerId: currentUser.uid,
-    members: { [currentUser.uid]: { role: 'owner', name: userProfile.displayName || '', avatar: userProfile.avatar || null } },
+    members: { [currentUser.uid]: { role: 'owner', name: userProfile.displayName || '', avatar: userProfile.avatar || null, joinedAt: Date.now() } },
     channels: {
       ['ch_' + Date.now()]: { name: 'عام', type: 'text', position: 0 },
       ['ch_' + (Date.now()+1)]: { name: 'صوتي عام', type: 'voice', position: 1 }
@@ -413,7 +413,7 @@ function renderChannels(sid) {
   dmBtn.className = 'ch-item';
   dmBtn.id = 'dmChannelBtn';
   const dmUnreadTotal = Object.values(_dmUnread||{}).reduce((a,b)=>a+b,0);
-  dmBtn.innerHTML = `<span class="ch-item-icon">💬</span><span class="ch-item-name">رسائلي الخاصة</span>${dmUnreadTotal>0?`<span class="ch-badge">${dmUnreadTotal>9?'9+':dmUnreadTotal}</span>`:''}`;
+  dmBtn.innerHTML = `<span class="ch-item-icon">💬</span><span class="ch-item-name">رسائلي الخاصة</span>${dmUnreadTotal>0?`<span class="ch-badge">${dmUnreadTotal>99?'99+':dmUnreadTotal}</span>`:''}`;
   dmBtn.addEventListener('click', () => { closeSidebar(); openDMScreen(); });
   dmSection.appendChild(dmBtn);
   list.appendChild(dmSection);

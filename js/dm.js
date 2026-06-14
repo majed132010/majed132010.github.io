@@ -6,12 +6,14 @@ let _dmTypingListener = null;
 let _dmReplyTo = null;
 const _dmUnread = {};
 const _dmGlobalListeners = {};
+let _lastServerId = null; // آخر سيرفر نشط قبل الدخول لشاشة DM
 
 function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 
 // ════ فتح شاشة الرسائل الخاصة ════
 function openDMScreen() {
   closeSidebar();
+  if (currentServer) _lastServerId = currentServer; // احفظ قبل التصفير لعرض أعضاء السيرفر الصحيح
   currentServer = null; currentChannel = null; _currentDmUid = null;
   document.getElementById('chSettingsBtn').style.display = 'none';
   document.getElementById('mhIcon').textContent = '💬';
@@ -38,17 +40,12 @@ function renderDmPickerList() {
   const container = document.getElementById('dmPickerList');
   if (!container || !currentUser) return;
 
-  // اجمع أعضاء السيرفر الحالي — إن لم يُختر سيرفر خذ كل السيرفرات المشترك بها
+  // استخدم السيرفر النشط — أو آخر سيرفر قبل فتح شاشة DM (يمنع ظهور أعضاء سيرفرات أخرى)
+  const activeServer = currentServer || _lastServerId;
   const svMembers = {};
-  if (currentServer && servers[currentServer]?.members) {
-    Object.entries(servers[currentServer].members).forEach(([uid, m]) => {
+  if (activeServer && servers[activeServer]?.members) {
+    Object.entries(servers[activeServer].members).forEach(([uid, m]) => {
       if (uid !== currentUser.uid) svMembers[uid] = m;
-    });
-  } else {
-    Object.values(servers || {}).forEach(sv => {
-      Object.entries(sv.members || {}).forEach(([uid, m]) => {
-        if (uid !== currentUser.uid) svMembers[uid] = m;
-      });
     });
   }
 
@@ -568,11 +565,11 @@ function clearDmUnread(uid) {
 function updateDmBadge() {
   const total=Object.values(_dmUnread||{}).reduce((a,b)=>a+b,0);
   const svBadge=document.getElementById('dmSvBadge');
-  if (svBadge) { svBadge.textContent=total>9?'9+':total; svBadge.style.display=total>0?'block':'none'; }
+  if (svBadge) { svBadge.textContent=total>99?'99+':total; svBadge.style.display=total>0?'block':'none'; }
   const btn=document.getElementById('dmChannelBtn');
   if (btn) {
     let badge=btn.querySelector('.ch-badge');
-    if (total>0) { if(!badge){badge=document.createElement('span');badge.className='ch-badge';btn.appendChild(badge);} badge.textContent=total>9?'9+':total; }
+    if (total>0) { if(!badge){badge=document.createElement('span');badge.className='ch-badge';btn.appendChild(badge);} badge.textContent=total>99?'99+':total; }
     else if (badge) badge.remove();
   }
   const convList=document.getElementById('dmConvList');
@@ -590,7 +587,7 @@ function renderDmConvList(container) {
       const name=dmData[uid]?.name||'مستخدم';
       const row=document.createElement('div');
       row.className='ch-item'; row.style.cssText='padding-right:28px';
-      row.innerHTML=`<div style="width:28px;height:28px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(name||'?')[0]}</div><span class="ch-item-name" style="font-size:13px">${escHtml(name)}</span><span class="ch-badge">${count>9?'9+':count}</span>`;
+      row.innerHTML=`<div style="width:28px;height:28px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(name||'?')[0]}</div><span class="ch-item-name" style="font-size:13px">${escHtml(name)}</span><span class="ch-badge">${count>99?'99+':count}</span>`;
       row.addEventListener('click',()=>{closeSidebar();openDM(uid,name);});
       container.appendChild(row);
     });
@@ -615,10 +612,17 @@ function listenDMs() {
     if (notif.from === currentUser.uid) return;
     if (notif.data?.type === 'dm' && notif.data?.fromUid) {
       const fromUid = notif.data.fromUid;
+      // isNew = true يعني لا يوجد مستمع بعد → _addDmListener سيُهيَّأ الآن
+      // وسيتجاهل الرسالة الأولى (initialized=false) لذا نعدّها هنا
+      const isNew = !_dmGlobalListeners[fromUid];
       _addDmListener(fromUid);
       if (_currentDmUid !== fromUid) {
-        _dmUnread[fromUid] = (_dmUnread[fromUid]||0) + 1;
-        updateDmBadge();
+        if (isNew) {
+          // الرسالة الأولى من هذا المستخدم — _addDmListener لن يلتقطها
+          _dmUnread[fromUid] = (_dmUnread[fromUid]||0) + 1;
+          updateDmBadge();
+        }
+        // الرسائل اللاحقة يعدّها _addDmListener مباشرة عبر child_added
         showDmNotif({ name: notif.title || 'رسالة خاصة', text: notif.body || '' }, fromUid);
       }
     }
@@ -630,24 +634,23 @@ function _addDmListener(uid) {
   if (_dmGlobalListeners[uid]) return;
   const dmId = getDmId(currentUser.uid, uid);
   const path = 'dm_messages/' + dmId;
-  db.ref(path).limitToLast(1).once('value').then(lastSnap => {
-    let lastKey = null;
-    lastSnap.forEach(s => { lastKey = s.key; });
-    const q = lastKey
-      ? db.ref(path).orderByKey().startAfter(lastKey)
-      : db.ref(path).limitToLast(1);
-    const fn = msgSnap => {
-      const msg = msgSnap.val();
-      if (!msg || msg.uid === currentUser.uid) return;
-      if (_currentDmUid === uid) return;
-      _dmUnread[uid] = (_dmUnread[uid]||0) + 1;
-      updateDmBadge();
-      _refreshPickerBadge(uid);
-      showDmNotif(msg, uid);
-    };
-    q.on('child_added', fn);
-    _dmGlobalListeners[uid] = { q, fn };
-  });
+  const q = db.ref(path).limitToLast(1);
+  let initialized = false;
+  const fn = msgSnap => {
+    // نتجاهل الرسائل الموجودة مسبقاً عند إعداد المستمع
+    if (!initialized) return;
+    const msg = msgSnap.val();
+    if (!msg || msg.uid === currentUser.uid) return;
+    if (_currentDmUid === uid) return;
+    _dmUnread[uid] = (_dmUnread[uid]||0) + 1;
+    updateDmBadge();
+    _refreshPickerBadge(uid);
+    showDmNotif(msg, uid);
+  };
+  q.on('child_added', fn);
+  // once('value') يُطلق بعد كل child_added الأولي → نضمن أن fn للرسائل القادمة فقط
+  q.once('value', () => { initialized = true; });
+  _dmGlobalListeners[uid] = { q, fn };
 }
 
 function renderDmList() {
