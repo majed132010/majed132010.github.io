@@ -184,13 +184,15 @@ function _cloudinaryVideoUrl(publicId) {
   return `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4/${publicId}.mp4`;
 }
 
-// رفع مجزَّأ (chunks) للفيديوهات الكبيرة — يتجنب انقطاع الاتصال على الشبكات البطيئة
+// رفع مجزَّأ (chunks) للفيديوهات الكبيرة
 async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
   const CHUNK = 6 * 1024 * 1024;
   const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const total = file.size;
   let offset = 0;
   let result = null;
+
+  console.log('[Cloudinary Chunked] START', { preset: CLOUDINARY_PRESET, cloud: CLOUDINARY_CLOUD, resourceType, fileSize: total, fileName: file.name, fileType: file.type });
 
   while (offset < total) {
     const end = Math.min(offset + CHUNK, total);
@@ -210,7 +212,20 @@ async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
         body: formData
       }
     );
-    if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'chunk upload failed'); }
+    if (!res.ok) {
+      let errBody = {};
+      try { errBody = await res.json(); } catch(_) {}
+      console.error('[Cloudinary Chunked] Detail Error:', {
+        status: res.status,
+        statusText: res.statusText,
+        preset: CLOUDINARY_PRESET,
+        cloud: CLOUDINARY_CLOUD,
+        resourceType,
+        chunkRange: `${offset}-${end - 1}/${total}`,
+        response: errBody
+      });
+      throw new Error(errBody.error?.message || `chunk upload failed (HTTP ${res.status})`);
+    }
     const data = await res.json();
     if (data.public_id || data.secure_url) result = data;
     offset = end;
@@ -223,6 +238,8 @@ async function uploadToCloudinary(file, retries = 3, onProgress) {
   const resourceType = (file.type || '').startsWith('video') ? 'video' : 'auto';
   const isVideo = resourceType === 'video';
   const CHUNK_THRESHOLD = 20 * 1024 * 1024;
+
+  console.log('[Cloudinary] START', { preset: CLOUDINARY_PRESET, cloud: CLOUDINARY_CLOUD, resourceType, fileSize: file.size, fileName: file.name, fileType: file.type, chunked: isVideo && file.size > CHUNK_THRESHOLD });
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -247,22 +264,39 @@ async function uploadToCloudinary(file, retries = 3, onProgress) {
           xhr.addEventListener('load', () => {
             try {
               const result = JSON.parse(xhr.responseText);
-              if (xhr.status >= 400) reject(new Error(result.error?.message || 'Cloudinary upload failed'));
-              else resolve(result);
+              if (xhr.status >= 400) {
+                console.error('[Cloudinary] Detail Error:', {
+                  status: xhr.status,
+                  preset: CLOUDINARY_PRESET,
+                  cloud: CLOUDINARY_CLOUD,
+                  resourceType,
+                  fileName: file.name,
+                  fileType: file.type,
+                  fileSize: file.size,
+                  response: result
+                });
+                reject(new Error(result.error?.message || `Cloudinary upload failed (HTTP ${xhr.status})`));
+              } else {
+                console.log('[Cloudinary] SUCCESS', { public_id: result.public_id, secure_url: result.secure_url });
+                resolve(result);
+              }
             } catch(e) { reject(e); }
           });
-          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('error', () => {
+            console.error('[Cloudinary] Network error (XHR)');
+            reject(new Error('Network error'));
+          });
           xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
           xhr.send(formData);
         });
       }
 
-      // للفيديو: رابط التحويل المباشر (on-demand، يُولَّد عند أول مشاهدة ويُخزَّن في CDN)
       if (isVideo && data && data.public_id) {
         return _cloudinaryVideoUrl(data.public_id);
       }
       return data.secure_url;
     } catch(e) {
+      console.error(`[Cloudinary] Attempt ${attempt} failed:`, e.message);
       if (attempt === retries) throw e;
       toast(`⏳ إعادة المحاولة ${attempt}...`);
       await new Promise(r => setTimeout(r, 2000 * attempt));
