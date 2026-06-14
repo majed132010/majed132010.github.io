@@ -102,6 +102,7 @@ function openDM(uid, name) {
     const _r = _dmListener.mainRef || null;
     if (_r) _r.off('child_added', _dmListener.fn);
     else db.ref(_dmListener.path).off('child_added', _dmListener.fn);
+    if (_dmListener.changeFn) db.ref(_dmListener.path).off('child_changed', _dmListener.changeFn);
     _dmListener = null;
   }
   if (_dmTypingListener) { db.ref(_dmTypingListener).off('value'); _dmTypingListener = null; }
@@ -125,9 +126,54 @@ function openDM(uid, name) {
     }
   };
 
+  // child_changed: يستقبل تحديثات تقدم الرفع وإبدال الشريط بالميديا عند الاكتمال
+  const changeFn = snap => {
+    const msg = snap.val();
+    if (!msg) return;
+    const el = dmArea.querySelector(`[data-key="${snap.key}"]`);
+    if (!el) return;
+    const body = el.querySelector('.msg-body');
+    if (!body) return;
+    const progWrap = body.querySelector('.msg-uploading-wrap');
+    if (progWrap) {
+      if (msg.uploading) {
+        const pct = msg.uploadProgress || 0;
+        const textEl = progWrap.querySelector('.msg-upload-text');
+        const fillEl = progWrap.querySelector('.msg-upload-fill');
+        if (textEl) textEl.textContent = `⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%`;
+        if (fillEl) fillEl.style.width = pct + '%';
+      } else if (!msg.uploading && msg.mediaUrl) {
+        progWrap.remove();
+        const mediaWrap = document.createElement('div');
+        mediaWrap.className = 'msg-media-wrap';
+        if (msg.mediaType === 'video') {
+          const vid = document.createElement('video');
+          vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
+          vid.className = 'msg-media-vid';
+          vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl, 'video', msg.mediaName); });
+          mediaWrap.appendChild(vid);
+        } else {
+          const img = document.createElement('img');
+          img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+          img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
+          loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+          mediaWrap.appendChild(img);
+        }
+        body.appendChild(mediaWrap);
+        requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
+      } else if (!msg.uploading && msg.uploadFailed) {
+        const textEl = progWrap.querySelector('.msg-upload-text');
+        const fillEl = progWrap.querySelector('.msg-upload-fill');
+        if (textEl) textEl.textContent = '❌ فشل الرفع';
+        if (fillEl) { fillEl.style.background = '#e74c3c'; fillEl.style.width = '100%'; }
+      }
+    }
+  };
+
   const dmRef = db.ref(path).limitToLast(40);
   dmRef.on('child_added', fn);
-  _dmListener = { path, mainRef: dmRef, fn };
+  db.ref(path).on('child_changed', changeFn);
+  _dmListener = { path, mainRef: dmRef, fn, changeFn };
 
   dmRef.once('value', () => {
     _dmInitialDone = true;
@@ -159,6 +205,17 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(quote);
   }
   if (msg.text) { const txt=document.createElement('div'); txt.className='msg-content'; txt.textContent=msg.text; body.appendChild(txt); }
+  if (msg.uploading && !msg.mediaUrl) {
+    const pct = msg.uploadProgress || 1;
+    const progWrap = document.createElement('div');
+    progWrap.className = 'msg-media-wrap msg-uploading-wrap';
+    progWrap.innerHTML = `<div class="msg-upload-indicator">
+      <div class="msg-upload-icon">${msg.mediaType === 'video' ? '🎥' : '🖼️'}</div>
+      <div class="msg-upload-text">⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%</div>
+      <div class="msg-upload-bar"><div class="msg-upload-fill" style="width:${pct}%"></div></div>
+    </div>`;
+    body.appendChild(progWrap);
+  }
   if (msg.mediaUrl) {
     const wrap = document.createElement('div');
     wrap.className = 'msg-media-wrap';
@@ -225,37 +282,37 @@ async function sendDM() {
   const dmPreview = document.getElementById('dmMediaPreview');
   if (dmPreview) { dmPreview.innerHTML=''; dmPreview.style.display='none'; }
 
-  if (media.length) {
-    toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
-  }
-
   for (const m of media) {
+    const dmMsgPath = 'dm_messages/' + dmId;
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+
+    // 1. إنشاء الرسالة فوراً مع شريط التقدم — يراه الطرفان لحظياً
+    const msgRef = await db.ref(dmMsgPath).push({
+      ...msgBase, text: '', mediaType: m.type, mediaName: m.name,
+      uploading: true, uploadProgress: 1, expiresAt, saved: false
+    });
+    const msgKey = msgRef.key;
+    const updatePct = (pct) => db.ref(dmMsgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
+
     try {
-      let _progressToast = null;
-      const onProgress = m.type === 'video' ? (pct) => {
-        if (!_progressToast) {
-          _progressToast = document.createElement('div');
-          _progressToast.className = 'toast show';
-          _progressToast.style.cssText = 'min-width:160px;text-align:center';
-          document.getElementById('toastContainer')?.appendChild(_progressToast);
-        }
-        _progressToast.textContent = `⏳ رفع الفيديو… ${pct}%`;
-        if (pct >= 100 && _progressToast.parentNode) _progressToast.parentNode.removeChild(_progressToast);
-      } : null;
-      if (!onProgress) toast('⏳ جاري رفع الوسائط...');
-      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, onProgress);
-      if (_progressToast?.parentNode) _progressToast.parentNode.removeChild(_progressToast);
+      const url = await uploadToCloudinary(
+        new File([m.blob], m.name, { type: m.mimeType }), 3, (pct) => updatePct(pct)
+      );
       if (m.localUrl) { URL.revokeObjectURL(m.localUrl); m.localUrl = null; }
-      const expiresAt = Date.now() + 24*60*60*1000;
-      await db.ref('dm_messages/' + dmId).push({ ...msgBase, text:'', mediaUrl:url, mediaType:m.type, mediaName:m.name, expiresAt, saved:false });
-      toast('✅ تم الإرسال');
+
+      // 2. تحديث الرسالة بالرابط النهائي — يطلق child_changed عند الجميع
+      await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+
       setTimeout(async () => {
         try {
-          await sendPushToUser(_currentDmUid, userProfile.displayName||'رسالة خاصة',
-            m.type==='video'?'🎥 فيديو':'🖼️ صورة', { type:'dm', fromUid:currentUser.uid });
+          await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة',
+            m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid });
         } catch(e) {}
       }, 0);
-    } catch(e) { toast('❌ فشل رفع الملف: ' + (e.message || '')); }
+    } catch(e) {
+      db.ref(dmMsgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true }).catch(() => {});
+      toast('❌ فشل رفع الملف: ' + (e.message || ''));
+    }
   }
 
   const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');

@@ -1190,6 +1190,31 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   line-height: 1.4;
 }
 
+/* ════ Upload progress indicator ════ */
+.msg-uploading-wrap { cursor: default; background: none; }
+.msg-upload-indicator {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 28px;
+  background: rgba(0,0,0,0.07);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 14px;
+  min-width: 180px;
+  font-family: Tajawal, sans-serif;
+}
+.msg-upload-icon { font-size: 26px; line-height: 1; }
+.msg-upload-text { font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; }
+.msg-upload-bar  { width: 100%; height: 7px; background: rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; }
+.msg-upload-fill {
+  height: 100%;
+  background: var(--acc);
+  border-radius: 4px;
+  transition: width 0.35s ease;
+  min-width: 4px;
+}
+
 /* Mobile — tighter media constraints so images/videos don't dominate small screens */
 @media (max-width: 768px) {
   .msg-media-wrap { max-width: 180px; }

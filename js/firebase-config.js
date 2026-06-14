@@ -243,16 +243,29 @@ async function uploadToCloudinary(file, retries = 3, onProgress) {
         formData.append('upload_preset', CLOUDINARY_PRESET);
         formData.append('folder', 'awalem');
         if (isVideo) {
-          // Cloudinary يولّد نسخة مضغوطة في الخلفية بعد اكتمال الرفع
           formData.append('eager', 'q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4');
           formData.append('eager_async', 'true');
         }
-        const res = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`,
-          { method: 'POST', body: formData }
-        );
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Cloudinary upload failed'); }
-        data = await res.json();
+        // XHR بدل fetch لدعم upload progress حتى للملفات الصغيرة
+        data = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`);
+          if (onProgress) {
+            xhr.upload.addEventListener('progress', e => {
+              if (e.lengthComputable) onProgress(Math.max(1, Math.round((e.loaded / e.total) * 100)));
+            });
+          }
+          xhr.addEventListener('load', () => {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              if (xhr.status >= 400) reject(new Error(result.error?.message || 'Cloudinary upload failed'));
+              else resolve(result);
+            } catch(e) { reject(e); }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+          xhr.send(formData);
+        });
       }
 
       // للفيديو: نُعيد رابط التحويل المباشر (720p، auto-quality، MP4)

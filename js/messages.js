@@ -68,6 +68,48 @@ function showMessages(sid, cid) {
     if (!el) return;
     const body = el.querySelector('.msg-body');
     if (!body) return;
+
+    // ── تحديث شريط رفع الميديا ──
+    const progWrap = body.querySelector('.msg-uploading-wrap');
+    if (progWrap) {
+      if (msg.uploading) {
+        // تحديث النسبة لحظياً
+        const pct = msg.uploadProgress || 0;
+        const textEl = progWrap.querySelector('.msg-upload-text');
+        const fillEl = progWrap.querySelector('.msg-upload-fill');
+        if (textEl) textEl.textContent = `⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%`;
+        if (fillEl) fillEl.style.width = pct + '%';
+      } else if (!msg.uploading && msg.mediaUrl) {
+        // اكتمل الرفع — استبدل شريط التقدم بالميديا الفعلية
+        progWrap.remove();
+        const mediaWrap = document.createElement('div');
+        mediaWrap.className = 'msg-media-wrap';
+        if (msg.mediaType === 'video') {
+          const vid = document.createElement('video');
+          vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
+          vid.className = 'msg-media-vid';
+          vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl, 'video', msg.mediaName); });
+          mediaWrap.appendChild(vid);
+        } else {
+          const img = document.createElement('img');
+          img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+          img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
+          loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+          mediaWrap.appendChild(img);
+        }
+        body.appendChild(mediaWrap);
+        const a = document.getElementById('messagesArea');
+        if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
+      } else if (!msg.uploading && msg.uploadFailed) {
+        // فشل الرفع
+        const textEl = progWrap.querySelector('.msg-upload-text');
+        const fillEl = progWrap.querySelector('.msg-upload-fill');
+        if (textEl) textEl.textContent = '❌ فشل الرفع';
+        if (fillEl) { fillEl.style.background = '#e74c3c'; fillEl.style.width = '100%'; }
+      }
+    }
+
+    // ── تفاعلات ونص ──
     renderReactions(msg.reactions || null, snap.key, body);
     const a = document.getElementById('messagesArea');
     if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
@@ -208,6 +250,19 @@ function buildMsgDiv(msg, key) {
     const vw = document.createElement('div');
     vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
     body.appendChild(vw);
+  }
+
+  // ── شريط تقدم الرفع (يظهر لكل المستخدمين لحظياً) ──
+  if (msg.uploading && !msg.mediaUrl) {
+    const pct = msg.uploadProgress || 1;
+    const progWrap = document.createElement('div');
+    progWrap.className = 'msg-media-wrap msg-uploading-wrap';
+    progWrap.innerHTML = `<div class="msg-upload-indicator">
+      <div class="msg-upload-icon">${msg.mediaType === 'video' ? '🎥' : '🖼️'}</div>
+      <div class="msg-upload-text">⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%</div>
+      <div class="msg-upload-bar"><div class="msg-upload-fill" style="width:${pct}%"></div></div>
+    </div>`;
+    body.appendChild(progWrap);
   }
 
   if (msg.mediaUrl) {
@@ -439,98 +494,86 @@ async function sendMessage() {
   }
 }
 
-// ════ رفع ملف واحد مع معاينة فورية ════
+// ════ رفع ملف واحد — push فوري في DB ثم تحديث لحظي للنسبة ════
 async function _uploadOneMedia(m, msgBase) {
   const _sid = currentServer, _cid = currentChannel;
-  const area = document.getElementById('messagesArea');
+  const msgPath = 'messages/' + _sid + '/' + _cid;
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
-  // استخدام رابط الـ Blob المُعَدّ مسبقاً وقت الاختيار — لا خطر من فقدان صلاحية الملف
-  const _blobUrl = m.localUrl;
-
-  // حارس طوارئ: يصفّر _sendingMedia بعد 15 ثانية حتماً في حال تعليق شبكي
+  // حارس طوارئ
   const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
 
-  // ── بناء tempDiv وإلحاقه بالمنطقة فوراً ──
-  const tempKey = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-  const tempDiv = document.createElement('div');
-  tempDiv.className = 'msg-group';
-  tempDiv.dataset.key = tempKey;
-  tempDiv.style.opacity = '0.6';
+  // 1. إنشاء الرسالة فوراً في DB مع حالة "جاري الرفع 1%"
+  //    كل المستخدمين يرون الرسالة والشريط فور إنشائها
+  const msgRef = await db.ref(msgPath).push({
+    ...msgBase,
+    text: '',
+    mediaType: m.type,
+    mediaName: m.name,
+    uploading: true,
+    uploadProgress: 1,
+    expiresAt,
+    saved: false
+  });
+  const msgKey = msgRef.key;
 
-  const tempAv = document.createElement('div');
-  tempAv.className = 'msg-av';
-  const myAv = userProfile?.avatar || auth.currentUser?.photoURL || null;
-  if (myAv) {
-    tempAv.innerHTML = `<img src="${myAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
-  } else {
-    tempAv.textContent = (msgBase.name || '?')[0];
-  }
+  const area = document.getElementById('messagesArea');
+  if (area) area.scrollTop = area.scrollHeight;
 
-  const tempBody = document.createElement('div');
-  tempBody.className = 'msg-body';
-  const tempMeta = document.createElement('div');
-  tempMeta.className = 'msg-meta';
-  tempMeta.innerHTML = `<span class="msg-name">${escHtml(msgBase.name || '')}</span><span class="msg-time">${formatTime(msgBase.ts)}</span>`;
-  tempBody.appendChild(tempMeta);
+  // دالة مساعدة: تحدّث النسبة في DB بدون انتظار (fire-and-forget)
+  const updatePct = (pct) => {
+    db.ref(msgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
+  };
 
-  const tempWrap = document.createElement('div');
-  tempWrap.className = 'msg-media-wrap';
-  if (m.type === 'video') {
-    const vid = document.createElement('video');
-    vid.src = _blobUrl; vid.className = 'msg-media-vid';
-    tempWrap.appendChild(vid);
-  } else {
-    const img = document.createElement('img');
-    img.src = _blobUrl; img.className = 'msg-media-img';
-    tempWrap.appendChild(img);
-  }
-
-  const indicator = document.createElement('div');
-  indicator.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;font-family:Tajawal,sans-serif;white-space:nowrap;pointer-events:none';
-  indicator.textContent = '⏳ جاري الرفع...';
-  tempWrap.appendChild(indicator);
-  tempBody.appendChild(tempWrap);
-  tempDiv.appendChild(tempAv);
-  tempDiv.appendChild(tempBody);
-  if (area) { area.appendChild(tempDiv); area.scrollTop = area.scrollHeight; }
-
-  // ── رفع الـ Blob مباشرةً (قُرئ وقت الاختيار — بلا مشاكل صلاحية) ──
   try {
-    const ext = (m.name.split('.').pop() || (m.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-    const storagePath = `media/${_sid}/${_cid}/${Date.now()}.${ext}`;
-    const storageRef = storage.ref(storagePath);
-    const uploadTask = storageRef.put(m.blob, {
-      contentType: m.mimeType || 'application/octet-stream'
-    });
-    uploadTask.on('state_changed', (snap) => {
-      if (snap.totalBytes > 0)
-        indicator.textContent = `⏳ ${Math.round((snap.bytesTransferred / snap.totalBytes) * 100)}%`;
-    });
-    const taskSnap = await uploadTask;
-    const mediaUrl = await taskSnap.ref.getDownloadURL();
+    let mediaUrl;
+
+    if (m.type === 'video') {
+      // فيديو → Cloudinary مع ضغط تلقائي وتقدم حقيقي عبر XHR
+      mediaUrl = await uploadToCloudinary(
+        new File([m.blob], m.name, { type: m.mimeType }),
+        3,
+        (pct) => updatePct(pct)
+      );
+    } else {
+      // صورة → Firebase Storage مع تقدم حقيقي
+      const ext = (m.name.split('.').pop() || 'jpg').toLowerCase();
+      const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
+      const uploadTask = storageRef.put(m.blob, { contentType: m.mimeType || 'application/octet-stream' });
+      await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+          (snap) => { if (snap.totalBytes > 0) updatePct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)); },
+          reject,
+          resolve
+        );
+      });
+      mediaUrl = await uploadTask.snapshot.ref.getDownloadURL();
+    }
 
     if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
-    if (currentServer !== _sid || currentChannel !== _cid) return;
-    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-    await db.ref('messages/' + _sid + '/' + _cid).push({
-      ...msgBase, text: '', mediaUrl, mediaType: m.type, mediaName: m.name, expiresAt, saved: false
+
+    // 2. تحديث نفس الرسالة بالرابط النهائي — يطلق child_changed عند الجميع فوراً
+    await db.ref(msgPath + '/' + msgKey).update({
+      mediaUrl,
+      uploading: false,
+      uploadProgress: null
     });
-    tempDiv.remove();
+
     if (area) area.scrollTop = area.scrollHeight;
+
   } catch(e) {
     window._sendingMedia = false;
+    db.ref(msgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true }).catch(() => {});
     if (e.code === 'storage/unauthorized') {
       toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
-    } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('fetch') || (e.message || '').toLowerCase().includes('network')) {
+    } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('network')) {
       toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
     } else {
       toast('❌ فشل رفع الملف: ' + (e.message || ''));
     }
   } finally {
     clearTimeout(_guardTimer);
-    if (tempDiv.parentNode) tempDiv.remove();
-    URL.revokeObjectURL(_blobUrl);
-    m.localUrl = null;
+    if (m.localUrl) { URL.revokeObjectURL(m.localUrl); m.localUrl = null; }
   }
 }
 
