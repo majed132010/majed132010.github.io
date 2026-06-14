@@ -22,6 +22,21 @@ function _dismissSplash() {
 // (slow network, Firebase initialisation error, blocked by browser, etc.)
 setTimeout(_dismissSplash, 2500);
 
+// ════ رسم لوحة المستخدم السفلى فوراً بمجرد توفّر بيانات Auth ════
+// يُحلّ مشكلة تأخّر ظهور ترس الإعدادات حتى اكتمال listenServers الـ async
+function renderSidebarBottom(user) {
+  // ابنِ userProfile مؤقتاً من بيانات Auth إذا لم يكن محمَّلاً بعد
+  if (!userProfile.displayName) userProfile.displayName = user.displayName || user.email?.split('@')[0] || 'مستخدم';
+  if (!userProfile.avatar)      userProfile.avatar      = user.photoURL || null;
+  updateUserPanel();
+  // أظهر ترس إعدادات السيرفر مباشرةً إن كان لدى المستخدم سيرفر سابق في التخزين المحلي
+  const lastSid = localStorage.getItem('awalem_lastServer');
+  if (lastSid) {
+    const btn = document.getElementById('chSettingsBtn');
+    if (btn) btn.style.display = '';
+  }
+}
+
 auth.onAuthStateChanged(user => {
   _dismissSplash(); // dismiss immediately on auth resolution (fast path)
   if (user) {
@@ -29,6 +44,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('loginScreen').style.display = 'none';
     const app = document.getElementById('app');
     if (app) app.style.display = 'flex';
+    renderSidebarBottom(user); // اعرض الشريط السفلي فوراً قبل أي قراءة من Firebase
     loadUserProfile().then(() => {
       initApp();
       initFCM(user.uid);
