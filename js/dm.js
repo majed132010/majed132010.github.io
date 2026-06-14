@@ -33,30 +33,101 @@ function openDMFromSvBar() {
   else openDMScreen();
 }
 
-// ════ قائمة المحادثات ════
+// ════ شاشة الأعضاء — Grid كامل من users ════
 function renderDmPickerList() {
   const container = document.getElementById('dmPickerList');
-  if (!container) return;
-  container.innerHTML = '';
-  db.ref('dms/' + currentUser.uid).once('value').then(snap => {
-    const dmMap = snap.val() || {};
-    if (!Object.keys(dmMap).length) {
-      container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-family:Tajawal,sans-serif">لا توجد محادثات خاصة بعد<br><br><button onclick="openNewDM()" style="background:var(--acc);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-family:Tajawal,sans-serif;cursor:pointer">ابدأ محادثة</button></div>';
+  if (!container || !currentUser) return;
+
+  db.ref('users').once('value').then(snap => {
+    const allUsers = snap.val() || {};
+    container.innerHTML = '';
+
+    const entries = Object.entries(allUsers).filter(([uid]) => uid !== currentUser.uid);
+    if (!entries.length) {
+      container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif;font-size:14px">لا يوجد أعضاء آخرون بعد</div>';
       return;
     }
-    Object.entries(dmMap).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).forEach(([uid,info]) => {
-      const name = info.name || 'مستخدم';
+
+    const grid = document.createElement('div');
+    grid.id = 'dmPickerGrid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:8px 4px 16px';
+
+    entries.forEach(([uid, data]) => {
+      const name = data.displayName || data.name || 'عضو';
       const unread = _dmUnread[uid] || 0;
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:rgba(0,0,0,0.04);-webkit-tap-highlight-color:transparent';
-      row.innerHTML = `
-        <div style="width:40px;height:40px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0">${name[0]}</div>
-        <div style="flex:1;min-width:0"><div style="font-family:Tajawal,sans-serif;font-weight:700;color:var(--text)">${escHtml(name)}</div></div>
-        ${unread>0?`<div style="background:#ed4245;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${unread}</div>`:''}
-      `;
-      row.addEventListener('click', () => openDM(uid, name));
-      container.appendChild(row);
+
+      const card = document.createElement('div');
+      card.dataset.dmUid = uid;
+      card.style.cssText = [
+        'position:relative;display:flex;flex-direction:column;align-items:center;gap:10px',
+        'padding:18px 10px 14px',
+        'border-radius:18px',
+        'background:rgba(0,0,0,0.03)',
+        'border:1.5px solid rgba(0,0,0,0.07)',
+        'cursor:pointer',
+        'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease,border-color 0.15s ease',
+        '-webkit-tap-highlight-color:transparent',
+        'user-select:none'
+      ].join(';');
+
+      // ── Avatar ──
+      const av = document.createElement('div');
+      av.style.cssText = 'position:relative;width:72px;height:72px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;overflow:visible;box-shadow:0 4px 14px rgba(0,0,0,0.18);flex-shrink:0';
+      const avInner = document.createElement('div');
+      avInner.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;background:var(--acc)';
+      if (data.avatar) {
+        avInner.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      } else {
+        avInner.textContent = (name[0] || '?').toUpperCase();
+      }
+      av.appendChild(avInner);
+
+      // ── Unread badge ──
+      if (unread > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'dm-picker-badge';
+        badge.style.cssText = 'position:absolute;top:-3px;right:-3px;background:#ed4245;color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:Tajawal,sans-serif;padding:0 4px;border:2px solid #fff;z-index:2';
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        av.appendChild(badge);
+      }
+
+      // ── Name ──
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;max-width:100%';
+      nameEl.textContent = name;
+
+      card.appendChild(av);
+      card.appendChild(nameEl);
+
+      // ── Interactions ──
+      card.addEventListener('mouseenter', () => {
+        card.style.background = 'rgba(26,95,95,0.07)';
+        card.style.borderColor = 'var(--acc)';
+        card.style.transform = 'translateY(-3px)';
+        card.style.boxShadow = '0 8px 22px rgba(0,0,0,0.12)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.background = 'rgba(0,0,0,0.03)';
+        card.style.borderColor = 'rgba(0,0,0,0.07)';
+        card.style.transform = '';
+        card.style.boxShadow = '';
+      });
+      card.addEventListener('touchstart', () => {
+        card.style.background = 'rgba(26,95,95,0.1)';
+        card.style.transform = 'scale(0.96)';
+      }, {passive:true});
+      card.addEventListener('touchend', () => {
+        card.style.background = 'rgba(0,0,0,0.03)';
+        card.style.transform = '';
+      }, {passive:true});
+      card.addEventListener('click', () => openDM(uid, name));
+
+      grid.appendChild(card);
     });
+
+    container.appendChild(grid);
+  }).catch(() => {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif">❌ تعذّر تحميل الأعضاء</div>';
   });
 }
 
@@ -462,9 +533,27 @@ function stopDmTyping() {
 }
 
 // ════ Badge وعداد غير المقروء ════
+function _refreshPickerBadge(uid) {
+  const card = document.querySelector(`#dmPickerGrid [data-dm-uid="${uid}"]`);
+  if (!card) return;
+  const av = card.querySelector('div[style*="position:relative"]');
+  if (!av) return;
+  const existing = av.querySelector('.dm-picker-badge');
+  if (existing) existing.remove();
+  const count = _dmUnread[uid] || 0;
+  if (count > 0) {
+    const badge = document.createElement('div');
+    badge.className = 'dm-picker-badge';
+    badge.style.cssText = 'position:absolute;top:-3px;right:-3px;background:#ed4245;color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:Tajawal,sans-serif;padding:0 4px;border:2px solid #fff;z-index:2';
+    badge.textContent = count > 99 ? '99+' : String(count);
+    av.appendChild(badge);
+  }
+}
+
 function clearDmUnread(uid) {
   _dmUnread[uid]=0;
   updateDmBadge();
+  _refreshPickerBadge(uid);
   renderDmList();
 }
 
@@ -545,6 +634,7 @@ function _addDmListener(uid) {
       if (_currentDmUid === uid) return;
       _dmUnread[uid] = (_dmUnread[uid]||0) + 1;
       updateDmBadge();
+      _refreshPickerBadge(uid);
       showDmNotif(msg, uid);
     };
     q.on('child_added', fn);
