@@ -186,7 +186,7 @@ function _cloudinaryVideoUrl(publicId) {
 
 // رفع مجزَّأ (chunks) للفيديوهات الكبيرة — يتجنب انقطاع الاتصال على الشبكات البطيئة
 async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
-  const CHUNK = 6 * 1024 * 1024; // 6MB لكل قطعة
+  const CHUNK = 6 * 1024 * 1024;
   const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const total = file.size;
   let offset = 0;
@@ -199,11 +199,6 @@ async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
     formData.append('file', chunk);
     formData.append('upload_preset', CLOUDINARY_PRESET);
     formData.append('folder', 'awalem');
-    // نطلب التحويل المتزامن في الجزء الأخير فقط
-    if (end === total) {
-      formData.append('eager', 'q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4');
-      formData.append('eager_async', 'true');
-    }
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`,
       {
@@ -225,28 +220,22 @@ async function _cloudinaryChunkedUpload(file, resourceType, onProgress) {
 }
 
 async function uploadToCloudinary(file, retries = 3, onProgress) {
-  // Cloudinary يتطلب المسار /video/upload لمقاطع الفيديو، وإلا يفشل أو يعلق الرفع.
   const resourceType = (file.type || '').startsWith('video') ? 'video' : 'auto';
   const isVideo = resourceType === 'video';
-  const CHUNK_THRESHOLD = 20 * 1024 * 1024; // فيديو > 20MB يُرفع مجزَّأً
+  const CHUNK_THRESHOLD = 20 * 1024 * 1024;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       let data;
 
       if (isVideo && file.size > CHUNK_THRESHOLD) {
-        // رفع مجزَّأ للفيديوهات الكبيرة
         data = await _cloudinaryChunkedUpload(file, resourceType, onProgress);
       } else {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', CLOUDINARY_PRESET);
         formData.append('folder', 'awalem');
-        if (isVideo) {
-          formData.append('eager', 'q_auto:low,vc_auto,w_1280,h_720,c_limit,f_mp4');
-          formData.append('eager_async', 'true');
-        }
-        // XHR بدل fetch لدعم upload progress حتى للملفات الصغيرة
+        // XHR لدعم upload progress الحقيقي
         data = await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`);
@@ -268,8 +257,7 @@ async function uploadToCloudinary(file, retries = 3, onProgress) {
         });
       }
 
-      // للفيديو: نُعيد رابط التحويل المباشر (720p، auto-quality، MP4)
-      // Cloudinary يولّده عند أول طلب ويخزّنه في CDN بعدها
+      // للفيديو: رابط التحويل المباشر (on-demand، يُولَّد عند أول مشاهدة ويُخزَّن في CDN)
       if (isVideo && data && data.public_id) {
         return _cloudinaryVideoUrl(data.public_id);
       }
