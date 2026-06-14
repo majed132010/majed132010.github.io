@@ -471,6 +471,17 @@ function openServerSettings() {
   openModal('serverSettingsModal');
 }
 
+// ════ زر الترس — يفتح لوحة الأدمن للمالك/الأدمن، وملف المستخدم للأعضاء العاديين ════
+function openSettingsForRole() {
+  if (currentServer && servers[currentServer] && currentUser) {
+    const sv = servers[currentServer];
+    const isOwner = sv.ownerId === currentUser.uid || sv.members?.[currentUser.uid]?.role === 'owner';
+    const isAdmin = isOwner || sv.members?.[currentUser.uid]?.role === 'admin';
+    if (isAdmin) { openServerSettings(); return; }
+  }
+  openEditProfile();
+}
+
 function openInvite() {
   const sv = servers[currentServer];
   if (!sv) return;
