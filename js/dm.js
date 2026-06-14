@@ -33,27 +33,53 @@ function openDMFromSvBar() {
   else openDMScreen();
 }
 
-// ════ شاشة الأعضاء — Grid كامل من users ════
+// ════ شاشة الأعضاء — Grid أعضاء السيرفر الحالي فقط ════
 function renderDmPickerList() {
   const container = document.getElementById('dmPickerList');
   if (!container || !currentUser) return;
 
-  db.ref('users').once('value').then(snap => {
-    const allUsers = snap.val() || {};
-    container.innerHTML = '';
+  // اجمع أعضاء السيرفر الحالي — إن لم يُختر سيرفر خذ كل السيرفرات المشترك بها
+  const svMembers = {};
+  if (currentServer && servers[currentServer]?.members) {
+    Object.entries(servers[currentServer].members).forEach(([uid, m]) => {
+      if (uid !== currentUser.uid) svMembers[uid] = m;
+    });
+  } else {
+    Object.values(servers || {}).forEach(sv => {
+      Object.entries(sv.members || {}).forEach(([uid, m]) => {
+        if (uid !== currentUser.uid) svMembers[uid] = m;
+      });
+    });
+  }
 
-    const entries = Object.entries(allUsers).filter(([uid]) => uid !== currentUser.uid);
-    if (!entries.length) {
-      container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif;font-size:14px">لا يوجد أعضاء آخرون بعد</div>';
-      return;
-    }
+  const memberUids = Object.keys(svMembers);
+  container.innerHTML = '';
 
+  if (!memberUids.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif;font-size:14px">لا يوجد أعضاء آخرون في هذا العالم</div>';
+    return;
+  }
+
+  // جلب بروفايلات حديثة من users لضمان اسم وصورة محدّثة
+  // يدمج بيانات العضو (الاحتياطية) مع بيانات المستخدم الحية
+  Promise.all(
+    memberUids.map(uid =>
+      db.ref('users/' + uid).once('value').then(s => {
+        const live = s.val() || {};
+        const member = svMembers[uid] || {};
+        return {
+          uid,
+          name:   live.displayName || member.name || 'عضو',
+          avatar: live.avatar      || member.avatar || null
+        };
+      })
+    )
+  ).then(list => {
     const grid = document.createElement('div');
     grid.id = 'dmPickerGrid';
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:8px 4px 16px';
 
-    entries.forEach(([uid, data]) => {
-      const name = data.displayName || data.name || 'عضو';
+    list.forEach(({ uid, name, avatar }) => {
       const unread = _dmUnread[uid] || 0;
 
       const card = document.createElement('div');
@@ -70,19 +96,19 @@ function renderDmPickerList() {
         'user-select:none'
       ].join(';');
 
-      // ── Avatar ──
+      // ── Avatar wrapper (overflow:visible للـ badge) ──
       const av = document.createElement('div');
-      av.style.cssText = 'position:relative;width:72px;height:72px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;overflow:visible;box-shadow:0 4px 14px rgba(0,0,0,0.18);flex-shrink:0';
+      av.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
+
       const avInner = document.createElement('div');
-      avInner.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;background:var(--acc)';
-      if (data.avatar) {
-        avInner.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      avInner.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,0.18)';
+      if (avatar) {
+        avInner.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
       } else {
         avInner.textContent = (name[0] || '?').toUpperCase();
       }
       av.appendChild(avInner);
 
-      // ── Unread badge ──
       if (unread > 0) {
         const badge = document.createElement('div');
         badge.className = 'dm-picker-badge';
@@ -91,7 +117,6 @@ function renderDmPickerList() {
         av.appendChild(badge);
       }
 
-      // ── Name ──
       const nameEl = document.createElement('div');
       nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;max-width:100%';
       nameEl.textContent = name;
@@ -99,27 +124,10 @@ function renderDmPickerList() {
       card.appendChild(av);
       card.appendChild(nameEl);
 
-      // ── Interactions ──
-      card.addEventListener('mouseenter', () => {
-        card.style.background = 'rgba(26,95,95,0.07)';
-        card.style.borderColor = 'var(--acc)';
-        card.style.transform = 'translateY(-3px)';
-        card.style.boxShadow = '0 8px 22px rgba(0,0,0,0.12)';
-      });
-      card.addEventListener('mouseleave', () => {
-        card.style.background = 'rgba(0,0,0,0.03)';
-        card.style.borderColor = 'rgba(0,0,0,0.07)';
-        card.style.transform = '';
-        card.style.boxShadow = '';
-      });
-      card.addEventListener('touchstart', () => {
-        card.style.background = 'rgba(26,95,95,0.1)';
-        card.style.transform = 'scale(0.96)';
-      }, {passive:true});
-      card.addEventListener('touchend', () => {
-        card.style.background = 'rgba(0,0,0,0.03)';
-        card.style.transform = '';
-      }, {passive:true});
+      card.addEventListener('mouseenter', () => { card.style.background='rgba(26,95,95,0.07)'; card.style.borderColor='var(--acc)'; card.style.transform='translateY(-3px)'; card.style.boxShadow='0 8px 22px rgba(0,0,0,0.12)'; });
+      card.addEventListener('mouseleave', () => { card.style.background='rgba(0,0,0,0.03)'; card.style.borderColor='rgba(0,0,0,0.07)'; card.style.transform=''; card.style.boxShadow=''; });
+      card.addEventListener('touchstart', () => { card.style.background='rgba(26,95,95,0.1)'; card.style.transform='scale(0.96)'; }, {passive:true});
+      card.addEventListener('touchend',   () => { card.style.background='rgba(0,0,0,0.03)'; card.style.transform=''; }, {passive:true});
       card.addEventListener('click', () => openDM(uid, name));
 
       grid.appendChild(card);
