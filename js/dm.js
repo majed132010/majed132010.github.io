@@ -609,31 +609,10 @@ function listenDMs() {
       _addDmListener(uid);
     });
   });
-  const notifRef = db.ref('notifications/'+currentUser.uid);
-  notifRef.off('child_added');
-  notifRef.on('child_added', snap => {
-    const notif = snap.val();
-    if (!notif) return;
-    if (Date.now() - notif.ts > 15000) return;
-    if (notif.from === currentUser.uid) return;
-    if (notif.data?.type === 'dm' && notif.data?.fromUid) {
-      const fromUid = notif.data.fromUid;
-      // isNew = true يعني لا يوجد مستمع بعد → _addDmListener سيُهيَّأ الآن
-      // وسيتجاهل الرسالة الأولى (initialized=false) لذا نعدّها هنا
-      const isNew = !_dmGlobalListeners[fromUid];
-      _addDmListener(fromUid);
-      if (_currentDmUid !== fromUid) {
-        if (isNew) {
-          // الرسالة الأولى من هذا المستخدم — _addDmListener لن يلتقطها
-          _dmUnread[fromUid] = (_dmUnread[fromUid]||0) + 1;
-          updateDmBadge();
-        }
-        // الرسائل اللاحقة يعدّها _addDmListener مباشرة عبر child_added
-        showDmNotif({ name: notif.title || 'رسالة خاصة', text: notif.body || '' }, fromUid);
-      }
-    }
-    db.ref('notifications/'+currentUser.uid+'/'+snap.key).remove();
-  });
+  // ✅ إصلاح المشكلة 1: إزالة المستمع المزدوج على notifications —
+  // notifications.js/listenNotifications() يتولى معالجة كل الإشعارات.
+  // وجود مستمعين على نفس المسار كان السبب الجذري لتكرار الإشعارات × 5
+  // وتضاعف عدادات الـ DM عند إرسال رسالة واحدة.
 }
 
 function _addDmListener(uid) {
@@ -642,7 +621,7 @@ function _addDmListener(uid) {
     const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
     try { oldQ.off('child_added', oldFn); } catch(e) {}
     delete _dmGlobalListeners[uid];
-    return; // المستمع كان قائماً وسليماً — فُكّ ربطه ولا داعي لإعادة التسجيل
+    // لا return هنا — نكمل لإعادة التسجيل بمستمع جديد نظيف
   }
   const dmId = getDmId(currentUser.uid, uid);
   const path = 'dm_messages/' + dmId;
