@@ -29,12 +29,6 @@ function renderSidebarBottom(user) {
   if (!userProfile.displayName) userProfile.displayName = user.displayName || user.email?.split('@')[0] || 'مستخدم';
   if (!userProfile.avatar)      userProfile.avatar      = user.photoURL || null;
   updateUserPanel();
-  // أظهر ترس إعدادات السيرفر مباشرةً إن كان لدى المستخدم سيرفر سابق في التخزين المحلي
-  const lastSid = localStorage.getItem('awalem_lastServer');
-  if (lastSid) {
-    const btn = document.getElementById('chSettingsBtn');
-    if (btn) btn.style.display = '';
-  }
 }
 
 auth.onAuthStateChanged(user => {

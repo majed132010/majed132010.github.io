@@ -15,7 +15,6 @@ function openDMScreen() {
   closeSidebar();
   if (currentServer) _lastServerId = currentServer; // احفظ قبل التصفير لعرض أعضاء السيرفر الصحيح
   currentServer = null; currentChannel = null; _currentDmUid = null;
-  document.getElementById('chSettingsBtn').style.display = 'none';
   document.getElementById('mhIcon').textContent = '💬';
   document.getElementById('mhName').textContent = 'الرسائل الخاصة';
   document.getElementById('searchToggleBtn').style.display = 'none';
@@ -598,7 +597,6 @@ function renderDmConvList(container) {
 // ════ استماع للرسائل الخاصة الجديدة عالمياً ════
 function listenDMs() {
   if (!currentUser) return;
-  // .off() إجباري قبل أي .on() جديد لقطع تكرار المستمعات عند إعادة التهيئة
   const dmsRef = db.ref('dms/'+currentUser.uid);
   dmsRef.off('value');
   dmsRef.on('value', snap => {
@@ -606,13 +604,11 @@ function listenDMs() {
     if (!snap.exists()) return;
     snap.forEach(ch => {
       const uid = ch.key;
-      _addDmListener(uid);
+      // لا تُعيد تسجيل المستمع إن كان موجوداً — إعادة التسجيل تُعيد initialized=false
+      // وتفتح نافذة يمكن خلالها لرسائل جديدة المرور دون إشعار أو بإشعار مزدوج
+      if (!_dmGlobalListeners[uid]) _addDmListener(uid);
     });
   });
-  // ✅ إصلاح المشكلة 1: إزالة المستمع المزدوج على notifications —
-  // notifications.js/listenNotifications() يتولى معالجة كل الإشعارات.
-  // وجود مستمعين على نفس المسار كان السبب الجذري لتكرار الإشعارات × 5
-  // وتضاعف عدادات الـ DM عند إرسال رسالة واحدة.
 }
 
 function _addDmListener(uid) {

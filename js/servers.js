@@ -260,7 +260,6 @@ function selectServer(sid) {
     }
     showView('home');
   }
-  document.getElementById('chSettingsBtn').style.display = '';
 }
 
 // ════ القائمة الرئيسية ════
@@ -279,7 +278,6 @@ function showHome() {
   window.currentServerId = null; window.currentChannelId = null;
   renderServerList();
   document.getElementById('chServerName').textContent = 'الرئيسية';
-  document.getElementById('chSettingsBtn').style.display = 'none';
   document.getElementById('channelList').innerHTML = '';
   document.getElementById('mhName').textContent = 'الرئيسية';
   document.getElementById('mhIcon').textContent = '🏠';
@@ -863,7 +861,6 @@ function restoreLastServer() {
   if (lastSid && servers[lastSid]) {
     currentServer = lastSid;
     renderServerList(); renderChannels(lastSid);
-    document.getElementById('chSettingsBtn').style.display = '';
     if (lastCid && servers[lastSid].channels?.[lastCid]) {
       selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
       if (isMobile()) setTimeout(() => openDrawer(), 100);
@@ -878,7 +875,6 @@ function restoreLastServer() {
     if (svKeys.length > 0) {
       const sid = svKeys[0]; currentServer = sid;
       renderServerList(); renderChannels(sid);
-      document.getElementById('chSettingsBtn').style.display = '';
       const chs = Object.entries(servers[sid].channels||{}).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
       const first = chs.find(([,ch])=>ch.type!=='voice');
       if (first) selectChannel(sid, first[0], first[1]);
