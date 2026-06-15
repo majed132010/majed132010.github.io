@@ -129,6 +129,16 @@ function listenIncomingCalls() {
     console.log('[CALL] 📥 حدث على مسار المكالمات الواردة:', call);
     if (!call) {
       console.log('[CALL] … لا توجد مكالمة واردة (تم المسح أو فارغ)');
+      // ✅ إصلاح: إذا كنا في شاشة الاستقبال وجاء null → أنهِ المكالمة فقط إذا لم يقبلها بعد
+      // null يأتي عندما يمسح المتصل الـ incoming (إلغاء) أو انتهت المهلة
+      if (_currentCall && _currentCall.role === 'callee') {
+        const elapsed = Date.now() - (_currentCall.ts || 0);
+        // تجاهل null الأول الذي يأتي فور التسجيل (أقل من 3 ثوانٍ من بدء المكالمة)
+        if (elapsed > 3000) {
+          console.log('[CALL] 📴 المتصل ألغى أو انتهت المهلة — إنهاء');
+          endCall('silent');
+        }
+      }
       return;
     }
     if (Date.now() - call.ts > 45000) {
@@ -260,12 +270,24 @@ async function endCall(reason = 'ended') {
     }
   }
 
-  // نظّف عقدة المكالمة الخاصة بنا في Firebase
-  if (currentUser) {
+  // ✅ إصلاح جذري: لا نمسح calls/{uid} كاملاً — نمسح فقط العقد التي كتبناها نحن
+  // مسح calls/{uid} كاملاً كان يمسح incoming الخاص بالطرف الآخر فيُخفي شاشته فوراً
+  if (currentUser && _currentCall) {
+    const { role, toUid, fromUid } = _currentCall;
     try {
-      await db.ref('calls/' + currentUser.uid).remove();
-      console.log('[CALL] ✓ حذفت calls/' + currentUser.uid);
-    } catch(e) { console.error('[CALL] ✖ فشل حذف عقدة المكالمة:', e.code, e.message); }
+      if (role === 'caller') {
+        // المتصل: يمسح response (الرد الذي كتبه المستقبل) وend الخاص به
+        await db.ref('calls/' + currentUser.uid + '/response').remove();
+        await db.ref('calls/' + currentUser.uid + '/end').remove();
+        // يمسح incoming الخاص بالمستقبل (الذي كتبه المتصل)
+        await db.ref('calls/' + toUid + '/incoming').remove();
+      } else {
+        // المستقبل: يمسح incoming الخاص به وresponse الذي كتبه
+        await db.ref('calls/' + currentUser.uid + '/incoming').remove();
+        await db.ref('calls/' + fromUid + '/response').remove();
+      }
+      console.log('[CALL] ✓ نظّفت عقد المكالمة بدقة');
+    } catch(e) { console.error('[CALL] ✖ فشل تنظيف عقد المكالمة:', e.code, e.message); }
   }
 
   // 🆕 نظّف سرّ الرفض الخاص بهذه المكالمة
