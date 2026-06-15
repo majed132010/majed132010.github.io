@@ -86,15 +86,17 @@ async function startCall(toUid, toName, type = 'audio') {
     endCall('no_answer');
   }, 45000);
 
-  // استمع لرد المتصل به
+  // ✅ إصلاح: امسح أي رد قديم قبل الاستماع — البيانات القديمة تُحرّك المستمع بـ null أو callId مختلف
   const responsePath = 'calls/' + currentUser.uid + '/response';
+  await db.ref(responsePath).remove().catch(() => {});
   console.log('[CALL] 👂 الاستماع لرد الطرف الآخر على →', responsePath);
   _callResponseRef = db.ref(responsePath);
   _callResponseRef.on('value', async snap => {
     const resp = snap.val();
     console.log('[CALL] 📥 وصل حدث على مسار الرد:', resp);
-    if (!resp || resp.callId !== callId) {
-      console.log('[CALL] … تجاهل الرد (فارغ أو callId غير مطابق)', { got: resp?.callId, expected: callId });
+    if (!resp) return; // تجاهل الحدث الفارغ الأول بعد المسح
+    if (resp.callId !== callId) {
+      console.log('[CALL] … تجاهل الرد (callId غير مطابق)', { got: resp?.callId, expected: callId });
       return;
     }
     _callResponseRef?.off('value'); _callResponseRef = null;
