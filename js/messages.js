@@ -82,22 +82,18 @@ function showMessages(sid, cid) {
       } else if (!msg.uploading && msg.mediaUrl) {
         // اكتمل الرفع — استبدل شريط التقدم بالميديا الفعلية
         progWrap.remove();
-        const mediaWrap = document.createElement('div');
-        mediaWrap.className = 'msg-media-wrap';
         if (msg.mediaType === 'video') {
-          const vid = document.createElement('video');
-          vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
-          vid.className = 'msg-media-vid';
-          vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl, 'video', msg.mediaName); });
-          mediaWrap.appendChild(vid);
+          body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
         } else {
+          const mediaWrap = document.createElement('div');
+          mediaWrap.className = 'msg-media-wrap';
           const img = document.createElement('img');
           img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
           img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
           loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
           mediaWrap.appendChild(img);
+          body.appendChild(mediaWrap);
         }
-        body.appendChild(mediaWrap);
         const a = document.getElementById('messagesArea');
         if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
@@ -273,14 +269,7 @@ function buildMsgDiv(msg, key) {
       expDiv.textContent = '🕐 انتهت صلاحية هذه الصورة';
       body.appendChild(expDiv);
     } else if (msg.mediaType === 'video') {
-      const mediaWrap = document.createElement('div');
-      mediaWrap.className = 'msg-media-wrap';
-      const vid = document.createElement('video');
-      vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
-      vid.className = 'msg-media-vid';
-      vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
-      mediaWrap.appendChild(vid);
-      body.appendChild(mediaWrap);
+      body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
       const mediaWrap = document.createElement('div');
       mediaWrap.className = 'msg-media-wrap';

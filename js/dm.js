@@ -222,22 +222,18 @@ function openDM(uid, name) {
         if (fillEl) fillEl.style.width = pct + '%';
       } else if (!msg.uploading && msg.mediaUrl) {
         progWrap.remove();
-        const mediaWrap = document.createElement('div');
-        mediaWrap.className = 'msg-media-wrap';
         if (msg.mediaType === 'video') {
-          const vid = document.createElement('video');
-          vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
-          vid.className = 'msg-media-vid';
-          vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl, 'video', msg.mediaName); });
-          mediaWrap.appendChild(vid);
+          body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
         } else {
+          const mediaWrap = document.createElement('div');
+          mediaWrap.className = 'msg-media-wrap';
           const img = document.createElement('img');
           img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
           img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
           loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
           mediaWrap.appendChild(img);
+          body.appendChild(mediaWrap);
         }
-        body.appendChild(mediaWrap);
         requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
         const textEl = progWrap.querySelector('.msg-upload-text');
@@ -295,15 +291,11 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(progWrap);
   }
   if (msg.mediaUrl) {
-    const wrap = document.createElement('div');
-    wrap.className = 'msg-media-wrap';
     if (msg.mediaType === 'video') {
-      const vid = document.createElement('video');
-      vid.src = msg.mediaUrl; vid.controls = true; vid.preload = 'metadata';
-      vid.className = 'msg-media-vid';
-      vid.addEventListener('click', e => { e.preventDefault(); openLightbox(msg.mediaUrl,'video',msg.mediaName); });
-      wrap.appendChild(vid);
+      body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
       const img = document.createElement('img');
       img.loading = 'lazy'; img.decoding = 'async';
       img.className = 'msg-media-img';
@@ -311,8 +303,8 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
       img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
       loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
       wrap.appendChild(img);
+      body.appendChild(wrap);
     }
-    body.appendChild(wrap);
   }
   if (msg.voiceUrl) { const vw=document.createElement('div'); vw.style.cssText='margin-top:4px'; vw.appendChild(buildVoiceMsg(msg.voiceUrl,msg.voiceDuration)); body.appendChild(vw); }
 

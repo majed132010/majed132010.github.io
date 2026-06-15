@@ -96,10 +96,11 @@ function generateAdminCode() {
   return code;
 }
 
-// ════ IMAGE CACHE (IndexedDB) ════
+// ════ MEDIA CACHE (IndexedDB) — صور + فيديوهات ════
 const _imgCacheDB = (() => {
   let db = null;
-  const DB_NAME = 'awalem_img_cache', DB_VER = 1, STORE = 'images';
+  const DB_NAME = 'awalem_img_cache', DB_VER = 2, STORE = 'images';
+  const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
 
   function open() {
     return new Promise((res, rej) => {
@@ -107,7 +108,15 @@ const _imgCacheDB = (() => {
       const req = indexedDB.open(DB_NAME, DB_VER);
       req.onupgradeneeded = e => {
         const d = e.target.result;
-        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'url' });
+        let store;
+        if (!d.objectStoreNames.contains(STORE)) {
+          store = d.createObjectStore(STORE, { keyPath: 'url' });
+        } else {
+          store = e.target.transaction.objectStore(STORE);
+        }
+        if (!store.indexNames.contains('cachedAt')) {
+          store.createIndex('cachedAt', 'cachedAt', { unique: false });
+        }
       };
       req.onsuccess = e => { db = e.target.result; res(db); };
       req.onerror = () => rej(req.error);
@@ -117,7 +126,7 @@ const _imgCacheDB = (() => {
   async function get(url) {
     try {
       const d = await open();
-      return new Promise((res) => {
+      return new Promise(res => {
         const tx = d.transaction(STORE, 'readonly');
         const req = tx.objectStore(STORE).get(url);
         req.onsuccess = () => res(req.result || null);
@@ -129,9 +138,15 @@ const _imgCacheDB = (() => {
   async function set(url, blob, expiresAt, saved) {
     try {
       const d = await open();
-      return new Promise((res) => {
+      return new Promise(res => {
         const tx = d.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put({ url, blob, expiresAt: expiresAt || null, saved: saved || false, cachedAt: Date.now() });
+        tx.objectStore(STORE).put({
+          url, blob,
+          expiresAt: expiresAt || null,
+          saved: saved || false,
+          cachedAt: Date.now(),
+          size: blob.size || 0
+        });
         tx.oncomplete = () => res(true);
         tx.onerror = () => res(false);
       });
@@ -142,17 +157,46 @@ const _imgCacheDB = (() => {
     try {
       const d = await open();
       const now = Date.now();
-      const tx = d.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      const req = store.openCursor();
-      req.onsuccess = e => {
-        const cursor = e.target.result;
-        if (!cursor) return;
-        const item = cursor.value;
-        if (item.expiresAt && !item.saved && now > item.expiresAt) cursor.delete();
-        cursor.continue();
-      };
-    } catch {}
+
+      // المرور الأول: حذف الإدخالات المنتهية الصلاحية غير المحفوظة
+      await new Promise(res => {
+        const tx = d.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        store.openCursor().onsuccess = e => {
+          const cursor = e.target.result;
+          if (!cursor) return;
+          const { expiresAt, saved } = cursor.value;
+          if (expiresAt && !saved && now > expiresAt) cursor.delete();
+          cursor.continue();
+        };
+        tx.oncomplete = res;
+      });
+
+      // المرور الثاني: تطبيق سقف 500 MB — حذف الأقدم أولاً (LRU)
+      await new Promise(res => {
+        const tx = d.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const entries = [];
+        store.index('cachedAt').openCursor(null, 'next').onsuccess = e => {
+          const cursor = e.target.result;
+          if (!cursor) {
+            const total = entries.reduce((s, x) => s + (x.size || 0), 0);
+            if (total > MAX_BYTES) {
+              let freed = 0;
+              for (const entry of entries) {
+                if (total - freed <= MAX_BYTES) break;
+                freed += entry.size || 0;
+                store.delete(entry.url);
+              }
+            }
+            return;
+          }
+          entries.push(cursor.value);
+          cursor.continue();
+        };
+        tx.oncomplete = res;
+      });
+    } catch(e) { console.warn('[cache] cleanup error:', e); }
   }
 
   return { get, set, cleanup };
@@ -173,6 +217,64 @@ async function loadCachedImage(url, expiresAt, saved) {
     await _imgCacheDB.set(url, blob, expiresAt, saved);
     return URL.createObjectURL(blob);
   } catch { return url; }
+}
+
+// استخراج رابط صورة مصغّرة من رابط Cloudinary للفيديو
+// Input:  .../video/upload/TRANSFORM/PUBLIC_ID.mp4
+// Output: .../video/upload/q_auto,w_640,h_360,c_fill,f_jpg,so_0/PUBLIC_ID.jpg
+function _cloudinaryVideoThumb(videoUrl) {
+  if (!videoUrl) return null;
+  const match = videoUrl.match(/\/video\/upload\/[^/]+\/(.+?)\.mp4/);
+  if (!match) return null;
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/q_auto,w_640,h_360,c_fill,f_jpg,so_0/${match[1]}.jpg`;
+}
+
+// عنصر فيديو مؤجَّل: يعرض صورة مصغّرة من الكاش، يُحمِّل الفيديو عند الضغط فقط
+function buildCachedVideoEl(videoUrl, videoName) {
+  const mediaWrap = document.createElement('div');
+  mediaWrap.className = 'msg-media-wrap';
+
+  const thumbWrap = document.createElement('div');
+  thumbWrap.className = 'msg-video-thumb-wrap';
+
+  const poster = document.createElement('img');
+  poster.className = 'msg-video-poster';
+  poster.alt = videoName || 'فيديو';
+  const thumbUrl = _cloudinaryVideoThumb(videoUrl);
+  if (thumbUrl) loadCachedImage(thumbUrl, null, true).then(src => { if (src) poster.src = src; });
+
+  const playBtn = document.createElement('div');
+  playBtn.className = 'msg-video-play-btn';
+  playBtn.textContent = '▶';
+
+  thumbWrap.appendChild(poster);
+  thumbWrap.appendChild(playBtn);
+
+  thumbWrap.addEventListener('click', async () => {
+    const vid = document.createElement('video');
+    vid.controls = true; vid.autoplay = true; vid.className = 'msg-media-vid';
+    vid.addEventListener('click', e => { e.preventDefault(); openLightbox(videoUrl, 'video', videoName); });
+
+    const cached = await _imgCacheDB.get(videoUrl);
+    if (cached?.blob) {
+      vid.src = URL.createObjectURL(cached.blob);
+    } else {
+      vid.src = videoUrl;
+      // كاش الفيديو في الخلفية للتشغيل الفوري في المرات القادمة (فيديوهات < 50 MB)
+      fetch(videoUrl).then(r => r.ok ? r.blob() : null).then(blob => {
+        if (blob && blob.size < 50 * 1024 * 1024) {
+          _imgCacheDB.set(videoUrl, blob, null, true).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
+    mediaWrap.innerHTML = '';
+    mediaWrap.appendChild(vid);
+    vid.play().catch(() => {});
+  }, { once: true });
+
+  mediaWrap.appendChild(thumbWrap);
+  return mediaWrap;
 }
 
 // ════ CLOUDINARY UPLOAD ════
