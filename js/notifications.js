@@ -52,6 +52,9 @@ function listenNotifications(userId) {
     const tag   = (notif.data?.type || 'msg') + '_' + (notif.data?.fromUid || notif.from || '');
     const now   = Date.now();
 
+    // ──── DM يُعالج حصراً بـ _addDmListener (تجنب التكرار بين المسارات) ────
+    if (notif.data?.type === 'dm') return;
+
     // ──── كبح البانرات المتلاحقة — إشعار واحد كل 4 ثوانٍ لنفس tag ────
     if (_lastShownTag[tag] && now - _lastShownTag[tag] < 4000) return;
     _lastShownTag[tag] = now;
@@ -59,13 +62,9 @@ function listenNotifications(userId) {
     if (Notification.permission === 'granted' && document.hidden) {
       new Notification(title, { body, icon: '/icon-192.png', tag });
     } else if (!document.hidden) {
-      if (notif.data?.type === 'dm') {
-        showDmNotif({ name: title, text: body }, notif.data?.fromUid);
-      } else {
-        const _sid = notif.data?.serverId, _cid = notif.data?.channelId;
-        if (_sid && _cid && !_isActiveChannel(_sid, _cid)) {
-          showInAppNotif({ name: notif.data?.senderName || title, text: body }, _sid, _cid);
-        }
+      const _sid = notif.data?.serverId, _cid = notif.data?.channelId;
+      if (_sid && _cid && !_isActiveChannel(_sid, _cid)) {
+        showInAppNotif({ name: notif.data?.senderName || title, text: body }, _sid, _cid);
       }
     }
   };
@@ -86,6 +85,8 @@ async function initFCM(userId) {
       const { title, body } = payload.notification || {};
       const data = payload.data || {};
       if (data.type === 'dm' && data.fromUid) {
+        // إذا كان التطبيق مرئياً — _addDmListener يتولى العرض ويُجنّب التكرار
+        if (!document.hidden) return;
         showDmNotif({ name: title || 'رسالة خاصة', text: body || '' }, data.fromUid);
       } else if (data.serverId && data.channelId) {
         if (_isActiveChannel(data.serverId, data.channelId)) return;
@@ -221,7 +222,14 @@ function showInAppNotif(msg, sid, cid) {
 function showDmNotif(msg, fromUid) {
   if (_currentDmUid === fromUid) return;
 
-  // زيادة العداد دائماً
+  // ── دُفاع واحد ضد التكرار: _addDmListener + listenNotifications + FCM تُطلق جميعها
+  // هذه الدالة لنفس الرسالة في غضون ملي-ثوانٍ. نسمح بإشعار واحد كل 1.5 ثانية لنفس المرسل.
+  const tag = 'dm_' + (fromUid || '');
+  const now = Date.now();
+  if (_lastShownTag[tag] && now - _lastShownTag[tag] < 1500) return;
+  _lastShownTag[tag] = now;
+
+  // زيادة العداد مرة واحدة فقط (هنا — لا في المستدعِي)
   _dmUnread[fromUid] = (_dmUnread[fromUid] || 0) + 1;
   updateDmBadge();
 

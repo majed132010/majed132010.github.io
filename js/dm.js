@@ -13,6 +13,14 @@ function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 // ════ فتح شاشة الرسائل الخاصة ════
 function openDMScreen() {
   closeSidebar();
+  // نظّف مستمع المحادثة المفتوحة — يمنع استقبال إشعارات بعد مغادرة شاشة DM
+  if (_dmListener) {
+    const _r = _dmListener.mainRef || null;
+    if (_r) _r.off('child_added', _dmListener.fn);
+    else db.ref(_dmListener.path).off('child_added', _dmListener.fn);
+    if (_dmListener.changeFn) db.ref(_dmListener.path).off('child_changed', _dmListener.changeFn);
+    _dmListener = null;
+  }
   if (currentServer) _lastServerId = currentServer; // احفظ قبل التصفير لعرض أعضاء السيرفر الصحيح
   currentServer = null; currentChannel = null; _currentDmUid = null;
   document.getElementById('mhIcon').textContent = '💬';
@@ -193,12 +201,6 @@ function openDM(uid, name) {
     dmArea.appendChild(buildDmMsgDiv(msg, snap.key, uid, name));
     if (_dmInitialDone) {
       dmArea.scrollTop = dmArea.scrollHeight;
-      if (_currentDmUid !== uid && msg.uid !== currentUser?.uid) {
-        _dmUnread[uid] = (_dmUnread[uid] || 0) + 1;
-        updateDmBadge();
-        renderDmList();
-        showDmNotif(msg, uid);
-      }
     }
   };
 
@@ -629,10 +631,9 @@ function _addDmListener(uid) {
     const msg = msgSnap.val();
     if (!msg || msg.uid === currentUser.uid) return;
     if (_currentDmUid === uid) return;
-    _dmUnread[uid] = (_dmUnread[uid]||0) + 1;
-    updateDmBadge();
-    _refreshPickerBadge(uid);
+    // showDmNotif تُزيد _dmUnread أولاً — ثم نحدّث بطاقة الـ picker بالرقم الجديد
     showDmNotif(msg, uid);
+    _refreshPickerBadge(uid);
   };
   q.on('child_added', fn);
   // once('value') يُطلق بعد كل child_added الأولي → نضمن أن fn للرسائل القادمة فقط
