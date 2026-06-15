@@ -86,15 +86,22 @@ async function startCall(toUid, toName, type = 'audio') {
     endCall('no_answer');
   }, 45000);
 
-  // ✅ إصلاح: امسح أي رد قديم قبل الاستماع — البيانات القديمة تُحرّك المستمع بـ null أو callId مختلف
+  // ✅ إصلاح: امسح أي رد قديم ثم استمع فقط للردود الجديدة بعد وقت بدء المكالمة
   const responsePath = 'calls/' + currentUser.uid + '/response';
+  const callStartTs = Date.now();
   await db.ref(responsePath).remove().catch(() => {});
   console.log('[CALL] 👂 الاستماع لرد الطرف الآخر على →', responsePath);
   _callResponseRef = db.ref(responsePath);
   _callResponseRef.on('value', async snap => {
     const resp = snap.val();
     console.log('[CALL] 📥 وصل حدث على مسار الرد:', resp);
-    if (!resp) return; // تجاهل الحدث الفارغ الأول بعد المسح
+    if (!resp) return; // تجاهل null (الحدث الفارغ بعد المسح)
+    // ✅ تجاهل أي رد كُتب قبل بدء هذه المكالمة (بيانات قديمة)
+    if (resp.ts && resp.ts < callStartTs) {
+      console.log('[CALL] … تجاهل الرد القديم (ts قبل بدء المكالمة)', { respTs: resp.ts, callStartTs });
+      await db.ref(responsePath).remove().catch(() => {});
+      return;
+    }
     if (resp.callId !== callId) {
       console.log('[CALL] … تجاهل الرد (callId غير مطابق)', { got: resp?.callId, expected: callId });
       return;
