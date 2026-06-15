@@ -452,9 +452,41 @@ async function joinCallChannel(channelName, type, otherName, otherUid) {
 
   } catch(e) {
     console.error('[CALL] ✖ خطأ في joinCallChannel:', e);
-    toast('❌ فشل الاتصال: ' + (e.message || ''));
-    endCall('silent');
+    // ✅ إصلاح المشكلة 3: خطأ شبكة Agora (مثل 502) لا يُنهي المكالمة فوراً
+    const isNetworkError = (e.message && (
+      e.message.includes('502') ||
+      e.message.includes('CORS') ||
+      e.message.includes('network') ||
+      e.message.includes('ERR_FAILED') ||
+      e.message.includes('fetch')
+    )) || String(e).includes('502') || e.code === 'OPERATION_ABORTED';
+    if (isNetworkError) {
+      console.warn('[CALL] ⚠ خطأ شبكة Agora — عرض خيار إعادة المحاولة');
+      _showAgoraNetworkError(channelName, type, otherName, otherUid);
+    } else {
+      toast('❌ فشل الاتصال: ' + (e.message || ''));
+      endCall('silent');
+    }
   }
+}
+
+// ▀▀▀▀ شاشة خطأ شبكة Agora مع زر إعادة المحاولة ▀▀▀▀
+function _showAgoraNetworkError(channelName, type, otherName, otherUid) {
+  let scr = document.getElementById('agoraErrorScreen');
+  if (!scr) { scr = document.createElement('div'); scr.id = 'agoraErrorScreen'; document.body.appendChild(scr); }
+  scr.style.cssText = 'position:fixed;inset:0;z-index:10001;background:linear-gradient(135deg,#1a0a0a,#2a1515);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Tajawal,sans-serif;color:#fff;padding:28px;text-align:center';
+  scr.innerHTML = [
+    '<div style="font-size:52px">📡</div>',
+    '<div style="font-size:19px;font-weight:800">تعذّر الاتصال بخادم المكالمات</div>',
+    '<div style="font-size:14px;color:rgba(255,255,255,0.75);max-width:320px;line-height:1.8">قد يكون خادم Agora غير متاح مؤقتاً.<br>المكالمة لا تزال نشطة — يمكنك إعادة المحاولة.</div>',
+    '<div style="display:flex;gap:14px;margin-top:8px">',
+    '<button id="agoraRetryBtn" style="background:#23a55a;color:#fff;border:none;border-radius:12px;padding:13px 22px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer">🔄 إعادة المحاولة</button>',
+    '<button id="agoraEndBtn" style="background:#e04040;color:#fff;border:none;border-radius:12px;padding:13px 22px;font-family:Tajawal,sans-serif;font-size:15px;font-weight:700;cursor:pointer">📵 إنهاء</button>',
+    '</div>'
+  ].join('');
+  scr.style.display = 'flex';
+  document.getElementById('agoraRetryBtn').onclick = function() { scr.remove(); joinCallChannel(channelName, type, otherName, otherUid); };
+  document.getElementById('agoraEndBtn').onclick = function() { scr.remove(); endCall('silent'); };
 }
 
 // ════ كتم الصوت في المكالمة ════
