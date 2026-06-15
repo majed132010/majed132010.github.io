@@ -119,7 +119,7 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {
-        if (client.url.includes('awalem-game')) {
+        if (client.url.includes('majed132010-github-io.vercel.app')) {
           client.focus();
           // أبلغ الصفحة المفتوحة بالإجراء (قبول) لتكمل المنطق وهي مُصادَقة
           if (e.action === 'accept') client.postMessage({ type: 'acceptCall', callId: data.callId });

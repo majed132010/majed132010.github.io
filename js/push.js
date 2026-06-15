@@ -16,14 +16,10 @@ async function sendPushToUser(targetUid, title, body, data = {}) {
     const tokenSnap = await db.ref('users/' + targetUid + '/fcmToken').once('value');
     const fcmToken = tokenSnap.val();
     if (fcmToken) {
-      // ✅ إصلاح المشكلة 4: لا نضع click_action أبداً في FCM queue —
-      // وضع URL مطلق (Absolute URL) كان يجعل Android يفتح Chrome الخارجي
-      // بدل التطبيق المثبّت (APK/PWA). الـ Service Worker يتولى الفتح الصحيح
-      // داخل نطاق التطبيق عبر clients.matchAll() ثم clients.openWindow().
       await db.ref('fcm_queue').push({
         token: fcmToken,
         title, body,
-        data: { ...data },
+        data: { ...data, click_action: 'https://majed132010-github-io.vercel.app' },
         ts: Date.now()
       });
     }
