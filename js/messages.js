@@ -166,6 +166,7 @@ async function loadMoreMessages() {
 
 // ════ بناء رسالة ════
 function buildMsgDiv(msg, key) {
+  if ((msg.mediaUrl || msg.voiceUrl) && msg.expiresAt && msg.saved !== true && Date.now() > msg.expiresAt) return null;
   const isAdmin = msg.role === 'owner' || msg.role === 'admin';
   const isMine = msg.uid === currentUser?.uid;
   const sv = servers[currentServer];
