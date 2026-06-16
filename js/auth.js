@@ -372,7 +372,7 @@ function openMemberCard(uid, name, avatar) {
   overlay.appendChild(card);
   document.body.appendChild(overlay);
   overlay.showModal();
-  setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.close(); overlay.remove(); } }); }, 500);
+  setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.close(); overlay.remove(); } }); }, 1000);
 }
 
 function copyAdminCode() {
