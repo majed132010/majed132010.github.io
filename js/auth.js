@@ -365,7 +365,7 @@ function openMemberCard(uid, name, avatar) {
 
   card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
   overlay.appendChild(card);
-  document.body.appendChild(overlay);
+  (document.getElementById('app') || document.body).appendChild(overlay);
   setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); }); }, 500);
 }
 
