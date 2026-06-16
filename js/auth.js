@@ -326,7 +326,7 @@ function openMemberCard(uid, name, avatar) {
 
   const overlay = document.createElement('dialog');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:transparent;border:none;padding:0;outline:none;overflow:visible;display:flex;align-items:center;justify-content:center';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:transparent;border:none;padding:20px;outline:none;overflow:visible;display:flex;align-items:center;justify-content:center;box-sizing:border-box';
   if (!document.getElementById('_mcBackdropStyle')) {
     const _s = document.createElement('style'); _s.id = '_mcBackdropStyle';
     _s.textContent = '#memberCardOverlay::backdrop{background:rgba(0,0,0,0.85)}';
@@ -334,7 +334,7 @@ function openMemberCard(uid, name, avatar) {
   }
 
   const card = document.createElement('div');
-  card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
+  card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
 
   const avEl = document.createElement('div');
   avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';

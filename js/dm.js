@@ -135,7 +135,7 @@ function renderDmPickerList() {
       card.addEventListener('touchstart', () => { card.style.background='rgba(26,95,95,0.1)'; card.style.transform='scale(0.96)'; }, {passive:true});
       card.addEventListener('touchend',   () => { card.style.background='rgba(0,0,0,0.03)'; card.style.transform=''; }, {passive:true});
       av.addEventListener('click', (e) => { e.stopPropagation(); openMemberCard(uid, name, avatar || null); });
-      card.addEventListener('click', (e) => { if (!e.target.closest('.dm-av')) openDM(uid, name); });
+      card.addEventListener('click', (e) => { if (e.target.closest('.dm-av')) return; openDM(uid, name); });
 
       grid.appendChild(card);
     });
