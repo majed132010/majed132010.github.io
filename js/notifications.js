@@ -87,11 +87,8 @@ async function initFCM(userId) {
     fcmMessaging.onMessage(payload => {
       const { title, body } = payload.notification || {};
       const data = payload.data || {};
-      if (data.type === 'dm' && data.fromUid) {
-        // إذا كان التطبيق مرئياً — _addDmListener يتولى العرض ويُجنّب التكرار
-        if (!document.hidden) return;
-        showDmNotif({ name: title || 'رسالة خاصة', text: body || '' }, data.fromUid);
-      } else if (data.serverId && data.channelId) {
+      if (data.type === 'dm') return;
+      if (data.serverId && data.channelId) {
         if (_isActiveChannel(data.serverId, data.channelId)) return;
         showInAppNotif({ name: data.senderName || title, text: body || '' }, data.serverId, data.channelId);
       } else {
