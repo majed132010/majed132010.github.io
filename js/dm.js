@@ -103,6 +103,7 @@ function renderDmPickerList() {
 
       // ── Avatar wrapper (overflow:visible للـ badge) ──
       const av = document.createElement('div');
+      av.className = 'dm-av';
       av.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
 
       const avInner = document.createElement('div');
@@ -133,7 +134,8 @@ function renderDmPickerList() {
       card.addEventListener('mouseleave', () => { card.style.background='rgba(0,0,0,0.03)'; card.style.borderColor='rgba(0,0,0,0.07)'; card.style.transform=''; card.style.boxShadow=''; });
       card.addEventListener('touchstart', () => { card.style.background='rgba(26,95,95,0.1)'; card.style.transform='scale(0.96)'; }, {passive:true});
       card.addEventListener('touchend',   () => { card.style.background='rgba(0,0,0,0.03)'; card.style.transform=''; }, {passive:true});
-      card.addEventListener('click', () => openDM(uid, name));
+      av.addEventListener('click', (e) => { e.stopPropagation(); openMemberCard(uid, name, avatar || null); });
+      card.addEventListener('click', (e) => { if (!e.target.closest('.dm-av')) openDM(uid, name); });
 
       grid.appendChild(card);
     });
