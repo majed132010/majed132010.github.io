@@ -215,12 +215,9 @@ function openDM(uid, name) {
     const progWrap = body.querySelector('.msg-uploading-wrap');
     if (progWrap) {
       if (msg.uploading) {
-        const pct = msg.uploadProgress || 0;
-        const textEl = progWrap.querySelector('.msg-upload-text');
-        const fillEl = progWrap.querySelector('.msg-upload-fill');
-        if (textEl) textEl.textContent = `⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%`;
-        if (fillEl) fillEl.style.width = pct + '%';
+        _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
       } else if (!msg.uploading && msg.mediaUrl) {
+        _cleanupUploadState(snap.key);
         progWrap.remove();
         if (msg.mediaType === 'video') {
           body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
@@ -236,10 +233,7 @@ function openDM(uid, name) {
         }
         requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
-        const textEl = progWrap.querySelector('.msg-upload-text');
-        const fillEl = progWrap.querySelector('.msg-upload-fill');
-        if (textEl) textEl.textContent = '❌ فشل الرفع';
-        if (fillEl) { fillEl.style.background = '#e74c3c'; fillEl.style.width = '100%'; }
+        _showUploadFailedEl(progWrap, snap.key);
       }
     }
   };
@@ -280,18 +274,17 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   }
   if (msg.text) { const txt=document.createElement('div'); txt.className='msg-content'; txt.textContent=msg.text; body.appendChild(txt); }
   if (msg.uploading && !msg.mediaUrl) {
-    const pct = msg.uploadProgress || 1;
-    const progWrap = document.createElement('div');
-    progWrap.className = 'msg-media-wrap msg-uploading-wrap';
-    progWrap.innerHTML = `<div class="msg-upload-indicator">
-      <div class="msg-upload-icon">${msg.mediaType === 'video' ? '🎥' : '🖼️'}</div>
-      <div class="msg-upload-text">⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%</div>
-      <div class="msg-upload-bar"><div class="msg-upload-fill" style="width:${pct}%"></div></div>
-    </div>`;
-    body.appendChild(progWrap);
+    body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
   }
   if (msg.mediaUrl) {
-    if (msg.mediaType === 'video') {
+    const expired = msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt;
+    if (expired) {
+      const expDiv = document.createElement('div');
+      expDiv.className = 'msg-media-expired';
+      expDiv.textContent = '🕐';
+      expDiv.title = 'انتهت صلاحية هذه الوسائط';
+      body.appendChild(expDiv);
+    } else if (msg.mediaType === 'video') {
       body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
       const wrap = document.createElement('div');
@@ -356,12 +349,19 @@ async function sendDM() {
     const dmMsgPath = 'dm_messages/' + dmId;
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
-    // 1. إنشاء الرسالة فوراً مع شريط التقدم — يراه الطرفان لحظياً
-    const msgRef = await db.ref(dmMsgPath).push({
+    // 1. احجز المفتاح أولاً ثم احفظ بيانات الـ preview قبل الكتابة
+    const msgRef = db.ref(dmMsgPath).push();
+    const msgKey = msgRef.key;
+    if (m.type !== 'video') {
+      (window._uploadPreviews = window._uploadPreviews || {})[msgKey] = URL.createObjectURL(m.blob);
+    }
+    (window._uploadBlobs = window._uploadBlobs || {})[msgKey] = {
+      blob: m.blob, name: m.name, type: m.type, mimeType: m.mimeType, msgPath: dmMsgPath
+    };
+    await msgRef.set({
       ...msgBase, text: '', mediaType: m.type, mediaName: m.name,
       uploading: true, uploadProgress: 1, expiresAt, saved: false
     });
-    const msgKey = msgRef.key;
     const updatePct = (pct) => db.ref(dmMsgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
 
     try {

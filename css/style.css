@@ -1219,23 +1219,98 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   .msg-video-thumb-wrap { width: 180px; }
 }
 
-/* Expired-media badge */
+/* Expired-media — minimal clock icon only */
 .msg-media-expired {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 9px 14px;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  color: var(--muted);
-  font-size: 12px;
-  font-family: Tajawal, sans-serif;
-  line-height: 1.4;
+  font-size: 22px;
+  cursor: default;
+  opacity: 0.6;
 }
 
-/* ════ Upload progress indicator ════ */
+/* ════ Upload progress — WhatsApp-style circular overlay (sender) ════ */
+
+/* Wrapper keeps overlay perfectly over the image preview */
+.msg-upload-preview-wrap {
+  position: relative;
+  display: inline-block;
+  border-radius: 12px;
+  overflow: hidden;
+  line-height: 0;
+}
+.msg-upload-preview-wrap img {
+  display: block;
+  max-width: 260px;
+  max-height: 260px;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  filter: brightness(0.55);
+}
+
+/* Dark semi-transparent overlay with circular SVG progress */
+.msg-upload-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.msg-upload-overlay.msg-upload-failed {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+/* SVG circular progress — 44×44 viewBox, r=18 → circ≈113.1 */
+.msg-upload-circle {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+/* Percentage label under the arc */
+.msg-upload-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  font-family: Tajawal, sans-serif;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Failed state icon */
+.msg-upload-fail-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+/* Retry button */
+.msg-upload-retry-btn {
+  margin-top: 6px;
+  padding: 5px 14px;
+  background: var(--acc);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-family: Tajawal, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.msg-upload-retry-btn:hover { background: var(--acc-dark, #0e4444); }
+
+/* Recipient progress bar (no preview) */
 .msg-uploading-wrap { cursor: default; background: none; }
 .msg-upload-indicator {
   display: inline-flex;

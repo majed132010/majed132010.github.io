@@ -277,6 +277,103 @@ function buildCachedVideoEl(videoUrl, videoName) {
   return mediaWrap;
 }
 
+// ════ UPLOAD PROGRESS HELPERS ════
+
+// بناء عنصر تقدم الرفع — واتساب-ستايل للمُرسِل، شريط عادي للمستقبِل
+function _buildUploadProgressEl(msgKey, pct, mediaType) {
+  const previewUrl = (window._uploadPreviews || {})[msgKey];
+  const wrap = document.createElement('div');
+  if (previewUrl) {
+    wrap.className = 'msg-media-wrap msg-upload-preview-wrap';
+    const img = document.createElement('img');
+    img.className = 'msg-media-img'; img.src = previewUrl; img.alt = '';
+    const overlay = document.createElement('div');
+    overlay.className = 'msg-upload-overlay';
+    const r = 18, circ = +(2 * Math.PI * r).toFixed(1);
+    overlay.innerHTML = `
+      <svg class="msg-upload-circle" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="${r}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="3.5"/>
+        <circle class="msg-upload-arc" cx="22" cy="22" r="${r}" fill="none" stroke="#fff" stroke-width="3.5"
+          stroke-dasharray="${circ}" stroke-dashoffset="${+(circ*(1-pct/100)).toFixed(1)}"
+          stroke-linecap="round" transform="rotate(-90 22 22)"/>
+      </svg>
+      <span class="msg-upload-pct">${pct}%</span>`;
+    wrap.appendChild(img);
+    wrap.appendChild(overlay);
+  } else {
+    wrap.className = 'msg-media-wrap msg-uploading-wrap';
+    wrap.innerHTML = `<div class="msg-upload-indicator">
+      <div class="msg-upload-icon">${mediaType === 'video' ? '🎥' : '🖼️'}</div>
+      <div class="msg-upload-text">⏳ جاري ${mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%</div>
+      <div class="msg-upload-bar"><div class="msg-upload-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }
+  return wrap;
+}
+
+// تحديث عنصر تقدم قائم — دائري أو شريط حسب نوعه
+function _updateUploadProgressEl(progWrap, pct, mediaType) {
+  const arc = progWrap.querySelector('.msg-upload-arc');
+  const pctEl = progWrap.querySelector('.msg-upload-pct');
+  if (arc && pctEl) {
+    const r = 18, circ = 2 * Math.PI * r;
+    arc.setAttribute('stroke-dashoffset', (circ * (1 - pct / 100)).toFixed(1));
+    pctEl.textContent = pct + '%';
+  } else {
+    const textEl = progWrap.querySelector('.msg-upload-text');
+    const fillEl = progWrap.querySelector('.msg-upload-fill');
+    if (textEl) textEl.textContent = `⏳ جاري ${mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%`;
+    if (fillEl) fillEl.style.width = pct + '%';
+  }
+}
+
+// إظهار حالة الفشل — overlay مع retry للمُرسِل، نص خطأ للمستقبِل
+function _showUploadFailedEl(progWrap, msgKey) {
+  const previewImg = progWrap.querySelector('img.msg-media-img');
+  if (previewImg) {
+    progWrap.innerHTML = '';
+    progWrap.className = 'msg-media-wrap msg-upload-preview-wrap';
+    progWrap.appendChild(previewImg);
+    const overlay = document.createElement('div');
+    overlay.className = 'msg-upload-overlay msg-upload-failed';
+    overlay.innerHTML = '<div class="msg-upload-fail-icon">⚠️</div>';
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'msg-upload-retry-btn';
+    retryBtn.textContent = 'إعادة الإرسال';
+    retryBtn.addEventListener('click', () => _retryMediaUpload(msgKey));
+    overlay.appendChild(retryBtn);
+    progWrap.appendChild(overlay);
+  } else {
+    const textEl = progWrap.querySelector('.msg-upload-text');
+    const fillEl = progWrap.querySelector('.msg-upload-fill');
+    if (textEl) textEl.textContent = '❌ فشل الرفع';
+    if (fillEl) { fillEl.style.background = '#e74c3c'; fillEl.style.width = '100%'; }
+  }
+}
+
+// تنظيف حالة الرفع بعد الاكتمال أو الإلغاء
+function _cleanupUploadState(msgKey) {
+  const previews = window._uploadPreviews || {};
+  if (previews[msgKey]) { URL.revokeObjectURL(previews[msgKey]); delete previews[msgKey]; }
+  if (window._uploadBlobs?.[msgKey]) delete window._uploadBlobs[msgKey];
+}
+
+// إعادة محاولة رفع ملف فشل — يستعيد الـ blob من window._uploadBlobs
+async function _retryMediaUpload(msgKey) {
+  const info = (window._uploadBlobs || {})[msgKey];
+  if (!info) { toast('❌ تعذّر إعادة الإرسال — الملف غير متوفر'); return; }
+  await db.ref(info.msgPath + '/' + msgKey).update({ uploading: true, uploadFailed: false, uploadProgress: 1 });
+  const updatePct = pct => db.ref(info.msgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
+  try {
+    const url = await uploadToCloudinary(new File([info.blob], info.name, { type: info.mimeType }), 3, updatePct);
+    await db.ref(info.msgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+    delete (window._uploadBlobs || {})[msgKey];
+  } catch(e) {
+    await db.ref(info.msgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true });
+    toast('❌ فشل الرفع مجدداً: ' + (e.message || ''));
+  }
+}
+
 // ════ CLOUDINARY UPLOAD ════
 const CLOUDINARY_CLOUD = 'dz9gy0rsr';
 const CLOUDINARY_PRESET = 'awalem_upload';

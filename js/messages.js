@@ -73,14 +73,10 @@ function showMessages(sid, cid) {
     const progWrap = body.querySelector('.msg-uploading-wrap');
     if (progWrap) {
       if (msg.uploading) {
-        // تحديث النسبة لحظياً
-        const pct = msg.uploadProgress || 0;
-        const textEl = progWrap.querySelector('.msg-upload-text');
-        const fillEl = progWrap.querySelector('.msg-upload-fill');
-        if (textEl) textEl.textContent = `⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%`;
-        if (fillEl) fillEl.style.width = pct + '%';
+        _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
       } else if (!msg.uploading && msg.mediaUrl) {
         // اكتمل الرفع — استبدل شريط التقدم بالميديا الفعلية
+        _cleanupUploadState(snap.key);
         progWrap.remove();
         if (msg.mediaType === 'video') {
           body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
@@ -97,11 +93,7 @@ function showMessages(sid, cid) {
         const a = document.getElementById('messagesArea');
         if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
-        // فشل الرفع
-        const textEl = progWrap.querySelector('.msg-upload-text');
-        const fillEl = progWrap.querySelector('.msg-upload-fill');
-        if (textEl) textEl.textContent = '❌ فشل الرفع';
-        if (fillEl) { fillEl.style.background = '#e74c3c'; fillEl.style.width = '100%'; }
+        _showUploadFailedEl(progWrap, snap.key);
       }
     }
 
@@ -248,17 +240,9 @@ function buildMsgDiv(msg, key) {
     body.appendChild(vw);
   }
 
-  // ── شريط تقدم الرفع (يظهر لكل المستخدمين لحظياً) ──
+  // ── تقدم الرفع: preview دائري للمُرسِل، شريط عادي للمستقبِل ──
   if (msg.uploading && !msg.mediaUrl) {
-    const pct = msg.uploadProgress || 1;
-    const progWrap = document.createElement('div');
-    progWrap.className = 'msg-media-wrap msg-uploading-wrap';
-    progWrap.innerHTML = `<div class="msg-upload-indicator">
-      <div class="msg-upload-icon">${msg.mediaType === 'video' ? '🎥' : '🖼️'}</div>
-      <div class="msg-upload-text">⏳ جاري ${msg.mediaType === 'video' ? 'معالجة الفيديو' : 'رفع الصورة'} ${pct}%</div>
-      <div class="msg-upload-bar"><div class="msg-upload-fill" style="width:${pct}%"></div></div>
-    </div>`;
-    body.appendChild(progWrap);
+    body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
   }
 
   if (msg.mediaUrl) {
@@ -266,7 +250,8 @@ function buildMsgDiv(msg, key) {
     if (expired) {
       const expDiv = document.createElement('div');
       expDiv.className = 'msg-media-expired';
-      expDiv.textContent = '🕐 انتهت صلاحية هذه الصورة';
+      expDiv.textContent = '🕐';
+      expDiv.title = 'انتهت صلاحية هذه الوسائط';
       body.appendChild(expDiv);
     } else if (msg.mediaType === 'video') {
       body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
@@ -492,9 +477,19 @@ async function _uploadOneMedia(m, msgBase) {
   // حارس طوارئ
   const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
 
-  // 1. إنشاء الرسالة فوراً في DB مع حالة "جاري الرفع 1%"
-  //    كل المستخدمين يرون الرسالة والشريط فور إنشائها
-  const msgRef = await db.ref(msgPath).push({
+  // 1. احجز المفتاح أولاً ثم احفظ بيانات الـ preview قبل الكتابة —
+  //    child_added يُطلَق أثناء set() فيجد window._uploadPreviews جاهزاً
+  const msgRef = db.ref(msgPath).push();
+  const msgKey = msgRef.key;
+
+  if (m.type !== 'video') {
+    (window._uploadPreviews = window._uploadPreviews || {})[msgKey] = URL.createObjectURL(m.blob);
+  }
+  (window._uploadBlobs = window._uploadBlobs || {})[msgKey] = {
+    blob: m.blob, name: m.name, type: m.type, mimeType: m.mimeType, msgPath
+  };
+
+  await msgRef.set({
     ...msgBase,
     text: '',
     mediaType: m.type,
@@ -504,7 +499,6 @@ async function _uploadOneMedia(m, msgBase) {
     expiresAt,
     saved: false
   });
-  const msgKey = msgRef.key;
 
   const area = document.getElementById('messagesArea');
   if (area) area.scrollTop = area.scrollHeight;
