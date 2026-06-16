@@ -326,7 +326,7 @@ function openMemberCard(uid, name, avatar) {
 
   const overlay = document.createElement('dialog');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:transparent;border:none;padding:20px;outline:none;overflow:visible;display:flex;align-items:center;justify-content:center;box-sizing:border-box';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
   if (!document.getElementById('_mcBackdropStyle')) {
     const _s = document.createElement('style'); _s.id = '_mcBackdropStyle';
     _s.textContent = '#memberCardOverlay::backdrop{background:rgba(0,0,0,0.85)}';
