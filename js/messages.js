@@ -202,7 +202,7 @@ function buildMsgDiv(msg, key) {
     av.addEventListener('touchend',  () => clearTimeout(_avLp), {passive: true});
     av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
   }
-  av.addEventListener('click', (e) => { e.stopPropagation(); console.log('[DEBUG] avatar clicked'); openMemberCard(msg.uid, msg.name, _memberAv); });
+  av.addEventListener('mousedown', (e) => { e.stopPropagation(); openMemberCard(msg.uid, msg.name, _memberAv); });
   if (!canModerate) av.style.cursor = 'pointer';
 
   const body = document.createElement('div');
