@@ -43,7 +43,8 @@ function showMessages(sid, cid) {
     const msg = snap.val();
     if (!msg) return;
     if (area.querySelector(`[data-key="${snap.key}"]`)) return; // dedup
-    area.appendChild(buildMsgDiv(msg, snap.key));
+    const _d = buildMsgDiv(msg, snap.key); if (!_d) return;
+    area.appendChild(_d);
     // تتبع المفتاح الأقدم للـ pagination
     if (!_oldestMsgKey || snap.key < _oldestMsgKey) _oldestMsgKey = snap.key;
     if (_initialDone) {
@@ -150,6 +151,7 @@ async function loadMoreMessages() {
   entries.reverse().forEach(([key, msg]) => {
     if (area.querySelector(`[data-key="${key}"]`)) return;
     const div = buildMsgDiv(msg, key);
+    if (!div) return;
     if (firstMsg) area.insertBefore(div, firstMsg);
     else area.appendChild(div);
   });
