@@ -320,6 +320,7 @@ function openProfile() {
 }
 
 function openMemberCard(uid, name, avatar) {
+  console.log('[DEBUG] openMemberCard called', uid, name);
   const existing = document.getElementById('memberCardOverlay');
   if (existing) existing.remove();
 
