@@ -277,14 +277,8 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
   }
   if (msg.mediaUrl) {
-    const expired = msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt;
-    if (expired) {
-      const expDiv = document.createElement('div');
-      expDiv.className = 'msg-media-expired';
-      expDiv.textContent = '🕐';
-      expDiv.title = 'انتهت صلاحية هذه الوسائط';
-      body.appendChild(expDiv);
-    } else if (msg.mediaType === 'video') {
+    if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) return null;
+    if (msg.mediaType === 'video') {
       body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
       const wrap = document.createElement('div');
