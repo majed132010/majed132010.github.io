@@ -326,7 +326,7 @@ function openMemberCard(uid, name, avatar) {
 
   const overlay = document.createElement('div');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center';
 
   const card = document.createElement('div');
   card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
@@ -365,7 +365,7 @@ function openMemberCard(uid, name, avatar) {
 
   card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
   overlay.appendChild(card);
-  (document.getElementById('app') || document.body).appendChild(overlay);
+  document.documentElement.appendChild(overlay);
   setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); }); }, 500);
 }
 
