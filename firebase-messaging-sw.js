@@ -16,7 +16,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // كبح تكرار الإشعارات: آخر وقت عرض لكل tag — يمنع الفيضان عند توارد دفعات متلاحقة
-const NOTIF_THROTTLE_MS = 4000;
+const NOTIF_THROTTLE_MS = 10000;
 const _lastShownByTag = {};
 function _throttled(tag) {
   const now = Date.now();

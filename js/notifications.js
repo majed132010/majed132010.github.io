@@ -55,6 +55,9 @@ function listenNotifications(userId) {
     // ──── DM يُعالج حصراً بـ _addDmListener (تجنب التكرار بين المسارات) ────
     if (notif.data?.type === 'dm') return;
 
+    // ──── إذا كان التطبيق مرئياً والرسالة في القناة النشطة — لا داعي للإشعار ────
+    if (!document.hidden && _isActiveChannel(notif.data?.serverId, notif.data?.channelId)) return;
+
     // ──── كبح البانرات المتلاحقة — إشعار واحد كل 4 ثوانٍ لنفس tag ────
     if (_lastShownTag[tag] && now - _lastShownTag[tag] < 4000) return;
     _lastShownTag[tag] = now;
