@@ -366,7 +366,7 @@ function openMemberCard(uid, name, avatar) {
   card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); }); }, 300);
 }
 
 function copyAdminCode() {
