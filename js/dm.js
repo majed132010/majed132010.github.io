@@ -198,7 +198,8 @@ function openDM(uid, name) {
   const fn = snap => {
     const msg = snap.val();
     if (!msg || dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
-    dmArea.appendChild(buildDmMsgDiv(msg, snap.key, uid, name));
+    const _d = buildDmMsgDiv(msg, snap.key, uid, name); if (!_d) return;
+    dmArea.appendChild(_d);
     if (_dmInitialDone) {
       dmArea.scrollTop = dmArea.scrollHeight;
     }
