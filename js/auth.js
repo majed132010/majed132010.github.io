@@ -326,7 +326,7 @@ function openMemberCard(uid, name, avatar) {
 
   const overlay = document.createElement('dialog');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'background:transparent;border:none;padding:0;outline:none;overflow:visible';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:transparent;border:none;padding:0;outline:none;overflow:visible;display:flex;align-items:center;justify-content:center';
   if (!document.getElementById('_mcBackdropStyle')) {
     const _s = document.createElement('style'); _s.id = '_mcBackdropStyle';
     _s.textContent = '#memberCardOverlay::backdrop{background:rgba(0,0,0,0.85)}';
@@ -371,8 +371,8 @@ function openMemberCard(uid, name, avatar) {
   card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
-  overlay.showModal();
-  setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.close(); overlay.remove(); } }); }, 1000);
+  overlay.show();
+  setTimeout(() => { overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); } }); }, 1000);
 }
 
 function copyAdminCode() {
