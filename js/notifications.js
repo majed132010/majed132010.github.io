@@ -25,7 +25,7 @@ function listenNotifications(userId) {
   const sessionStart = Date.now();
   const ref = db.ref('notifications/' + userId)
     .orderByChild('ts')
-    .startAt(sessionStart - 8000); // تحمّل تأخير الساعة حتى 8 ثوانٍ
+    .startAt(sessionStart);
 
   const fn = snap => {
     if (!snap.exists()) return;
@@ -85,6 +85,7 @@ async function initFCM(userId) {
     if (!('Notification' in window)) return;
     fcmMessaging = FB.messaging();
     fcmMessaging.onMessage(payload => {
+      if (document.hidden) return;
       const { title, body } = payload.notification || {};
       const data = payload.data || {};
       if (data.type === 'dm' && data.fromUid) {
