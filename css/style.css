@@ -620,6 +620,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   z-index: 100;
 }
 .msg-group:hover .msg-actions { display: flex; }
+.msg-actions { display: none !important; }
 .ma-btn {
   width: 28px; height: 28px;
   border-radius: 6px; border: none;

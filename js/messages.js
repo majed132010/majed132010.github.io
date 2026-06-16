@@ -286,38 +286,7 @@ function buildMsgDiv(msg, key) {
 
   if (msg.reactions) renderReactions(msg.reactions, key, body);
 
-  const actions = document.createElement('div');
-  actions.className = 'msg-actions';
-
-  const reactBtn = document.createElement('button');
-  reactBtn.className = 'ma-btn'; reactBtn.textContent = '😀'; reactBtn.title = 'تفاعل';
-  reactBtn.addEventListener('click', e => { e.stopPropagation(); showReactionPicker(key, reactBtn); });
-  actions.appendChild(reactBtn);
-
-  const replyBtn = document.createElement('button');
-  replyBtn.className = 'ma-btn'; replyBtn.textContent = '↩️'; replyBtn.title = 'رد';
-  replyBtn.addEventListener('click', e => { e.stopPropagation(); setReply(key, msg.name, msg.text); });
-  actions.appendChild(replyBtn);
-
-  if (isMine && msg.text) {
-    const editBtn = document.createElement('button');
-    editBtn.className = 'ma-btn'; editBtn.textContent = '✏️'; editBtn.title = 'تعديل';
-    editBtn.addEventListener('click', e => { e.stopPropagation(); startEditMessage(key, msg.text); });
-    actions.appendChild(editBtn);
-  }
-  if (isMine || isAdminUser) {
-    const delBtn = document.createElement('button');
-    delBtn.className = 'ma-btn danger'; delBtn.textContent = '🗑️'; delBtn.title = 'حذف';
-    delBtn.addEventListener('click', e => { e.stopPropagation(); deleteMessage(key); });
-    actions.appendChild(delBtn);
-  }
-
-  let lpTimer;
-  div.addEventListener('touchstart', () => { lpTimer = setTimeout(() => { actions.style.display='flex'; }, 500); }, {passive:true});
-  div.addEventListener('touchend', () => clearTimeout(lpTimer), {passive:true});
-  div.addEventListener('touchmove', () => clearTimeout(lpTimer), {passive:true});
-
-  div.appendChild(av); div.appendChild(body); div.appendChild(actions);
+  div.appendChild(av); div.appendChild(body);
 
   // ── WhatsApp-style context bar: right-click / long-press ──────────────────
   if (!window._ctxDismissReady) {
