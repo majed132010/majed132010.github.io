@@ -319,6 +319,55 @@ function openProfile() {
   openModal('profileModal');
 }
 
+function openMemberCard(uid, name, avatar) {
+  const existing = document.getElementById('memberCardOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'memberCardOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
+
+  const avEl = document.createElement('div');
+  avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
+  if (avatar) avEl.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+  else avEl.textContent = (name || '?')[0];
+
+  const nameEl = document.createElement('div');
+  nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#fff;margin-top:4px;text-align:center';
+  nameEl.textContent = name || '—';
+
+  const tagEl = document.createElement('div');
+  tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
+  db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
+
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
+
+  const mkBtn = (icon, label, fn) => {
+    const b = document.createElement('button');
+    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px';
+    b.innerHTML = `<span style="font-size:22px;line-height:1">${icon}</span><span>${label}</span>`;
+    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
+    b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
+    b.addEventListener('click', () => { overlay.remove(); fn(); });
+    return b;
+  };
+
+  btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => openDM(uid, name)));
+  if (uid !== currentUser?.uid) {
+    btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
+    btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
+  }
+
+  card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
 function copyAdminCode() {
   const code = userProfile.adminCode || '';
   navigator.clipboard?.writeText(code).then(() => toast('📋 تم نسخ الكود: ' + code));

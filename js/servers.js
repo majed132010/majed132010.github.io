@@ -832,7 +832,7 @@ async function renderMembersList() {
     item.appendChild(av); item.appendChild(nameEl);
     const roleLabel = role==='owner'?'👑 مالك':role==='admin'?'🛡️ أدمن':'';
     if (roleLabel) { const badge = document.createElement('div'); badge.className='member-role-badge'; badge.textContent=roleLabel; item.appendChild(badge); }
-    if (uid !== currentUser?.uid) { item.title = 'رسالة خاصة'; item.addEventListener('click', () => { openDM(uid,name); document.getElementById('membersPanel').classList.remove('open'); }); }
+    item.style.cursor = 'pointer'; item.addEventListener('click', () => openMemberCard(uid, name, data.avatar));
     container.appendChild(item);
   });
 }
