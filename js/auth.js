@@ -356,7 +356,7 @@ function openMemberCard(uid, name, avatar) {
     return b;
   };
 
-  btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => openDM(uid, name)));
+  btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => { overlay.remove(); setTimeout(() => openDM(uid, name), 50); }));
   if (uid !== currentUser?.uid) {
     btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
     btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
