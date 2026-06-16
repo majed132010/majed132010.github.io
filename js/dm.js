@@ -309,6 +309,43 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     delBtn.addEventListener('click',e=>{e.stopPropagation();deleteDmMessage(key,otherUid);}); actions.appendChild(delBtn);
   }
   div.appendChild(av); div.appendChild(body); div.appendChild(actions);
+
+  // ── WhatsApp-style context bar: right-click / long-press ──────────────────
+  if (!window._ctxDismissReady) {
+    window._ctxDismissReady = true;
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    });
+  }
+  const ctxBar = document.createElement('div');
+  ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
+  const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
+  [
+    { icon: '↩️', label: 'رد',          fn: () => setDmReply(key, msg.name, msg.text) },
+    { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
+    { icon: '⭐', label: 'تثبيت',        fn: () => toast('⭐ قريباً') },
+    ...(isMine ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteDmMessage(key, otherUid) }] : []),
+    ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
+  ].forEach(ac => {
+    const b = document.createElement('button');
+    b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
+    b.title = ac.label;
+    b.innerHTML = `<span class="mc-icon">${ac.icon}</span><span class="mc-label">${ac.label}</span>`;
+    b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
+    ctxBar.appendChild(b);
+  });
+  body.style.position = 'relative';
+  body.appendChild(ctxBar);
+  div.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    ctxBar.classList.add('visible');
+  });
+  let _ctxLp;
+  div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
+  div.addEventListener('touchend',   () => clearTimeout(_ctxLp), { passive: true });
+  div.addEventListener('touchmove',  () => clearTimeout(_ctxLp), { passive: true });
+
   return div;
 }
 

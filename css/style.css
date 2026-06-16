@@ -1342,6 +1342,53 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   .msg-media-vid  { max-height: 180px; }
 }
 
+/* ════ Message context bar (right-click / long-press) ════ */
+.msg-ctx-bar {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  display: none;
+  flex-direction: row;
+  gap: 0;
+  background: #1a2535;
+  border-radius: 24px;
+  padding: 4px 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 300;
+  white-space: nowrap;
+  animation: ctxBarIn 0.15s ease;
+}
+.msg-ctx-bar.mine { left: auto; right: 0; }
+.msg-ctx-bar.visible { display: flex; }
+@keyframes ctxBarIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+.mc-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 11px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 18px;
+  transition: background 0.12s;
+  min-width: 44px;
+}
+.mc-btn:hover { background: rgba(255, 255, 255, 0.09); }
+.mc-btn.danger:hover { background: rgba(220, 50, 50, 0.18); }
+.mc-btn.danger .mc-label { color: #e05555; }
+.mc-icon  { font-size: 19px; line-height: 1; }
+.mc-label {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: Tajawal, sans-serif;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 /* ════ SPLASH SCREEN ════ */
 #splashScreen {
   position: fixed;
