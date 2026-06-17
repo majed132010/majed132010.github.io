@@ -432,3 +432,24 @@ async function sendDM() {
     sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text, { type: 'dm', fromUid: currentUser.uid });
   }
 }
+
+async function handleDmMediaSelect(input) {
+  const files = Array.from(input.files);
+  input.value = '';
+  if (!files.length) return;
+  if (!window._pendingDmMedia) window._pendingDmMedia = [];
+  for (const file of files) {
+    const isVideo = file.type.startsWith('video');
+    const maxSize = isVideo ? 500*1024*1024 : 50*1024*1024;
+    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${isVideo?'500MB':'50MB'}`); continue; }
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      let blob = new Blob([arrayBuffer], { type: file.type });
+      if (!isVideo) blob = await compressImage(blob);
+      const mimeType = blob.type || file.type;
+      const localUrl = URL.createObjectURL(blob);
+      window._pendingDmMedia.push({ blob, type: isVideo?'video':'image', name: file.name, mimeType, localUrl });
+      document.getElementById('dmSendBtn').classList.add('active');
+    } catch(e) { toast('❌ تعذّر قراءة الملف'); }
+  }
+}
