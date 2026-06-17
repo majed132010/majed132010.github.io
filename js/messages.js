@@ -398,6 +398,7 @@ async function _kickUserFromChat(uid, name) {
 // ════ إرسال رسالة ════
 async function sendMessage() {
   console.log('[sendMessage] called, pendingMedia:', window._pendingMedia?.length, 'text:', document.getElementById('mainChatInp')?.value?.trim()?.slice(0,20));
+  console.log('[sendMessage] currentServer:', currentServer, 'currentChannel:', currentChannel, 'muted:', _currentUserMuted);
   if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا العالم'); return; }
   const inp = document.getElementById('mainChatInp');
   const text = inp ? inp.value.trim() : '';
