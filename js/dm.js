@@ -281,6 +281,16 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   const meta = document.createElement('div'); meta.className='msg-meta';
   meta.innerHTML=`<span class="msg-name">${escHtml(msg.name||'')}</span><span class="msg-time">${formatTime(msg.ts)}</span>`;
   body.appendChild(meta);
+  if (isMine) {
+    const statusEl = document.createElement('span');
+    statusEl.className = 'msg-status';
+    statusEl.dataset.key = key;
+    statusEl.style.cssText = 'font-size:11px;margin-right:4px;display:block;text-align:left;';
+    statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+    statusEl.style.color = msg.status === 'read' ? '#5865f2' : '#8899aa';
+    console.log('[STATUS]', msg.status, key);
+    meta.appendChild(statusEl);
+  }
   if (msg.replyTo) {
     const quote=document.createElement('div'); quote.className='msg-reply-quote';
     quote.innerHTML=`<div class="rq-name">${escHtml(msg.replyTo.name||'')}</div><div class="rq-text">${escHtml(msg.replyTo.text||'🖼️')}</div>`;
