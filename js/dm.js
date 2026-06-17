@@ -340,3 +340,95 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
 
   return div;
 }
+
+// ════ متغيرات الحالة ════
+function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
+
+const _dmUnread = {};
+const _dmGlobalListeners = {};
+let _dmListener = null;
+let _dmTypingListener = null;
+let _dmReplyTo = null;
+let _currentDmUid = null;
+let _lastServerId = null;
+let _dmTypingTimer = null;
+
+function clearDmUnread(uid) {
+  _dmUnread[uid] = 0;
+  if (typeof updateDmBadge === 'function') updateDmBadge();
+  renderDmList();
+}
+
+function renderDmList() {
+  const container = document.getElementById('dmList');
+  if (!container || !currentUser) return;
+  db.ref('dms/' + currentUser.uid).once('value').then(snap => {
+    const dms = snap.val() || {};
+    container.innerHTML = '';
+    if (!Object.keys(dms).length) return;
+    Object.entries(dms).sort((a,b) => (b[1].ts||0) - (a[1].ts||0)).forEach(([uid, info]) => {
+      const item = document.createElement('div');
+      item.className = 'dm-item' + (_currentDmUid === uid ? ' active' : '');
+      const unread = _dmUnread[uid] || 0;
+      item.innerHTML = `<div class="dm-av">${(info.name||'?')[0]}</div><div class="dm-name">${escHtml(info.name||'مستخدم')}</div>${unread > 0 ? `<div class="dm-unread">${unread > 99 ? '99+' : unread}</div>` : ''}`;
+      item.addEventListener('click', () => openDM(uid, info.name || 'مستخدم'));
+      container.appendChild(item);
+    });
+  });
+}
+
+function setDmReply(key, name, text) {
+  _dmReplyTo = { key, name, text };
+  document.getElementById('dmReplyName').textContent = name;
+  document.getElementById('dmReplyText').textContent = text || '🖼️';
+  document.getElementById('dmReplyBar').style.display = 'flex';
+  document.getElementById('dmChatInp').focus();
+}
+
+function clearDmReply() {
+  _dmReplyTo = null;
+  document.getElementById('dmReplyBar').style.display = 'none';
+}
+
+function startDmTyping() {
+  if (!_currentDmUid || !currentUser) return;
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  db.ref('dm_typing/' + dmId + '/' + currentUser.uid).set(true);
+  clearTimeout(_dmTypingTimer);
+  _dmTypingTimer = setTimeout(() => db.ref('dm_typing/' + dmId + '/' + currentUser.uid).remove(), 4000);
+}
+
+function stopDmTyping() {
+  if (!_currentDmUid || !currentUser) return;
+  clearTimeout(_dmTypingTimer);
+  db.ref('dm_typing/' + getDmId(currentUser.uid, _currentDmUid) + '/' + currentUser.uid).remove();
+}
+
+async function deleteDmMessage(key, otherUid) {
+  if (!confirm('حذف هذه الرسالة؟')) return;
+  const dmId = getDmId(currentUser.uid, otherUid);
+  await db.ref('dm_messages/' + dmId + '/' + key).remove();
+  document.querySelector(`[data-key="${key}"]`)?.remove();
+}
+
+async function sendDM() {
+  if (!_currentDmUid || !currentUser) return;
+  const inp = document.getElementById('dmChatInp');
+  const text = inp?.value.trim();
+  if (!text) return;
+  inp.value = ''; inp.style.height = '';
+  document.getElementById('dmSendBtn')?.classList.remove('active');
+  stopDmTyping();
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), status: 'sent' };
+  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
+  msgBase.text = text;
+  const msgRef = db.ref('dm_messages/' + dmId).push();
+  await msgRef.set(msgBase);
+  const dmMeta = { name: userProfile.displayName || 'مستخدم', ts: Date.now(), lastMsg: text };
+  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).update(dmMeta);
+  await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).update({ name: userProfile.displayName || 'مستخدم', ts: Date.now(), lastMsg: text });
+  if (typeof sendPushToUser === 'function') {
+    sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text, { type: 'dm', fromUid: currentUser.uid });
+  }
+}
