@@ -1,6 +1,9 @@
 window.openDMFromSvBar = function() {
-  if (isMobile()) openDrawer();
-  else openDMScreen();
+  if (typeof isMobile === 'function' && isMobile()) {
+    if (typeof openDrawer === 'function') openDrawer();
+  } else {
+    if (typeof openDMScreen === 'function') openDMScreen();
+  }
 };
 
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
