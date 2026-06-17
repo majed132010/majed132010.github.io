@@ -6,6 +6,42 @@ window.openDMFromSvBar = function() {
   }
 };
 
+window.sendDM = async function() {
+  if (!_currentDmUid || !currentUser) return;
+  const inp = document.getElementById('dmChatInp');
+  const text = inp?.value.trim();
+  if (!text && !window._pendingDmMedia?.length) return;
+  inp.value = ''; inp.style.height = '';
+  document.getElementById('dmSendBtn').classList.remove('active');
+  if (typeof stopDmTyping === 'function') stopDmTyping();
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  const msgBase = { uid: currentUser.uid, name: userProfile.displayName||'مستخدم', ts: Date.now(), status: 'sent' };
+  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
+  if (text) {
+    await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+    try { await sendPushToUser(_currentDmUid, userProfile.displayName||'رسالة خاصة', text.slice(0,80), { type:'dm', fromUid: currentUser.uid }); } catch(e) {}
+  }
+  const media = window._pendingDmMedia || [];
+  window._pendingDmMedia = [];
+  for (const m of media) {
+    const dmMsgPath = 'dm_messages/' + dmId;
+    const msgRef = db.ref(dmMsgPath).push();
+    const msgKey = msgRef.key;
+    await msgRef.set({ ...msgBase, text:'', mediaType:m.type, mediaName:m.name, uploading:true, uploadProgress:1, expiresAt: Date.now()+86400000, saved:false });
+    try {
+      const url = await uploadToCloudinary(new File([m.blob], m.name, {type:m.mimeType}), 3, ()=>{});
+      await db.ref(dmMsgPath+'/'+msgKey).update({ mediaUrl:url, uploading:false, uploadProgress:null });
+    } catch(e) {
+      db.ref(dmMsgPath+'/'+msgKey).update({ uploading:false, uploadFailed:true });
+      toast('❌ فشل رفع الملف');
+    }
+  }
+  const otherSnap = await db.ref('users/'+_currentDmUid+'/displayName').once('value');
+  const otherName = otherSnap.val() || 'مستخدم';
+  await db.ref('dms/'+currentUser.uid+'/'+_currentDmUid).set({ name:otherName, ts:Date.now() });
+  await db.ref('dms/'+_currentDmUid+'/'+currentUser.uid).set({ name:userProfile.displayName||'مستخدم', ts:Date.now() });
+};
+
 function openDMScreen() {
   closeSidebar();
   if (currentServer) _lastServerId = currentServer;
