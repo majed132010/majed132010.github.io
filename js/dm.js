@@ -10,6 +10,7 @@ window.sendDM = async function() {
   if (!_currentDmUid || !currentUser) return;
   const inp = document.getElementById('dmChatInp');
   const text = inp?.value.trim();
+  console.log('[sendDM] text:', text, 'media length:', window._pendingDmMedia?.length, 'pendingDmMedia:', JSON.stringify(window._pendingDmMedia?.map(m => m.name)));
   if (!text && !window._pendingDmMedia?.length) return;
   inp.value = ''; inp.style.height = '';
   document.getElementById('dmSendBtn').classList.remove('active');
