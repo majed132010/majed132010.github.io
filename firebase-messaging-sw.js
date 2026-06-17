@@ -28,48 +28,52 @@ function _throttled(tag) {
 // استقبال الإشعارات عندما يكون التطبيق في الخلفية
 // ملاحظة: الدالة السحابية ترسل رسائل data-only، لذا نقرأ الحقول من payload.data وليس payload.notification.
 messaging.onBackgroundMessage(payload => {
-  const data = payload.data || {};
-  const title = data.title || (payload.notification && payload.notification.title) || '🔥 عوالم';
-  const body  = data.body  || (payload.notification && payload.notification.body)  || 'لديك إشعار جديد';
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+    if (clients.length > 0) return; // app is open, skip — foreground handles it
 
-  // مكالمة واردة → إشعار واحد فقط لكل مكالمة، بأزرار [قبول ✅]/[رفض ❌]
-  if (data.type === 'call') {
-    const tag = 'call_' + (data.callId || '');
-    // إن كان إشعار نفس المكالمة معروضاً بالفعل → لا إعادة عرض ولا اهتزاز جديد
-    return self.registration.getNotifications({ tag }).then(existing => {
-      if (existing.length || _throttled(tag)) return;
-      return self.registration.showNotification(title, {
-        body,
-        icon: '/awalem-game/icon.png',
-        badge: '/awalem-game/icon.png',
-        dir: 'rtl', lang: 'ar',
-        vibrate: [300, 150, 300, 150, 300],
-        tag,
-        requireInteraction: true,           // لا يختفي تلقائياً حتى يتفاعل المستخدم
-        data,
-        actions: [
-          { action: 'accept', title: 'قبول ✅' },
-          { action: 'reject', title: 'رفض ❌' }
-        ]
+    const data = payload.data || {};
+    const title = data.title || (payload.notification && payload.notification.title) || '🔥 عوالم';
+    const body  = data.body  || (payload.notification && payload.notification.body)  || 'لديك إشعار جديد';
+
+    // مكالمة واردة → إشعار واحد فقط لكل مكالمة، بأزرار [قبول ✅]/[رفض ❌]
+    if (data.type === 'call') {
+      const tag = 'call_' + (data.callId || '');
+      // إن كان إشعار نفس المكالمة معروضاً بالفعل → لا إعادة عرض ولا اهتزاز جديد
+      return self.registration.getNotifications({ tag }).then(existing => {
+        if (existing.length || _throttled(tag)) return;
+        return self.registration.showNotification(title, {
+          body,
+          icon: '/awalem-game/icon.png',
+          badge: '/awalem-game/icon.png',
+          dir: 'rtl', lang: 'ar',
+          vibrate: [300, 150, 300, 150, 300],
+          tag,
+          requireInteraction: true,           // لا يختفي تلقائياً حتى يتفاعل المستخدم
+          data,
+          actions: [
+            { action: 'accept', title: 'قبول ✅' },
+            { action: 'reject', title: 'رفض ❌' }
+          ]
+        });
       });
-    });
-  }
+    }
 
-  // إشعار عادي — tag حسب النوع والمرسل يدمج المتلاحق منها بدل التكديس
-  const tag = (data.type || 'msg') + '_' + (data.fromUid || data.serverId || '');
-  if (_throttled(tag)) return;
-  self.registration.showNotification(title, {
-    body,
-    icon: '/awalem-game/icon.png',
-    badge: '/awalem-game/icon.png',
-    dir: 'rtl', lang: 'ar',
-    vibrate: [200, 100, 200],
-    tag,
-    data,
-    actions: [
-      { action: 'open',  title: 'فتح اللعبة' },
-      { action: 'close', title: 'إغلاق' }
-    ]
+    // إشعار عادي — tag حسب النوع والمرسل يدمج المتلاحق منها بدل التكديس
+    const tag = (data.type || 'msg') + '_' + (data.fromUid || data.serverId || '');
+    if (_throttled(tag)) return;
+    self.registration.showNotification(title, {
+      body,
+      icon: '/awalem-game/icon.png',
+      badge: '/awalem-game/icon.png',
+      dir: 'rtl', lang: 'ar',
+      vibrate: [200, 100, 200],
+      tag,
+      data,
+      actions: [
+        { action: 'open',  title: 'فتح اللعبة' },
+        { action: 'close', title: 'إغلاق' }
+      ]
+    });
   });
 });
 
