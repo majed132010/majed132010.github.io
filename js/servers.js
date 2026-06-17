@@ -163,7 +163,7 @@ function showSvCtx(sid, sv, anchorEl) {
   popup.style.right = right + 'px';
   const label = document.createElement('div');
   label.style.cssText = 'font-size:11px;color:var(--gold);padding:6px 12px 8px;font-weight:800;border-bottom:1px solid rgba(180,150,80,0.2);margin-bottom:4px;white-space:nowrap';
-  label.textContent = (sv.emoji||'🌍') + ' ' + (sv.name||');
+  label.textContent = (sv.emoji||'🌍') + ' ' + (sv.name||'');
   popup.appendChild(label);
   const mkBtn = (icon, text, danger, fn) => {
     const b = document.createElement('button');
