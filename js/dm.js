@@ -3,10 +3,6 @@ window.openDMFromSvBar = function() {
   else openDMScreen();
 };
 
-window.openDMScreen = function() {
-  openDMScreen();
-};
-
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
 function openDM(uid, name) {
   closeSidebar();
