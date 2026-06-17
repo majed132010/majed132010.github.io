@@ -20,8 +20,8 @@ function listenNotifications(userId) {
 
   // نقطة بداية الجلسة — نُعالج فقط الإشعارات الجديدة فعلاً.
   // استخدام orderByChild('ts').startAt بدلاً من limitToLast(1) يقطع
-  // حلقة cascade الكلاسيكية: حذف الإشعار الأخير يُظهر السابق له →
-  // child_added → delete → child_added ... بلا نهاية.
+  // حلقة cascade الكلاسيكية: حذف الإشعار الأخير يُظهر السابق له ←
+  // child_added ← delete ← child_added ... بلا نهاية.
   const sessionStart = Date.now();
   const ref = db.ref('notifications/' + userId)
     .orderByChild('ts')
@@ -141,6 +141,7 @@ function showNotifBtn(userId) {
 }
 
 // ════ DO NOT DISTURB ════
+// دالة لتبديل وضع عدم الإزعاج
 function toggleDND() {
   _dndActive = !_dndActive;
   const btn = document.getElementById('dndBtn');
@@ -222,16 +223,20 @@ function showInAppNotif(msg, sid, cid) {
 function showDmNotif(msg, fromUid) {
   if (_currentDmUid === fromUid) return;
 
-  // ── دُفاع واحد ضد التكرار: _addDmListener + listenNotifications + FCM تُطلق جميعها
+  // ── دِفاع واحد ضد التكرار: _addDmListener + listenNotifications + FCM تُطلق جميعها
   // هذه الدالة لنفس الرسالة في غضون ملي-ثوانٍ. نسمح بإشعار واحد كل 1.5 ثانية لنفس المرسل.
   const tag = 'dm_' + (fromUid || '');
   const now = Date.now();
   if (_lastShownTag[tag] && now - _lastShownTag[tag] < 1500) return;
   _lastShownTag[tag] = now;
 
-  // زيادة العداد مرة واحدة فقط (هنا — لا في المستدعِي)
-  _dmUnread[fromUid] = (_dmUnread[fromUid] || 0) + 1;
-  updateDmBadge();
+  // الحماية الآمنة: زيادة العداد وتحديث شارة الإشعارات الخاصة في حال كان الكائن معرّفاً
+  if (typeof _dmUnread !== 'undefined') {
+    _dmUnread[fromUid] = (_dmUnread[fromUid] || 0) + 1;
+  }
+  if (typeof updateDmBadge === 'function') {
+    updateDmBadge();
+  }
 
   const senderName = msg.name || 'رسالة خاصة';
   const body = msg.text
