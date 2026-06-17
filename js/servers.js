@@ -419,7 +419,7 @@ function renderChannels(sid) {
   const dmUnreadTotal = Object.values((typeof _dmUnread !== 'undefined' ? _dmUnread : {})).reduce((a,b)=>a+b,0);
   
   dmBtn.innerHTML = `<span class="ch-item-icon">💬</span><span class="ch-item-name">رسائلي الخاصة</span>${dmUnreadTotal>0?`<span class="ch-badge">${dmUnreadTotal>99?'99+':dmUnreadTotal}</span>`:''}`;
-  dmBtn.addEventListener('click', () => { closeSidebar(); openDMScreen(); });
+  dmBtn.addEventListener('click', () => { closeSidebar();  if (typeof openDMScreen === 'function') openDMScreen(); });
   dmSection.appendChild(dmBtn);
   list.appendChild(dmSection);
   setTimeout(() => { if (typeof updateDmBadge === 'function') updateDmBadge(); }, 100);
