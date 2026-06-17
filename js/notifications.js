@@ -220,6 +220,7 @@ function showInAppNotif(msg, sid, cid) {
 
 // ════ إشعار داخلي للرسائل الخاصة ════
 function showDmNotif(msg, fromUid) {
+  console.log('[DM] showDmNotif called for uid:', fromUid, 'stack:', new Error().stack.split('\n')[2]);
   if (_currentDmUid === fromUid) return;
 
   // ── دُفاع واحد ضد التكرار: _addDmListener + listenNotifications + FCM تُطلق جميعها

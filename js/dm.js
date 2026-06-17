@@ -640,6 +640,7 @@ function listenDMs() {
 }
 
 function _addDmListener(uid) {
+  console.log('[DM] _addDmListener called for uid:', uid, 'existing:', !!_dmGlobalListeners[uid]);
   // فسخ المستمع القديم صراحةً قبل أي تسجيل جديد — يقطع أي تراكم محتمل في المستمعات
   if (_dmGlobalListeners[uid]) {
     const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
