@@ -219,6 +219,17 @@ function openDM(uid, name) {
   const changeFn = snap => {
     const msg = snap.val();
     if (!msg) return;
+    // real-time read receipt for sender
+    if (msg && msg.status === 'read' && msg.uid === currentUser.uid) {
+      const dmArea2 = document.getElementById('dmMessages');
+      if (dmArea2) {
+        const statusEl = dmArea2.querySelector(`.msg-status[data-key="${snap.key}"]`);
+        if (statusEl) {
+          statusEl.textContent = '✓✓';
+          statusEl.style.color = '#5865f2';
+        }
+      }
+    }
     // تحديث علامة القراءة فوراً للمُرسل
     if (msg.status === 'read' && msg.uid === currentUser.uid) {
       const statusEl = dmArea.querySelector(`.msg-status[data-key="${snap.key}"]`);
