@@ -412,6 +412,7 @@ async function deleteDmMessage(key, otherUid) {
 }
 
 async function sendDM() {
+  console.log('[sendDM] called, text:', !!document.getElementById('dmChatInp')?.value.trim(), 'media:', window._pendingDmMedia?.length);
   if (!_currentDmUid || !currentUser) return;
   const inp = document.getElementById('dmChatInp');
   const text = inp?.value.trim();
@@ -474,4 +475,5 @@ async function handleDmMediaSelect(input) {
       document.getElementById('dmSendBtn').classList.add('active');
     } catch(e) { toast('❌ تعذّر قراءة الملف'); }
   }
+  console.log('[DM Media] files count:', files.length, 'pending after:', window._pendingDmMedia?.length);
 }
