@@ -23,7 +23,65 @@ function openDMScreen() {
   if (dmPicker) dmPicker.style.display = 'flex';
   const dmChat = document.getElementById('dmChatArea');
   if (dmChat) dmChat.style.display = 'none';
-  if (typeof renderDmList === 'function') renderDmList();
+  renderDmPickerList();
+}
+
+function renderDmPickerList() {
+  const container = document.getElementById('dmPickerList');
+  if (!container || !currentUser) return;
+
+  const activeServer = currentServer || _lastServerId;
+  const svMembers = {};
+  if (activeServer && typeof servers !== 'undefined' && servers[activeServer]?.members) {
+    Object.entries(servers[activeServer].members).forEach(([uid, m]) => {
+      if (uid !== currentUser.uid) svMembers[uid] = m;
+    });
+  }
+
+  const memberUids = Object.keys(svMembers);
+  container.innerHTML = '';
+
+  if (!memberUids.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif;font-size:14px">لا يوجد أعضاء آخرون في هذا العالم</div>';
+    return;
+  }
+
+  Promise.all(
+    memberUids.map(uid =>
+      db.ref('users/' + uid).once('value').then(s => {
+        const live = s.val() || {};
+        const member = svMembers[uid] || {};
+        return { uid, name: live.displayName || member.name || 'عضو', avatar: live.avatar || member.avatar || null };
+      })
+    )
+  ).then(list => {
+    container.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.id = 'dmPickerGrid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:8px 4px 16px';
+
+    list.forEach(({ uid, name, avatar }) => {
+      const card = document.createElement('div');
+      card.dataset.dmUid = uid;
+      card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent';
+
+      const av = document.createElement('div');
+      av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
+      if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      else av.textContent = (name[0] || '?').toUpperCase();
+
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif';
+      nameEl.textContent = name;
+
+      card.appendChild(av);
+      card.appendChild(nameEl);
+      card.addEventListener('click', () => openDM(uid, name));
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  });
 }
 
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
