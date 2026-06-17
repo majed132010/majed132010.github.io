@@ -6,6 +6,24 @@ window.openDMFromSvBar = function() {
   }
 };
 
+function openDMScreen() {
+  closeSidebar();
+  if (currentServer) _lastServerId = currentServer;
+  currentServer = null; currentChannel = null; _currentDmUid = null;
+  if (document.getElementById('chSettingsBtn')) document.getElementById('chSettingsBtn').style.display = 'none';
+  document.getElementById('mhIcon').textContent = '💬';
+  document.getElementById('mhName').textContent = 'الرسائل الخاصة';
+  document.getElementById('searchToggleBtn').style.display = 'none';
+  document.getElementById('membersToggleBtn').style.display = 'none';
+  const oldBtns = document.getElementById('dmCallBtns');
+  if (oldBtns) oldBtns.remove();
+  if (typeof renderServerList === 'function') renderServerList();
+  showView('dm');
+  document.getElementById('dmPickerScreen').style.display = 'flex';
+  document.getElementById('dmChatArea').style.display = 'none';
+  if (typeof renderDmPickerList === 'function') renderDmPickerList();
+}
+
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
 function openDM(uid, name) {
   closeSidebar();
