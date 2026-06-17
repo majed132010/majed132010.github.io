@@ -62,7 +62,7 @@
     <div class="sv-item sv-add" onclick="openCreateServer()" title="اصنع عالمك 🌌">🌌</div>
     <div class="sv-item sv-add" onclick="openJoinServer()" title="انضمام برابط/كود">🔗</div>
     <div class="sv-sep"></div>
-    <div class="sv-item" id="dmSvBtn" onclick="openDMFromSvBar()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
+    <div class="sv-item" id="dmSvBtn" onclick="if(typeof openDMFromSvBar==='function')openDMFromSvBar()" title="الرسائل الخاصة" style="position:relative;font-size:20px">
       💬
       <span id="dmSvBadge" style="display:none;position:absolute;top:0;right:0;background:#ed4245;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;line-height:16px;text-align:center"></span>
     </div>
