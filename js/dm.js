@@ -210,6 +210,10 @@ function openDM(uid, name) {
     if (!msg || dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
     const _d = buildDmMsgDiv(msg, snap.key, uid, name); if (!_d) return;
     dmArea.appendChild(_d);
+    // if incoming message from other user, mark as read immediately
+    if (msg.uid === uid && msg.status !== 'read') {
+      db.ref('dm_messages/' + getDmId(currentUser.uid, uid) + '/' + snap.key + '/status').set('read');
+    }
     if (_dmInitialDone) {
       dmArea.scrollTop = dmArea.scrollHeight;
     }
