@@ -23,7 +23,7 @@ function openDMScreen() {
   if (dmPicker) dmPicker.style.display = 'flex';
   const dmChat = document.getElementById('dmChatArea');
   if (dmChat) dmChat.style.display = 'none';
-  renderDmList();
+  if (typeof renderDmList === 'function') renderDmList();
 }
 
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
