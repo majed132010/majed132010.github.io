@@ -147,3 +147,110 @@ function openDM(uid, name) {
     if (el) el.textContent = snap.val() ? name + ' يكتب...' : '';
   });
 }
+
+// ════ بناء رسالة خاصة (نسخة معدلة لدعم تلميح وقت القراءة) ════
+function buildDmMsgDiv(msg, key, otherUid, otherName) {
+  const isMine = msg.uid === currentUser?.uid;
+  const div = document.createElement('div');
+  div.className = 'msg-group'; div.dataset.key = key;
+  const av = document.createElement('div'); av.className='msg-av'; av.textContent=(msg.name||'?')[0];
+  const body = document.createElement('div'); body.className='msg-body';
+  const meta = document.createElement('div'); meta.className='msg-meta';
+  meta.innerHTML=`<span class="msg-name">${escHtml(msg.name||'')}</span><span class="msg-time">${formatTime(msg.ts)}</span>`;
+  body.appendChild(meta);
+  
+  if (isMine) {
+    const statusEl = document.createElement('span');
+    statusEl.className = 'msg-status';
+    statusEl.dataset.key = key;
+    statusEl.style.cssText = 'font-size:11px;margin-right:4px;';
+    statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+    statusEl.style.color = msg.status === 'read' ? '#5865f2' : '#8899aa';
+    statusEl.style.marginTop = '2px';
+    statusEl.style.display = 'inline-block';
+    
+    // إضافة تلميح الوقت المحدّث للرسائل المحمّلة مسبقاً إذا كانت مقروءة ولديها وقت مسجل
+    if (msg.status === 'read' && msg.readAt) {
+      statusEl.title = 'قرأ الساعة ' + new Date(msg.readAt).toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'});
+      statusEl.style.cursor = 'help';
+    }
+    
+    console.log('[STATUS]', msg.status, key);
+    meta.appendChild(statusEl);
+  }
+  
+  if (msg.replyTo) {
+    const quote=document.createElement('div'); quote.className='msg-reply-quote';
+    quote.innerHTML=`<div class="rq-name">${escHtml(msg.replyTo.name||'')}</div><div class="rq-text">${escHtml(msg.replyTo.text||'🖼️')}</div>`;
+    body.appendChild(quote);
+  }
+  if (msg.text) { const txt=document.createElement('div'); txt.className='msg-content'; txt.textContent=msg.text; body.appendChild(txt); }
+  if (msg.uploading && !msg.mediaUrl) {
+    body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
+  }
+  if (msg.mediaUrl) {
+    if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) return null;
+    if (msg.mediaType === 'video') {
+      body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async';
+      img.className = 'msg-media-img';
+      img.alt = msg.mediaName || '';
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
+      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+      wrap.appendChild(img);
+      body.appendChild(wrap);
+    }
+  }
+  if (msg.voiceUrl) { const vw=document.createElement('div'); vw.style.cssText='margin-top:4px'; vw.appendChild(buildVoiceMsg(msg.voiceUrl,msg.voiceDuration)); body.appendChild(vw); }
+
+  const actions=document.createElement('div'); actions.className='msg-actions';
+  const replyBtn=document.createElement('button'); replyBtn.className='ma-btn'; replyBtn.textContent='↩️'; replyBtn.title='رد';
+  replyBtn.addEventListener('click',e=>{e.stopPropagation();setDmReply(key,msg.name,msg.text);}); actions.appendChild(replyBtn);
+  if (isMine) {
+    const delBtn=document.createElement('button'); delBtn.className='ma-btn danger'; delBtn.textContent='🗑️'; delBtn.title='حذف';
+    delBtn.addEventListener('click',e=>{e.stopPropagation();deleteDmMessage(key,otherUid);}); actions.appendChild(delBtn);
+  }
+  div.appendChild(av); div.appendChild(body); div.appendChild(actions);
+
+  // ── WhatsApp-style context bar: right-click / long-press ──────────────────
+  if (!window._ctxDismissReady) {
+    window._ctxDismissReady = true;
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    });
+  }
+  const ctxBar = document.createElement('div');
+  ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
+  const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
+  [
+    { icon: '↩️', label: 'رد',         fn: () => setDmReply(key, msg.name, msg.text) },
+    { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
+    { icon: '⭐', label: 'تثبيت',        fn: () => toast('⭐ قريباً') },
+    ...(isMine ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteDmMessage(key, otherUid) }] : []),
+    ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
+  ].forEach(ac => {
+    const b = document.createElement('button');
+    b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
+    b.title = ac.label;
+    b.innerHTML = `<span class="mc-icon">${ac.icon}</span><span class="mc-label">${ac.label}</span>`;
+    b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
+    ctxBar.appendChild(b);
+  });
+  body.style.position = 'relative';
+  body.appendChild(ctxBar);
+  div.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    ctxBar.classList.add('visible');
+  });
+  let _ctxLp;
+  div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
+  div.addEventListener('touchend',   () => clearTimeout(_ctxLp), { passive: true });
+  div.addEventListener('touchmove',  () => clearTimeout(_ctxLp), { passive: true });
+
+  return div;
+}
