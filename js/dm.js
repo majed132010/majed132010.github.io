@@ -285,7 +285,7 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     const statusEl = document.createElement('span');
     statusEl.className = 'msg-status';
     statusEl.dataset.key = key;
-    statusEl.style.cssText = 'font-size:11px;margin-right:4px;display:block;text-align:left;';
+    statusEl.style.cssText = 'font-size:11px;margin-right:4px;';
     statusEl.textContent = msg.status === 'read' ? '✓✓' : msg.status === 'sent' ? '✓' : '✓';
     statusEl.style.color = msg.status === 'read' ? '#5865f2' : '#8899aa';
     statusEl.style.marginTop = '2px';
