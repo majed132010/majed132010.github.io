@@ -180,7 +180,7 @@ function openDM(uid, name) {
   if (chat) { chat.style.display = 'flex'; chat.style.flexDirection = 'column'; }
   clearDmUnread(uid);
   const dmId2 = getDmId(currentUser.uid, uid);
-  db.ref('dm_messages/' + dmId2).once('value').then(snap => {
+  db.ref('dm_messages/' + dmId2).limitToLast(40).once('value').then(snap => {
     const updates = {};
     snap.forEach(ch => {
       const msg = ch.val();
