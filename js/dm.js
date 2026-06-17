@@ -116,7 +116,7 @@ function openDM(uid, name) {
   document.getElementById('dmPickerScreen').style.display = 'none';
   const chat = document.getElementById('dmChatArea');
   if (chat) { chat.style.display = 'flex'; chat.style.flexDirection = 'column'; }
-  clearDmUnread(uid);
+  if (typeof clearDmUnread === 'function') clearDmUnread(uid);
   
   // تحديث الرسائل القديمة غير المقروءة عند فتح المحادثة مع تسجيل وقت القراءة الحالي
   db.ref('dm_messages/' + getDmId(currentUser.uid, uid)).limitToLast(10).once('value').then(snap => {
