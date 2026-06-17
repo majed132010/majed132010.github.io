@@ -410,12 +410,15 @@ function renderChannels(sid) {
   const dmBtn = document.createElement('div');
   dmBtn.className = 'ch-item';
   dmBtn.id = 'dmChannelBtn';
-  const dmUnreadTotal = Object.values(_dmUnread||{}).reduce((a,b)=>a+b,0);
+  
+  // الحماية الآمنة لفحص كائن _dmUnread قبل إجراء عملية الـ reduce لعدم تعطل الكود
+  const dmUnreadTotal = Object.values((typeof _dmUnread !== 'undefined' ? _dmUnread : {})).reduce((a,b)=>a+b,0);
+  
   dmBtn.innerHTML = `<span class="ch-item-icon">💬</span><span class="ch-item-name">رسائلي الخاصة</span>${dmUnreadTotal>0?`<span class="ch-badge">${dmUnreadTotal>99?'99+':dmUnreadTotal}</span>`:''}`;
   dmBtn.addEventListener('click', () => { closeSidebar(); openDMScreen(); });
   dmSection.appendChild(dmBtn);
   list.appendChild(dmSection);
-  setTimeout(() => updateDmBadge(), 100);
+  setTimeout(() => { if (typeof updateDmBadge === 'function') updateDmBadge(); }, 100);
 }
 
 // ════ اختيار قناة ════
@@ -621,13 +624,10 @@ async function checkBanned(sid) {
 }
 
 // ════ ضمان تسجيل العضوية الكاملة ════
-// يقرأ مباشرة من DB (لا يعتمد على الكاش المحلي الذي قد يكون قديماً)،
-// ويكتب السجل كاملاً إن كان غائباً أو ناقصاً، بدون catch صامت.
 async function _ensureMemberRegistered(sid) {
   if (!currentUser || !sid) return;
   if (_registeredServers.has(sid)) return; // تم التحقق مسبقاً في هذه الجلسة
 
-  // استخدام auth.currentUser مباشرة كمرجع أساسي للهوية
   const authUser = auth.currentUser;
   if (!authUser) return;
 
@@ -642,20 +642,18 @@ async function _ensureMemberRegistered(sid) {
   const entry = snap.val();
 
   if (!entry) {
-    // لا يوجد سجل عضوية — تحقق أن المستخدم مضاف فعلاً لهذا السيرفر
     const svSnap = await db.ref('users/' + currentUser.uid + '/servers/' + sid).once('value');
     if (!svSnap.exists()) return; // ليس عضواً — لا تتدخل
     const newEntry = { role: 'member', name: displayName, avatar, joinedAt: Date.now() };
-    await memberRef.set(newEntry); // يرفع استثناءً إن رُفضت الصلاحية
+    await memberRef.set(newEntry);
     if (servers[sid]) {
       if (!servers[sid].members) servers[sid].members = {};
       servers[sid].members[currentUser.uid] = newEntry;
     }
     console.log('[MEMBERS] ✓ تم إنشاء سجل العضوية لـ', currentUser.uid, 'في', sid);
   } else if (!entry.name || !entry.avatar) {
-    // السجل موجود لكن ناقص — أضف name/avatar دون المساس بالـ role
     const update = { name: displayName, avatar };
-    await memberRef.update(update); // يرفع استثناءً إن رُفضت الصلاحية
+    await memberRef.update(update);
     if (servers[sid]?.members?.[currentUser.uid]) {
       Object.assign(servers[sid].members[currentUser.uid], update);
     }
@@ -885,9 +883,6 @@ function restoreLastServer() {
 }
 
 // ════ تسجيل رسالة صوتية في المحادثات الخاصة (DM) ════
-// حالة مستقلة عن تسجيل القنوات (voice.js) حتى لا يتعارضا.
-// يدير حالة التسجيل ذاتياً ولا يعتمد على وجود زر معيّن في ملفات الواجهة:
-// كل وصول للـ DOM محميّ بـ (?.) فيعمل المنطق حتى لو لم يوجد عنصر الزر.
 let _dmMediaRecorder = null, _dmAudioChunks = [], _dmRecordingTimer = null;
 let _dmRecordingSeconds = 0, _dmVoiceRecordingBusy = false;
 
@@ -896,7 +891,6 @@ async function toggleDmVoiceRecording() {
   if (!_currentDmUid || !currentUser) { toast('⚠️ افتح محادثة خاصة أولاً'); return; }
   const btn = document.getElementById('dmVoiceRecordBtn');
 
-  // إيقاف التسجيل الجاري وإرساله
   if (_dmMediaRecorder && _dmMediaRecorder.state === 'recording') {
     _dmVoiceRecordingBusy = true;
     clearInterval(_dmRecordingTimer);
@@ -905,7 +899,6 @@ async function toggleDmVoiceRecording() {
     return;
   }
 
-  // بدء تسجيل جديد
   if (!_dmMediaRecorder || _dmMediaRecorder.state === 'inactive') {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -929,7 +922,7 @@ async function toggleDmVoiceRecording() {
       _dmRecordingTimer = setInterval(() => {
         _dmRecordingSeconds++;
         if (btn) btn.textContent = `⏹ ${_dmRecordingSeconds}s`;
-        if (_dmRecordingSeconds >= 60) toggleDmVoiceRecording(); // حد أقصى 60 ثانية
+        if (_dmRecordingSeconds >= 60) toggleDmVoiceRecording();
       }, 1000);
       toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال');
     } catch (e) {
@@ -939,7 +932,6 @@ async function toggleDmVoiceRecording() {
   }
 }
 
-// رفع الرسالة الصوتية للمحادثة الخاصة الحالية وإرسالها (يطابق نمط dm.js)
 async function _sendDmVoiceMessage(blob, duration, mimeType) {
   if (!_currentDmUid || !currentUser) return;
   toast('⏳ جاري إرسال الرسالة الصوتية...');
@@ -956,12 +948,10 @@ async function _sendDmVoiceMessage(blob, duration, mimeType) {
       voiceDuration: duration,
       text: ''
     });
-    // حدّث فهرس المحادثات للطرفين
     const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
     const otherName = otherSnap.val() || 'مستخدم';
     await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
     await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
-    // إشعار الطرف الآخر
     setTimeout(async () => {
       try {
         await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية',
