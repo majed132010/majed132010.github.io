@@ -259,7 +259,7 @@ function openDM(uid, name) {
 
   const dmRef = db.ref(path).limitToLast(40);
   dmRef.on('child_added', fn);
-  db.ref(path).on('child_changed', changeFn);
+  db.ref('dm_messages/' + dmId).on('child_changed', changeFn);
   _dmListener = { path, mainRef: dmRef, fn, changeFn };
 
   dmRef.once('value', () => {
