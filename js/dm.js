@@ -448,50 +448,6 @@ async function deleteDmMessage(key, otherUid) {
   document.querySelector(`[data-key="${key}"]`)?.remove();
 }
 
-async function sendDM() {
-  console.log('[sendDM] called, text:', !!document.getElementById('dmChatInp')?.value.trim(), 'media:', window._pendingDmMedia?.length);
-  if (!_currentDmUid || !currentUser) return;
-  const inp = document.getElementById('dmChatInp');
-  const text = inp?.value.trim();
-  if (!text) return;
-  inp.value = ''; inp.style.height = '';
-  document.getElementById('dmSendBtn')?.classList.remove('active');
-  stopDmTyping();
-  const dmId = getDmId(currentUser.uid, _currentDmUid);
-  const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), status: 'sent' };
-  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
-  msgBase.text = text;
-  const msgRef = db.ref('dm_messages/' + dmId).push();
-  await msgRef.set(msgBase);
-  const dmMeta = { name: userProfile.displayName || 'مستخدم', ts: Date.now(), lastMsg: text };
-  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).update(dmMeta);
-  await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).update({ name: userProfile.displayName || 'مستخدم', ts: Date.now(), lastMsg: text });
-  const media = window._pendingDmMedia || [];
-  window._pendingDmMedia = [];
-  for (const m of media) {
-    const dmId2 = getDmId(currentUser.uid, _currentDmUid);
-    const dmMsgPath = 'dm_messages/' + dmId2;
-    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-    const msgRef = db.ref(dmMsgPath).push();
-    const msgKey = msgRef.key;
-    await msgRef.set({
-      uid: currentUser.uid, name: userProfile.displayName||'مستخدم', ts: Date.now(),
-      text: '', mediaType: m.type, mediaName: m.name,
-      uploading: true, uploadProgress: 1, expiresAt, saved: false, status: 'sent'
-    });
-    try {
-      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, () => {});
-      await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
-      try { await sendPushToUser(_currentDmUid, userProfile.displayName||'رسالة خاصة', m.type==='video'?'🎥 فيديو':'🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
-    } catch(e) {
-      db.ref(dmMsgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true });
-      toast('❌ فشل رفع الملف');
-    }
-  }
-  if (typeof sendPushToUser === 'function') {
-    sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text, { type: 'dm', fromUid: currentUser.uid });
-  }
-}
 
 async function handleDmMediaSelect(input) {
   const files = Array.from(input.files);
