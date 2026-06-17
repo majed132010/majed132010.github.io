@@ -467,7 +467,7 @@ async function handleDmMediaSelect(input) {
     try {
       const arrayBuffer = await file.arrayBuffer();
       let blob = new Blob([arrayBuffer], { type: file.type });
-      if (!isVideo) blob = await compressImage(blob);
+      if (!isVideo && typeof compressImage === 'function') blob = await compressImage(blob);
       const mimeType = blob.type || file.type;
       const localUrl = URL.createObjectURL(blob);
       window._pendingDmMedia.push({ blob, type: isVideo?'video':'image', name: file.name, mimeType, localUrl });
