@@ -663,7 +663,7 @@ function _addDmListener(uid) {
   // فسخ المستمع القديم صراحةً قبل أي تسجيل جديد — يقطع أي تراكم محتمل في المستمعات
   if (_dmGlobalListeners[uid]) {
     const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
-    try { oldQ.off('child_added', oldFn); } catch(e) {}
+    try { oldQ.off('child_added', oldFn); oldQ.off('child_changed', oldFn); } catch(e) {}
     delete _dmGlobalListeners[uid];
     // لا return هنا — نكمل لإعادة التسجيل بمستمع جديد نظيف
   }
@@ -682,6 +682,19 @@ function _addDmListener(uid) {
     _refreshPickerBadge(uid);
   };
   q.on('child_added', fn);
+  const changeFn = msgSnap => {
+    if (!initialized) return;
+    const msg = msgSnap.val();
+    if (!msg || msg.uid !== currentUser.uid) return;
+    const dmArea = document.getElementById('dmMessages');
+    if (!dmArea) return;
+    const statusEl = dmArea.querySelector(`.msg-status[data-key="${msgSnap.key}"]`);
+    if (statusEl && msg.status === 'read') {
+      statusEl.textContent = '✓✓';
+      statusEl.style.color = '#5865f2';
+    }
+  };
+  q.on('child_changed', changeFn);
   // once('value') يُطلق بعد كل child_added الأولي → نضمن أن fn للرسائل القادمة فقط
   q.once('value', () => { initialized = true; });
   _dmGlobalListeners[uid] = { q, fn };
