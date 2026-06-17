@@ -426,6 +426,23 @@ async function handleDmMediaSelect(input) {
       const mimeType = blob.type || file.type;
       const localUrl = URL.createObjectURL(blob);
       window._pendingDmMedia.push({ blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl });
+      // عرض معاينة الصورة
+let preview = document.getElementById('dmMediaPreview');
+if (!preview) {
+  preview = document.createElement('div');
+  preview.id = 'dmMediaPreview';
+  preview.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;background:rgba(0,0,0,0.05);border-radius:8px;margin:4px 0';
+  const dmInput = document.querySelector('#dmChatArea .chat-input-wrap');
+  if (dmInput) dmInput.insertBefore(preview, dmInput.firstChild);
+}
+preview.style.display = 'flex';
+const wrap = document.createElement('div');
+wrap.style.cssText = 'position:relative;display:inline-flex';
+const thumb = document.createElement(isVideo ? 'video' : 'img');
+thumb.src = localUrl;
+thumb.style.cssText = 'height:60px;max-width:90px;border-radius:6px;object-fit:cover;display:block';
+wrap.appendChild(thumb);
+preview.appendChild(wrap);
       const sendBtn = document.getElementById('dmSendBtn');
       if (sendBtn) sendBtn.classList.add('active');
     } catch(e) { toast('❌ تعذّر قراءة الملف'); }
