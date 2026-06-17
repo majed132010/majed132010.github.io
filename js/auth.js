@@ -1,4 +1,7 @@
-// ════ AUTH & USER ════
+// ═════════════════════════════════════════════════════════════════
+// ════ AUTH & USER SYSTEM ═════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
+
 let currentUser = null;
 let userProfile = {};
 
@@ -18,34 +21,51 @@ function _dismissSplash() {
   splash.classList.add('splash-out');
   setTimeout(() => { if (splash.parentNode) splash.remove(); }, 450);
 }
+
 // Fail-safe: force-dismiss after 2.5 s even if onAuthStateChanged never fires
-// (slow network, Firebase initialisation error, blocked by browser, etc.)
 setTimeout(_dismissSplash, 2500);
 
+// ════ وظيفة حالة الاتصال الحية (Online Status System) ════
+function updateOnlineStatus(isOnline) {
+  if (!currentUser) return;
+  db.ref('users/' + currentUser.uid).update({
+    online: isOnline,
+    lastSeen: Date.now()
+  });
+  if (isOnline) {
+    db.ref('users/' + currentUser.uid + '/online').onDisconnect().set(false);
+    db.ref('users/' + currentUser.uid + '/lastSeen').onDisconnect().set(Date.now());
+  }
+}
+
 // ════ رسم لوحة المستخدم السفلى فوراً بمجرد توفّر بيانات Auth ════
-// يُحلّ مشكلة تأخّر ظهور ترس الإعدادات حتى اكتمال listenServers الـ async
 function renderSidebarBottom(user) {
-  // ابنِ userProfile مؤقتاً من بيانات Auth إذا لم يكن محمَّلاً بعد
   if (!userProfile.displayName) userProfile.displayName = user.displayName || user.email?.split('@')[0] || 'مستخدم';
   if (!userProfile.avatar)      userProfile.avatar      = user.photoURL || null;
   updateUserPanel();
 }
 
+// ════ مستمع حالة الحساب والاتصال الأساسي ════
 auth.onAuthStateChanged(user => {
-  _dismissSplash(); // dismiss immediately on auth resolution (fast path)
+  _dismissSplash(); 
   if (user) {
     currentUser = user;
     document.getElementById('loginScreen').style.display = 'none';
     const app = document.getElementById('app');
     if (app) app.style.display = 'flex';
-    renderSidebarBottom(user); // اعرض الشريط السفلي فوراً قبل أي قراءة من Firebase
+    renderSidebarBottom(user); 
     loadUserProfile().then(() => {
       initApp();
       initFCM(user.uid);
       listenNotifications(user.uid);
-      // تسجيل مستمع المكالمات الواردة — بدونه لا يستقبل الطرف الآخر أي مكالمة
+      
+      // 🆕 تفعيل بث حالة الاتصال الحية للمستخدم فور الدخول
+      updateOnlineStatus(true);
+      window.addEventListener('beforeunload', () => updateOnlineStatus(false));
+
+      // تسجيل مستمع المكالمات الواردة
       if (typeof listenIncomingCalls === 'function') {
-        console.log('[CALL] استدعاء listenIncomingCalls بعد تسجيل الدخول لـ', user.uid);
+        console.log('[CALL] 📞 استدعاء listenIncomingCalls بعد تسجيل الدخول لـ', user.uid);
         listenIncomingCalls();
       } else {
         console.error('[CALL] ✖ الدالة listenIncomingCalls غير معرّفة — تأكد من تحميل js/calls.js');
@@ -53,7 +73,7 @@ auth.onAuthStateChanged(user => {
     });
   } else {
     currentUser = null;
-    // نظّف مستمع الإشعارات فوراً عند تسجيل الخروج — يمنع تلقّي إشعارات الجلسة القديمة
+    // نظّف مستمع الإشعارات فوراً عند تسجيل الخروج
     if (typeof _notifListener !== 'undefined' && _notifListener) {
       _notifListener.ref.off('child_added', _notifListener.fn);
       _notifListener = null;
@@ -66,9 +86,7 @@ auth.onAuthStateChanged(user => {
 
 const _GOOGLE_BTN_HTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg> دخول بـ Google';
 
-// ════ 🆕 حفظ Firebase idToken في IndexedDB ليقرأه الـ Service Worker ════
-// يستخدمه الـ SW لكتابة رفض المكالمة الصامت مُصادَقاً (?auth=ID_TOKEN) في RTDB.
-// نفس اسم القاعدة/المخزن مستخدم في firebase-messaging-sw.js للقراءة.
+// ════ حفظ Firebase idToken في IndexedDB ليقرأه الـ Service Worker ════
 const _AUTH_IDB_NAME = 'awalem-auth';
 const _AUTH_IDB_STORE = 'kv';
 
@@ -93,7 +111,6 @@ function _putAuthKV(key, val) {
   }));
 }
 
-// يُطلق عند الدخول، وعند كل تجديد تلقائي للتوكن (كل ~ساعة)، وعند الخروج
 auth.onIdTokenChanged(async user => {
   try {
     if (user) {
@@ -120,7 +137,6 @@ function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  // الأساس: signInWithPopup. وعند حظره/تعذّره من المتصفح: تحويل تلقائي إلى signInWithRedirect.
   auth.signInWithPopup(provider)
     .then(() => { if (btn) btn.disabled = false; })
     .catch(e => {
@@ -149,11 +165,9 @@ async function loadUserProfile() {
     userProfile.displayName = currentUser.displayName || 'مستخدم';
     userProfile.tag = String(Math.floor(1000 + Math.random() * 9000));
     userProfile.adminCode = generateAdminCode();
-    // بذر صورة Google عند أول تسجيل دخول إن لم تُحفظ بعد
     if (!userProfile.avatar && currentUser.photoURL) userProfile.avatar = currentUser.photoURL;
     await db.ref('users/' + currentUser.uid).update(userProfile);
   } else if (!userProfile.avatar && currentUser.photoURL) {
-    // مستخدم قديم لم تُحفظ له صورة بعد — نحفظها الآن
     userProfile.avatar = currentUser.photoURL;
     db.ref('users/' + currentUser.uid + '/avatar').set(currentUser.photoURL);
   }
@@ -167,7 +181,6 @@ async function loadUserProfile() {
 function updateUserPanel() {
   const av = document.getElementById('upAv');
   if (av) {
-    // RTDB avatar أولاً، ثم صورة Google الحية كاحتياط
     const src = userProfile.avatar || auth.currentUser?.photoURL || null;
     if (src) {
       av.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">`;
@@ -181,14 +194,11 @@ function updateUserPanel() {
   if (dni) dni.value = userProfile.displayName || '';
 }
 
-// ════ فتح مودال تعديل الملف الشخصي مع تعبئة القيم الحالية ════
 function openEditProfile() {
   const nameInp = document.getElementById('displayNameInp');
   if (nameInp) nameInp.value = userProfile.displayName || '';
-  // إعادة تعيين حقل الملف لمنع عرض ملف انتُقي سابقاً
   const fileInp = document.getElementById('epAvatarInput');
   if (fileInp) fileInp.value = '';
-  // تعبئة معاينة الصورة الحالية
   const prev = document.getElementById('epAvatarPreview');
   if (prev) {
     if (userProfile.avatar) {
@@ -200,7 +210,6 @@ function openEditProfile() {
   openModal('settingsModal');
 }
 
-// معاينة محلية للصورة الجديدة قبل الرفع
 function previewEditAvatar(input) {
   const file = input.files[0];
   if (!file) return;
@@ -213,7 +222,6 @@ function previewEditAvatar(input) {
   reader.readAsDataURL(file);
 }
 
-// ════ مزامنة الاسم والصورة في جميع السيرفرات ════
 async function _syncProfileToServers(name, avatarUrl) {
   if (!currentUser) return;
   const snap = await db.ref('users/' + currentUser.uid + '/servers').once('value');
@@ -226,7 +234,6 @@ async function _syncProfileToServers(name, avatarUrl) {
   if (Object.keys(updates).length) await db.ref().update(updates);
 }
 
-// ════ حفظ الملف الشخصي: رفع الصورة + تحديث Auth + RTDB + جميع السيرفرات ════
 async function saveSettings() {
   const name = (document.getElementById('displayNameInp')?.value || '').trim();
   if (!name) { toast('❌ الاسم لا يمكن أن يكون فارغاً'); return; }
@@ -244,19 +251,15 @@ async function saveSettings() {
       avatarUrl = await uploadToStorage(file, `avatars/${currentUser.uid}/avatar.jpg`);
     }
 
-    // تحديث Firebase Auth profile
     const profileUpdate = { displayName: name };
     if (avatarUrl) profileUpdate.photoURL = avatarUrl;
     await auth.currentUser.updateProfile(profileUpdate);
 
-    // تحديث RTDB
     await db.ref('users/' + currentUser.uid).update({ displayName: name, avatar: avatarUrl });
 
-    // تحديث الكاش المحلي
     userProfile.displayName = name;
     userProfile.avatar = avatarUrl;
 
-    // مزامنة فورية مع جميع السيرفرات
     await _syncProfileToServers(name, avatarUrl);
 
     updateUserPanel();
@@ -271,12 +274,11 @@ async function saveSettings() {
 }
 
 async function doSignOut() {
-  if (localAudioTrack) localAudioTrack.close();
-  if (agoraClient) await agoraClient.leave();
+  if (typeof localAudioTrack !== 'undefined' && localAudioTrack) localAudioTrack.close();
+  if (typeof agoraClient !== 'undefined' && agoraClient) await agoraClient.leave();
   await auth.signOut();
 }
 
-// رفع سريع للصورة من مودال الملف الشخصي (مع مزامنة السيرفرات)
 async function uploadAvatar(input) {
   const file = input.files[0];
   if (!file || !currentUser) return;
@@ -319,15 +321,18 @@ function openProfile() {
   openModal('profileModal');
 }
 
+// ═════════════════════════════════════════════════════════════════
+// 🆕 دالة بطاقة العضو البارزة الفخمة (Quick Action Member Card)
+// ═════════════════════════════════════════════════════════════════
 function openMemberCard(uid, name, avatar) {
   console.log('[DEBUG] openMemberCard called', uid, name);
   const existing = document.getElementById('memberCardOverlay');
   if (existing) existing.remove();
 
-  const overlay = document.createElement('dialog');
+  // 1. تحويل الـ Container إلى div مستقل تماماً لكسر قفل الـ Stacking Context
+  const overlay = document.createElement('div');
   overlay.id = 'memberCardOverlay';
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
-
 
   const card = document.createElement('div');
   card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
@@ -344,6 +349,16 @@ function openMemberCard(uid, name, avatar) {
   const tagEl = document.createElement('div');
   tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
   db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
+
+  // 2. فحص وعرض حالة الاتصال الحية (متصل الآن 🟢 / غير متصل ⚪)
+  const onlineEl = document.createElement('div');
+  onlineEl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;margin-top:2px;';
+  db.ref('users/' + uid + '/online').once('value').then(s => {
+    const isOn = s.val() === true;
+    onlineEl.innerHTML = isOn
+      ? '<span style="width:8px;height:8px;border-radius:50%;background:#23a55a;display:inline-block"></span><span style="color:#23a55a;font-weight:700">متصل الآن</span>'
+      : '<span style="width:8px;height:8px;border-radius:50%;background:#80848e;display:inline-block"></span><span style="color:#80848e">غير متصل</span>';
+  });
 
   const btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
@@ -364,9 +379,17 @@ function openMemberCard(uid, name, avatar) {
     btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
   }
 
-  card.appendChild(avEl); card.appendChild(nameEl); card.appendChild(tagEl); card.appendChild(btns);
+  // 3. ربط وتجميع الهيكل البصري الكامل داخل الكارد
+  card.appendChild(avEl); 
+  card.appendChild(nameEl); 
+  card.appendChild(tagEl); 
+  card.appendChild(onlineEl); 
+  card.appendChild(btns);
+  
   overlay.appendChild(card);
   document.body.appendChild(overlay);
+  
+  // إغلاق المنبثق عند الضغط على المساحة المعتتمة بالخلفية
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
