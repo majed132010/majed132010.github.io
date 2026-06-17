@@ -823,6 +823,7 @@ async function handleMediaSelect(input) {
       if (!isVideo) {
         blob = await compressImage(blob);
       }
+      console.log('[handleMediaSelect] file:', file.name, 'blob size:', blob.size, 'type:', blob.type);
 
       const mimeType = blob.type || file.type || 'application/octet-stream';
       const localUrl = URL.createObjectURL(blob);
@@ -856,6 +857,7 @@ async function handleMediaSelect(input) {
     } catch(e) {
       wrap.remove();
       if (!window._pendingMedia.length) preview.style.display='none';
+      console.error('[handleMediaSelect] ERROR:', e);
       toast('❌ تعذّر قراءة الملف: ' + (e.message || ''));
     }
   }
