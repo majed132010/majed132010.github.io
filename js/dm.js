@@ -19,9 +19,11 @@ function openDMScreen() {
   if (oldBtns) oldBtns.remove();
   if (typeof renderServerList === 'function') renderServerList();
   showView('dm');
-  document.getElementById('dmPickerScreen').style.display = 'flex';
-  document.getElementById('dmChatArea').style.display = 'none';
-  if (typeof renderDmPickerList === 'function') renderDmPickerList();
+  const dmPicker = document.getElementById('dmPickerScreen');
+  if (dmPicker) dmPicker.style.display = 'flex';
+  const dmChat = document.getElementById('dmChatArea');
+  if (dmChat) dmChat.style.display = 'none';
+  renderDmList();
 }
 
 // ════ فتح محادثة خاصة (نسخة معدلة لدعم وقت القراءة) ════
