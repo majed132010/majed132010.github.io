@@ -179,6 +179,14 @@ function openDM(uid, name) {
   const chat = document.getElementById('dmChatArea');
   if (chat) { chat.style.display = 'flex'; chat.style.flexDirection = 'column'; }
   clearDmUnread(uid);
+  db.ref('dm_messages/' + getDmId(currentUser.uid, uid)).limitToLast(10).once('value').then(snap => {
+    const updates = {};
+    snap.forEach(ch => {
+      const msg = ch.val();
+      if (msg && msg.uid === uid && msg.status !== 'read') updates[ch.key + '/status'] = 'read';
+    });
+    if (Object.keys(updates).length) db.ref('dm_messages/' + getDmId(currentUser.uid, uid)).update(updates);
+  });
   renderDmList();
 
   const dmArea = document.getElementById('dmMessages');
