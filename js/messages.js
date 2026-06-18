@@ -6,23 +6,19 @@ let _currentMsgPath = null;
 let _replyTo = null;
 let _editingKey = null;
 let _typingTimer = null;
-let _msgLoadGen = 0; // يمنع listeners الـ async القديمة من التسجيل بعد تغيير القناة
+let _msgLoadGen = 0;
 let _searchResults = [], _searchIndex = 0;
 
 // ════ عرض الرسائل ════
 function showMessages(sid, cid) {
- // تصفير حارس الرفع فور تبديل القناة — يمنع أي تعليق من جلسة سابقة
  window._sendingMedia = false;
- // تجديد التوكن فوراً حتى يكون جاهزاً قبل أي رفع
  if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
-
  showView('messages');
  if (typeof _currentUserMuted !== 'undefined') _applyMuteState(_currentUserMuted);
  if (typeof _ensureMemberRegistered === 'function') _ensureMemberRegistered(sid);
  _oldestMsgKey = null;
  _allLoaded = false;
  _currentMsgPath = 'messages/' + sid + '/' + cid;
-
  const area = document.getElementById('messagesArea');
  const loadBtn = document.getElementById('loadMoreBtn');
  area.innerHTML = '';
@@ -30,30 +26,20 @@ function showMessages(sid, cid) {
  cleanupMessagesListener();
  clearUnread(sid, cid);
  listenTyping(sid, cid);
- // ضمان تفعيل مستمع الإشعارات — يُعيد الربط إن كان مفقوداً (حماية من انقطاع غير متوقع)
  if (currentUser && !_notifListener) listenNotifications(currentUser.uid);
-
- // جيل فريد يُبطل أي callback قديم إذا بدّل المستخدم القناة
  const gen = ++_msgLoadGen;
- let _initialDone = false; // يصبح true بعد اكتمال الدفعة الأولى
-
- // fn واحدة تتولى التحميل الأولي والرسائل الحية على حدٍّ سواء
+ let _initialDone = false;
  const fn = snap => {
  if (gen !== _msgLoadGen) return;
  const msg = snap.val();
  if (!msg) return;
- if (area.querySelector(`[data-key="${snap.key}"]`)) return; // dedup
+ if (area.querySelector(`[data-key="${snap.key}"]`)) return;
  const _d = buildMsgDiv(msg, snap.key); if (!_d) return;
  area.appendChild(_d);
- // تتبع المفتاح الأقدم للـ pagination
  if (!_oldestMsgKey || snap.key < _oldestMsgKey) _oldestMsgKey = snap.key;
  if (_initialDone) {
- // رسالة حية — تمرير تلقائي ذكي
  const dist = area.scrollHeight - area.scrollTop - area.clientHeight;
- if (dist < 250 || msg.uid === currentUser?.uid) {
- area.scrollTop = area.scrollHeight;
- }
- // إشعار داخلي إذا كان المستخدم في قناة أخرى
+ if (dist < 250 || msg.uid === currentUser?.uid) area.scrollTop = area.scrollHeight;
  if (msg.uid !== currentUser?.uid) {
  const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
@@ -61,7 +47,6 @@ function showMessages(sid, cid) {
  }
  }
  };
-
  const changeFn = snap => {
  const msg = snap.val();
  if (!msg) return;
@@ -69,36 +54,24 @@ function showMessages(sid, cid) {
  if (!el) return;
  const body = el.querySelector('.msg-body');
  if (!body) return;
-
- // ── تحديث شريط رفع الميديا ──
  const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
  if (progWrap) {
- if (msg.uploading) {
- _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
- } else if (!msg.uploading && msg.mediaUrl) {
- // اكتمل الرفع — استبدل شريط التقدم بالميديا الفعلية
+ if (msg.uploading) _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
+ else if (!msg.uploading && msg.mediaUrl) {
  _cleanupUploadState(snap.key);
  progWrap.remove();
- if (msg.mediaType === 'video') {
- body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
- } else {
- const mediaWrap = document.createElement('div');
- mediaWrap.className = 'msg-media-wrap';
- const img = document.createElement('img');
- img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+ if (msg.mediaType === 'video') body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+ else {
+ const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
+ const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
  img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
  loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
- mediaWrap.appendChild(img);
- body.appendChild(mediaWrap);
+ mediaWrap.appendChild(img); body.appendChild(mediaWrap);
  }
  const a = document.getElementById('messagesArea');
  if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
- } else if (!msg.uploading && msg.uploadFailed) {
- _showUploadFailedEl(progWrap, snap.key);
+ } else if (!msg.uploading && msg.uploadFailed) _showUploadFailedEl(progWrap, snap.key);
  }
- }
-
- // ── تفاعلات ونص ──
  renderReactions(msg.reactions || null, snap.key, body);
  const a = document.getElementById('messagesArea');
  if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
@@ -111,15 +84,10 @@ function showMessages(sid, cid) {
  }
  }
  };
-
- // ── تسجيل مستمع واحد: يحمّل الدفعة الأولى ثم يستمر حياً ──
- // limitToLast يُعيد المزامنة تلقائياً عند إعادة الاتصال — لا يفوّت رسائل
  const mainRef = db.ref(_currentMsgPath).limitToLast(PAGE_SIZE);
  mainRef.on('child_added', fn);
  db.ref(_currentMsgPath).on('child_changed', changeFn);
  messagesListener = { path: _currentMsgPath, mainRef, fn, changeFn };
-
- // 'value' يُطلَق بعد انتهاء كل child_added الأولية — نستغله لقفل حالة التحميل
  mainRef.once('value', snap => {
  if (gen !== _msgLoadGen) return;
  _initialDone = true;
@@ -175,8 +143,7 @@ function buildMsgDiv(msg, key) {
  const myRole = sv?.members?.[currentUser?.uid]?.role;
  const isAdminUser = myRole === 'owner' || myRole === 'admin';
  const targetRole = sv?.members?.[msg.uid]?.role;
- const canModerate = isAdminUser && !isMine &&
- !(myRole === 'admin' && (targetRole === 'owner' || targetRole === 'admin'));
+ const canModerate = isAdminUser && !isMine && !(myRole === 'admin' && (targetRole === 'owner' || targetRole === 'admin'));
  const div = document.createElement('div');
  div.className = 'msg-group';
  div.dataset.key = key;
@@ -200,8 +167,33 @@ function buildMsgDiv(msg, key) {
  av.addEventListener('touchend',  () => clearTimeout(_avLp), {passive: true});
  av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
  }
- av.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); e.stopImmediatePropagation(); openMemberCard(msg.uid, msg.name, _memberAv); });
- // ✅ تم إزالة touchstart handler الإضافي — لا حاجة له مع auth.js v2
+
+ // ✅ FIX: منع الـ click الافتراضي على الموبايل (Ghost Click)
+ // نستخدم touchstart لمنع click، ثم نستدعي openMemberCard مباشرة
+ av.addEventListener('touchstart', (e) => {
+   // لا نمنع الافتراضي هنا لأننا نريد السماح بالـ scroll
+ }, { passive: true });
+
+ // ✅ FIX: استخدام touchend مع preventDefault لمنع click التلقائي
+ let _touchHandled = false;
+ av.addEventListener('touchend', (e) => {
+   _touchHandled = true;
+   e.preventDefault(); // ← يمنع click التلقائي (Ghost Click)
+   e.stopPropagation();
+   console.log('[DEBUG] touchend on avatar, opening card');
+   openMemberCard(msg.uid, msg.name, _memberAv);
+ }, { passive: false });
+
+ // ✅ للدسكتوب: استخدام click كالمعتاد
+ av.addEventListener('click', (e) => { 
+   if (_touchHandled) { _touchHandled = false; return; } // ← تجاهل click إذا كان من touch
+   e.stopPropagation(); 
+   e.preventDefault(); 
+   e.stopImmediatePropagation(); 
+   console.log('[DEBUG] click on avatar, opening card');
+   openMemberCard(msg.uid, msg.name, _memberAv); 
+ });
+
  if (!canModerate) av.style.cursor = 'pointer';
 
  const body = document.createElement('div');
@@ -249,7 +241,6 @@ function buildMsgDiv(msg, key) {
  body.appendChild(vw);
  }
 
- // ── تقدم الرفع: preview دائري للمُرسِل، شريط عادي للمستقبِل ──
  if (msg.uploading && !msg.mediaUrl) {
  body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
  }
@@ -264,21 +255,20 @@ function buildMsgDiv(msg, key) {
  const img = document.createElement('img');
  img.decoding = 'async';
  img.className = 'msg-media-img';
- img.src = ''; // blank immediately — no inherited/default src
- img.dataset.msgKey = key; // stamp with message key for async guard
+ img.src = '';
+ img.dataset.msgKey = key;
  img.alt = msg.mediaName || '';
  img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
  img.addEventListener('load', () => {
  const a = document.getElementById('messagesArea');
  if (!a) return;
- // rAF lets the browser reflow the expanded image before measuring scroll distance
  requestAnimationFrame(() => {
  const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
  if (dist < 300) a.scrollTop = a.scrollHeight;
  });
  });
  loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
- if (img.dataset.msgKey !== key) return; // stale callback — element was reused, abort
+ if (img.dataset.msgKey !== key) return;
  if (src) img.src = src;
  else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
  });
@@ -291,7 +281,6 @@ function buildMsgDiv(msg, key) {
 
  div.appendChild(av); div.appendChild(body);
 
- // ── WhatsApp-style context bar: right-click / long-press ──────────────────
  if (!window._ctxDismissReady) {
  window._ctxDismissReady = true;
  document.addEventListener('click', () => {
@@ -416,7 +405,6 @@ async function sendMessage() {
  const preview = document.getElementById('mediaPreviewArea');
  if (preview) { preview.innerHTML = ''; preview.style.display = 'none'; }
 
- // ── وضع التعديل ──
  if (_editingKey) {
  const key = _editingKey;
  cancelEdit();
@@ -440,10 +428,8 @@ async function sendMessage() {
  clearReply();
  }
 
- // ── تجديد التوكن قبل أي كتابة أو رفع (non-fatal: خطأ الشبكة لا يوقف الإرسال) ──
  if (auth.currentUser) { try { await auth.currentUser.getIdToken(true); } catch(e) {} }
 
- // ── إرسال النص مباشرة إلى قاعدة البيانات ──
  if (text) {
  await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
  const _pSid = currentServer, _pCid = currentChannel;
@@ -462,7 +448,6 @@ async function sendMessage() {
  }, 0);
  }
 
- // ── رفع الميديا — الحارس _sendingMedia مضمون التصفير في finally ──
  if (!media.length) return;
  if (!_isConnected) {
  try { await waitForConnection(5000); }
@@ -486,17 +471,12 @@ async function sendMessage() {
  }
 }
 
-// ════ رفع ملف واحد — push فوري في DB ثم تحديث لحظي للنسبة ════
+// ════ رفع ملف واحد ════
 async function _uploadOneMedia(m, msgBase) {
  const _sid = currentServer, _cid = currentChannel;
  const msgPath = 'messages/' + _sid + '/' + _cid;
  const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-
- // حارس طوارئ
  const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
-
- // 1. احجز المفتاح أولاً ثم احفظ بيانات الـ preview قبل الكتابة —
- // child_added يُطلَق أثناء set() فيجد window._uploadPreviews جاهزاً
  const msgRef = db.ref(msgPath).push();
  const msgKey = msgRef.key;
 
@@ -521,7 +501,6 @@ async function _uploadOneMedia(m, msgBase) {
  const area = document.getElementById('messagesArea');
  if (area) area.scrollTop = area.scrollHeight;
 
- // دالة مساعدة: تحدّث النسبة في DB بدون انتظار (fire-and-forget)
  const updatePct = (pct) => {
  db.ref(msgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
  };
@@ -530,14 +509,12 @@ async function _uploadOneMedia(m, msgBase) {
  let mediaUrl;
 
  if (m.type === 'video') {
- // فيديو → Cloudinary مع ضغط تلقائي وتقدم حقيقي عبر XHR
  mediaUrl = await uploadToCloudinary(
  new File([m.blob], m.name, { type: m.mimeType }),
  3,
  (pct) => updatePct(pct)
  );
  } else {
- // صورة → Firebase Storage مع تقدم حقيقي
  const ext = (m.name.split('.').pop() || 'jpg').toLowerCase();
  const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
  const uploadTask = storageRef.put(m.blob, { contentType: m.mimeType || 'application/octet-stream' });
@@ -553,7 +530,6 @@ async function _uploadOneMedia(m, msgBase) {
 
  if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
 
- // 2. تحديث نفس الرسالة بالرابط النهائي — يطلق child_changed عند الجميع فوراً
  await db.ref(msgPath + '/' + msgKey).update({
  mediaUrl,
  uploading: false,
@@ -636,8 +612,6 @@ function showReactionPicker(msgKey, anchorEl) {
  picker.appendChild(span);
  });
  document.body.appendChild(picker);
-
- // Flip-aware positioning: prefer above the button, fall back to below
  const rect = anchorEl.getBoundingClientRect();
  const pw = picker.offsetWidth || 232;
  const ph = picker.offsetHeight || 48;
@@ -648,7 +622,6 @@ function showReactionPicker(msgKey, anchorEl) {
  picker.style.position = 'fixed';
  picker.style.left = left + 'px';
  picker.style.top = top + 'px';
-
  const close = e => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close, true); } };
  setTimeout(() => document.addEventListener('click', close, true), 50);
 }
@@ -674,7 +647,6 @@ function renderReactions(reactions, msgKey, container) {
  const chip = document.createElement('div');
  chip.className = 'reaction-chip' + (isMine ? ' mine' : '');
  chip.innerHTML = `${emoji}${uids.length}`;
- // Tooltip: first 3 names who reacted
  const names = uids.slice(0, 3)
  .map(uid => servers[currentServer]?.members?.[uid]?.name || 'مستخدم')
  .join('، ');
@@ -730,7 +702,6 @@ function listenTyping(sid, cid) {
 // ════ تنظيف الـ listener ════
 function cleanupMessagesListener() {
  if (messagesListener) {
- // فصل الـ listener عبر نفس الـ ref المُسجَّل — الـ path وحده لا يكفي
  const ref = messagesListener.mainRef || messagesListener.queryRef;
  if (ref) ref.off('child_added', messagesListener.fn);
  if (messagesListener.changeFn) db.ref(messagesListener.path).off('child_changed', messagesListener.changeFn);
@@ -822,7 +793,6 @@ async function handleMediaSelect(input) {
  const maxLabel = isVideo ? '500MB' : '50MB';
  if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); continue; }
 
- // بناء wrap مؤقت مع مؤشر تحميل فوري
  const wrap = document.createElement('div');
  wrap.style.cssText = 'position:relative;display:inline-flex;flex-shrink:0;align-items:center;justify-content:center';
  const loadingEl = document.createElement('div');
@@ -833,14 +803,9 @@ async function handleMediaSelect(input) {
  preview.appendChild(wrap);
 
  try {
- // قراءة الملف كاملاً الآن — قبل أن يفقد المتصفح صلاحيته
  const arrayBuffer = await file.arrayBuffer();
  let blob = new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' });
-
- // ضغط الصور فقط (الفيديو يُرفع كما هو)
- if (!isVideo) {
- blob = await compressImage(blob);
- }
+ if (!isVideo) blob = await compressImage(blob);
  console.log('[handleMediaSelect] file:', file.name, 'blob size:', blob.size, 'type:', blob.type);
 
  const mimeType = blob.type || file.type || 'application/octet-stream';
@@ -848,7 +813,6 @@ async function handleMediaSelect(input) {
  const entry = { blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl };
  window._pendingMedia.push(entry);
 
- // استبدال مؤشر التحميل بالمعاينة الفعلية
  loadingEl.remove();
  if (isVideo) {
  const vid = document.createElement('video');
