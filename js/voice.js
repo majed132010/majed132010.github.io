@@ -309,6 +309,11 @@ async function toggleVoiceRecording() {
     _voiceRecordingBusy = true;
     clearInterval(_recordingTimer);
     btn.classList.remove('recording'); btn.textContent = '🎤'; btn.disabled = true;
+    document.getElementById('voiceRecordBtn').style.background = '';
+    document.getElementById('voiceRecordBtn').style.borderColor = '';
+    document.getElementById('voiceRecordBtn').style.color = '';
+    clearInterval(window._recTimer);
+    if (window._recTimerEl) { window._recTimerEl.remove(); window._recTimerEl = null; }
     _mediaRecorder.stop();
   } else if (!_mediaRecorder || _mediaRecorder.state === 'inactive') {
     try {
@@ -329,6 +334,21 @@ async function toggleVoiceRecording() {
       };
       _mediaRecorder.start();
       btn.classList.add('recording'); btn.textContent = '⏹ 0s';
+      document.getElementById('voiceRecordBtn').style.background = 'rgba(220,50,50,0.3)';
+      document.getElementById('voiceRecordBtn').style.borderColor = 'rgba(220,50,50,0.6)';
+      document.getElementById('voiceRecordBtn').style.color = '#e04040';
+      let _recSeconds = 0;
+      window._recTimerEl = document.createElement('span');
+      window._recTimerEl.id = 'recTimerDisplay';
+      window._recTimerEl.style.cssText = 'font-size:13px;font-weight:700;color:#e04040;font-family:Tajawal,sans-serif;min-width:38px;text-align:center';
+      window._recTimerEl.textContent = '0:00';
+      document.getElementById('voiceRecordBtn').insertAdjacentElement('afterend', window._recTimerEl);
+      window._recTimer = setInterval(() => {
+        _recSeconds++;
+        const m = Math.floor(_recSeconds/60);
+        const s = String(_recSeconds%60).padStart(2,'0');
+        if (window._recTimerEl) window._recTimerEl.textContent = m+':'+s;
+      }, 1000);
       _recordingTimer = setInterval(() => {
         _recordingSeconds++;
         btn.textContent = `⏹ ${_recordingSeconds}s`;
