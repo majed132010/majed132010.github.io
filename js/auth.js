@@ -390,7 +390,9 @@ function openMemberCard(uid, name, avatar) {
   document.body.appendChild(overlay);
   
   // إغلاق المنبثق عند الضغط على المساحة المعتتمة بالخلفية
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => {
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  }, 300);
 }
 
 function copyAdminCode() {
