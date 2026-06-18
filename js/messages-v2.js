@@ -168,29 +168,11 @@ function buildMsgDiv(msg, key) {
  av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
  }
 
- // ✅ FIX: منع الـ click الافتراضي على الموبايل (Ghost Click)
- // نستخدم touchstart لمنع click، ثم نستدعي openMemberCard مباشرة
- av.addEventListener('touchstart', (e) => {
-   // لا نمنع الافتراضي هنا لأننا نريد السماح بالـ scroll
- }, { passive: true });
-
- // ✅ FIX: استخدام touchend مع preventDefault لمنع click التلقائي
- let _touchHandled = false;
- av.addEventListener('touchend', (e) => {
-   _touchHandled = true;
-   e.preventDefault(); // ← يمنع click التلقائي (Ghost Click)
-   e.stopPropagation();
-   console.log('[DEBUG] touchend on avatar, opening card');
-   openMemberCard(msg.uid, msg.name, _memberAv);
- }, { passive: false });
-
- // ✅ للدسكتوب: استخدام click كالمعتاد
+ // ✅ FIX FINAL: معالج click بسيط وواضح — يستدعي openMemberCard فقط
  av.addEventListener('click', (e) => { 
-   if (_touchHandled) { _touchHandled = false; return; } // ← تجاهل click إذا كان من touch
+   console.log('[DEBUG] Avatar clicked, calling openMemberCard for', msg.name);
    e.stopPropagation(); 
    e.preventDefault(); 
-   e.stopImmediatePropagation(); 
-   console.log('[DEBUG] click on avatar, opening card');
    openMemberCard(msg.uid, msg.name, _memberAv); 
  });
 
