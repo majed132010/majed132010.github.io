@@ -317,12 +317,29 @@ function openProfile() {
 function openMemberCard(uid, name, avatar) {
   console.log('[DEBUG] openMemberCard called', uid, name);
   const existing = document.getElementById('memberCardOverlay');
-  if (existing) existing.remove();
+  if (existing) {
+    console.log('[DEBUG] Removing existing card');
+    existing.remove();
+  }
 
-  // ✅ FIX v6: تأخير 600ms — يضمن أن Ghost Click (300ms) قد انتهى تماماً
-  // قبل إنشاء البطاقة. بهذا لا يمكن للـ Ghost Click أن يصل للبطاقة أبداً.
+  // ✅ FIX v7: إنشاء البطاقة فوراً لكن مع pointer-events:none
+  // هذا يمنع Ghost Click من ضرب الأزرار لأنها غير قابلة للنقر
+  _buildMemberCard(uid, name, avatar);
+
+  const overlay = document.getElementById('memberCardOverlay');
+  if (!overlay) {
+    console.error('[DEBUG] Failed to create overlay!');
+    return;
+  }
+
+  // ✅ تعطيل كل أحداث المؤشر على الـ overlay والأطفال (الأزرار)
+  overlay.style.pointerEvents = 'none';
+  console.log('[DEBUG] Card created, pointer-events disabled');
+
+  // ✅ إعادة التفعيل بعد انتهاء نافذة Ghost Click (600ms)
   setTimeout(() => {
-    _buildMemberCard(uid, name, avatar);
+    overlay.style.pointerEvents = 'auto';
+    console.log('[DEBUG] pointer-events enabled, card now clickable');
   }, 600);
 }
 
@@ -367,7 +384,13 @@ function _buildMemberCard(uid, name, avatar) {
     b.innerHTML = `${icon}<span style="font-size:11px">${label}</span>`;
     b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
     b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
-    b.addEventListener('click', (e) => { e.stopPropagation(); overlay.remove(); fn(); });
+    // ✅ debug logging
+    b.addEventListener('click', (e) => { 
+      console.log('[DEBUG] Button clicked:', label);
+      e.stopPropagation(); 
+      overlay.remove(); 
+      fn(); 
+    });
     return b;
   };
 
@@ -386,8 +409,9 @@ function _buildMemberCard(uid, name, avatar) {
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  // إغلاق عند الضغط على الخلفية
+  // ✅ إغلاق عند الضغط على الخلفية (مع debug)
   overlay.addEventListener('click', (e) => {
+    console.log('[DEBUG] Overlay clicked, target:', e.target === overlay ? 'overlay' : 'child');
     if (e.target === overlay) {
       overlay.remove();
     }
