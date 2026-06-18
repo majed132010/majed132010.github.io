@@ -332,10 +332,10 @@ function openMemberCard(uid, name, avatar) {
   // 1. تحويل الـ Container إلى div مستقل تماماً لكسر قفل الـ Stacking Context
   const overlay = document.createElement('div');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
 
   const card = document.createElement('div');
-  card.style.cssText = 'background:#1a2535;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif';
+  card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif';
 
   const avEl = document.createElement('div');
   avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
