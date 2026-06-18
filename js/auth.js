@@ -390,15 +390,13 @@ function openMemberCard(uid, name, avatar) {
   document.body.appendChild(overlay);
   
   // إغلاق المنبثق عند الضغط على المساحة المعتتمة بالخلفية
+  window._memberCardOpen = true;
   setTimeout(() => {
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    document.addEventListener('click', function _closeCard(e) {
-      if (!overlay.contains(e.target)) {
-        overlay.remove();
-        document.removeEventListener('click', _closeCard);
-      }
+    window._memberCardOpen = false;
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { overlay.remove(); window._memberCardOpen = false; }
     });
-  }, 400);
+  }, 500);
 }
 
 function copyAdminCode() {
