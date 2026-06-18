@@ -1,6 +1,6 @@
-// ════ عوالم — Service Worker v4 ════
-const CACHE_NAME = 'awalem-v5';
-const IMAGE_CACHE = 'awalem-images-v2';
+// ════ عوالم — Service Worker v5 (محدّث) ════
+const CACHE_NAME = 'awalem-v6';
+const IMAGE_CACHE = 'awalem-images-v3';
 const CACHE_URLS = [
   '/',
   '/index.html',
@@ -17,11 +17,11 @@ const CACHE_URLS = [
   '/js/calls.js',
   '/js/push.js',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js',
 ];
 
 self.addEventListener('install', event => {
@@ -30,7 +30,7 @@ self.addEventListener('install', event => {
       cache.addAll(CACHE_URLS).catch(() => {})
     )
   );
-  self.skipWaiting(); // تفعيل فوري بدون انتظار
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -44,7 +44,7 @@ self.addEventListener('activate', event => {
       )
     )
   );
-  self.clients.claim(); // استحواذ فوري على جميع النوافذ
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
@@ -77,7 +77,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ملفات JS و CSS — Network first دائماً للحصول على أحدث نسخة
+  // ملفات JS و CSS — Network first
   if (url.pathname.startsWith('/js/') || url.pathname.startsWith('/css/')) {
     event.respondWith(
       fetch(event.request)
@@ -122,8 +122,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Push notifications — مع كبح التكرار (نفس منطق firebase-messaging-sw.js)
-// tag موحّد لكل مكالمة/مرسل يدمج الإشعارات المتلاحقة بدل تكديسها، وفاصل 4 ثوانٍ كحد أدنى
+// Push notifications — مع كبح التكرار
 const NOTIF_THROTTLE_MS = 4000;
 const _lastShownByTag = {};
 function _throttled(tag) {
@@ -143,14 +142,17 @@ self.addEventListener('push', event => {
       ? 'call_' + (d.callId || '')
       : (d.type || 'msg') + '_' + (d.fromUid || d.serverId || '');
 
+    // ✅ استخدام الأيقونة الصحيحة
+    const iconUrl = '/icon-192.png';
+    const badgeUrl = '/icon-192.png';
+
     event.waitUntil(
       self.registration.getNotifications({ tag }).then(existing => {
-        // إشعار بنفس الـ tag معروض بالفعل أو ضمن مهلة الكبح → تجاهل (يمنع الفيضان)
         if (existing.length || _throttled(tag)) return;
         return self.registration.showNotification(data.title || 'عوالم', {
           body: data.body || '',
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
+          icon: iconUrl,
+          badge: badgeUrl,
           dir: 'rtl',
           lang: 'ar',
           tag,
