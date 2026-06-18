@@ -71,7 +71,7 @@ function showMessages(sid, cid) {
     if (!body) return;
 
     // ── تحديث شريط رفع الميديا ──
-    const progWrap = body.querySelector('.msg-uploading-wrap');
+    const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
     if (progWrap) {
       if (msg.uploading) {
         _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
