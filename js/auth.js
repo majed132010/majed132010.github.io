@@ -315,84 +315,79 @@ function openProfile() {
 // 🆕 دالة بطاقة العضو البارزة الفخمة (Quick Action Member Card)
 // ═════════════════════════════════════════════════════════════════
 function openMemberCard(uid, name, avatar) {
- console.log('[DEBUG] openMemberCard called', uid, name);
- const existing = document.getElementById('memberCardOverlay');
- if (existing) existing.remove();
+  console.log('[DEBUG] openMemberCard called', uid, name);
+  const existing = document.getElementById('memberCardOverlay');
+  if (existing) existing.remove();
 
- // ✅ FIX: pointer-events: none مؤقتاً على الـ overlay لمنع استقبال click الحالي
- const overlay = document.createElement('div');
- overlay.id = 'memberCardOverlay';
- overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;pointer-events:none;';
+  // ✅ FIX v2: pointer-events: none على الـ overlay لمنع Ghost Click
+  const overlay = document.createElement('div');
+  overlay.id = 'memberCardOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;pointer-events:none;';
 
- const card = document.createElement('div');
- // ✅ FIX: pointer-events: auto على البطاقة فقط
- card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;pointer-events:auto;';
+  const card = document.createElement('div');
+  // ✅ pointer-events: auto على البطاقة فقط
+  card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;pointer-events:auto;';
 
- const avEl = document.createElement('div');
- avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
- if (avatar) avEl.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover">`;
- else avEl.textContent = (name || '?')[0];
+  const avEl = document.createElement('div');
+  avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
+  if (avatar) avEl.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover">`;
+  else avEl.textContent = (name || '?')[0];
 
- const nameEl = document.createElement('div');
- nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#fff;margin-top:4px;text-align:center';
- nameEl.textContent = name || '—';
+  const nameEl = document.createElement('div');
+  nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#fff;margin-top:4px;text-align:center';
+  nameEl.textContent = name || '—';
 
- const tagEl = document.createElement('div');
- tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
- db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
+  const tagEl = document.createElement('div');
+  tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
+  db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
 
- // حالة الاتصال الحية
- const onlineEl = document.createElement('div');
- onlineEl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;margin-top:2px;';
- db.ref('users/' + uid + '/online').once('value').then(s => {
- const isOn = s.val() === true;
- onlineEl.innerHTML = isOn
- ? '<span style="width:8px;height:8px;border-radius:50%;background:#3ba55c;display:inline-block"></span> متصل الآن'
- : '<span style="width:8px;height:8px;border-radius:50%;background:#888;display:inline-block"></span> غير متصل';
- });
+  // حالة الاتصال الحية
+  const onlineEl = document.createElement('div');
+  onlineEl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;margin-top:2px;';
+  db.ref('users/' + uid + '/online').once('value').then(s => {
+    const isOn = s.val() === true;
+    onlineEl.innerHTML = isOn
+      ? '<span style="width:8px;height:8px;border-radius:50%;background:#3ba55c;display:inline-block"></span> متصل الآن'
+      : '<span style="width:8px;height:8px;border-radius:50%;background:#888;display:inline-block"></span> غير متصل';
+  });
 
- const btns = document.createElement('div');
- btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
 
- const mkBtn = (icon, label, fn) => {
- const b = document.createElement('button');
- b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;pointer-events:auto;';
- b.innerHTML = `${icon}<span style="font-size:11px">${label}</span>`;
- b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
- b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
- // ✅ FIX: stopPropagation لمنع إغلاق البطاقة بالخطأ
- b.addEventListener('click', (e) => { e.stopPropagation(); overlay.remove(); fn(); });
- return b;
- };
+  const mkBtn = (icon, label, fn) => {
+    const b = document.createElement('button');
+    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;pointer-events:auto;';
+    b.innerHTML = `${icon}<span style="font-size:11px">${label}</span>`;
+    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
+    b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
+    b.addEventListener('click', (e) => { e.stopPropagation(); overlay.remove(); fn(); });
+    return b;
+  };
 
- btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => { setTimeout(() => openDM(uid, name), 50); }));
- if (uid !== currentUser?.uid) {
- btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
- btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
- }
+  btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => { setTimeout(() => openDM(uid, name), 50); }));
+  if (uid !== currentUser?.uid) {
+    btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
+    btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
+  }
 
- card.appendChild(avEl);
- card.appendChild(nameEl);
- card.appendChild(tagEl);
- card.appendChild(onlineEl);
- card.appendChild(btns);
+  card.appendChild(avEl);
+  card.appendChild(nameEl);
+  card.appendChild(tagEl);
+  card.appendChild(onlineEl);
+  card.appendChild(btns);
 
- overlay.appendChild(card);
- document.body.appendChild(overlay);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 
- // ✅ FIX: تفعيل pointer-events بعد انتهاء حدث الـ click الحالي
- requestAnimationFrame(() => {
- requestAnimationFrame(() => {
- overlay.style.pointerEvents = 'auto';
- });
- });
-
- // ✅ FIX: إغلاق عند الضغط على الخلفية فقط (وليس على البطاقة)
- overlay.addEventListener('click', (e) => {
- if (e.target === overlay) {
- overlay.remove();
- }
- });
+  // ✅ FIX v2: تأخير 500ms — يُفعّل pointer-events ويضيف click handler بعد Ghost Click
+  setTimeout(() => {
+    overlay.style.pointerEvents = 'auto';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+      }
+    });
+  }, 500);
 }
 
 function copyAdminCode() {
