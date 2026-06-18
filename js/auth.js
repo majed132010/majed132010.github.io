@@ -316,26 +316,19 @@ function openProfile() {
 // ═════════════════════════════════════════════════════════════════
 function openMemberCard(uid, name, avatar) {
   console.log('[DEBUG] openMemberCard called', uid, name);
-
-  // ✅ FIX v4: إزالة البطاقة القديمة إن وجدت
   const existing = document.getElementById('memberCardOverlay');
   if (existing) existing.remove();
 
-  // ✅ FIX v4: إنشاء البطاقة في setTimeout بعد انتهاء الـ click الحالي
-  // هذا يضمن أن Ghost Click لا يصل للبطاقة
-  setTimeout(() => {
-    _buildMemberCard(uid, name, avatar);
-  }, 50);
-}
-
-// ✅ FIX v4: دالة بناء البطاقة منفصلة
-function _buildMemberCard(uid, name, avatar) {
+  // ✅ FIX v5: إنشاء الـ overlay فوراً لكن بدون click handler
+  // الـ overlay يغطي الشاشة بالكامل — الـ Ghost Click (300ms) سيضربه
+  // لذا نمنع الـ pointer-events على الـ overlay نفسه
   const overlay = document.createElement('div');
   overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;pointer-events:none;';
 
   const card = document.createElement('div');
-  card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;';
+  // ✅ البطاقة فقط تستقبل الـ pointer-events
+  card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;pointer-events:auto;';
 
   const avEl = document.createElement('div');
   avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
@@ -365,7 +358,7 @@ function _buildMemberCard(uid, name, avatar) {
 
   const mkBtn = (icon, label, fn) => {
     const b = document.createElement('button');
-    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;';
+    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;pointer-events:auto;';
     b.innerHTML = `${icon}<span style="font-size:11px">${label}</span>`;
     b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
     b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
@@ -388,12 +381,16 @@ function _buildMemberCard(uid, name, avatar) {
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  // ✅ FIX v4: إغلاق عند الضغط على الخلفية فقط (بعد تأكد من عدم وجود Ghost Click)
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
-    }
-  });
+  // ✅ FIX v5: نُضيف click handler للـ overlay بعد انتهاء Ghost Click (500ms)
+  // قبل ذلك: pointer-events:none على الـ overlay = الـ Ghost Click يتجاوزه
+  setTimeout(() => {
+    overlay.style.pointerEvents = 'auto';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+      }
+    });
+  }, 500);
 }
 
 function copyAdminCode() {
