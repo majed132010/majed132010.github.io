@@ -557,6 +557,7 @@ async function _uploadOneMedia(m, msgBase) {
       uploading: false,
       uploadProgress: null
     });
+    console.log('[_uploadOneMedia] DB updated with mediaUrl:', mediaUrl?.slice(0,50));
 
     if (area) area.scrollTop = area.scrollHeight;
 
