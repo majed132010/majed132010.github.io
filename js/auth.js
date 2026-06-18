@@ -392,7 +392,13 @@ function openMemberCard(uid, name, avatar) {
   // إغلاق المنبثق عند الضغط على المساحة المعتتمة بالخلفية
   setTimeout(() => {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  }, 300);
+    document.addEventListener('click', function _closeCard(e) {
+      if (!overlay.contains(e.target)) {
+        overlay.remove();
+        document.removeEventListener('click', _closeCard);
+      }
+    });
+  }, 400);
 }
 
 function copyAdminCode() {
