@@ -203,6 +203,9 @@ function buildMsgDiv(msg, key) {
     av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
   }
   av.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); e.stopImmediatePropagation(); openMemberCard(msg.uid, msg.name, _memberAv); });
+  av.addEventListener('touchstart', (e) => {
+  e.stopPropagation();
+}, { passive: true });
   if (!canModerate) av.style.cursor = 'pointer';
 
   const body = document.createElement('div');
