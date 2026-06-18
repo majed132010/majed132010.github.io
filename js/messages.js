@@ -467,13 +467,20 @@ async function sendMessage() {
     catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
   }
   if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
+  console.log('[sendMessage] starting media upload, count:', media.length);
   toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
 
   window._sendingMedia = true;
   try {
-    for (const m of media) await _uploadOneMedia(m, msgBase);
+    for (const m of media) {
+      console.log('[sendMessage] uploading:', m.name, m.type);
+      await _uploadOneMedia(m, msgBase);
+      console.log('[sendMessage] done:', m.name);
+    }
+  } catch(uploadErr) {
+    console.error('[sendMessage] upload error:', uploadErr);
   } finally {
-    window._sendingMedia = false; // يتصفر حتماً بغض النظر عن النتيجة
+    window._sendingMedia = false;
   }
 }
 
