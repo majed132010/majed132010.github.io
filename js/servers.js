@@ -98,7 +98,7 @@ function listenServers() {
  // ✅ مستمع تغييرات: يضيف/يحذف سيرفر واحد فقط بدون إعادة تحميل الكل
  ref.on('child_added', snap => {
  const sid = snap.key;
- if (servers[sid]) return; // موجود بالفعل
+ if (servers[sid]) return;
  db.ref('servers/' + sid).once('value').then(s => {
  if (s.val()) { servers[sid] = s.val(); renderServerList(); }
  });
@@ -382,8 +382,7 @@ function renderChannels(sid) {
  const sv = servers[sid];
  if (!sv) return;
  const nameEl = document.getElementById('chServerName');
- if (nameEl) {if (sv.avatarUrl) nameEl.innerHTML = `<img src="${escHtml(sv.avatarUrl)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:6px">${escHtml(sv.name)}`; else nameEl.textContent = (sv.emoji||'') + ' ' + sv.name;
- }
+ if (nameEl) { if (sv.avatarUrl) nameEl.innerHTML = `<img src="${escHtml(sv.avatarUrl)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:6px">${escHtml(sv.name)}`; else nameEl.textContent = (sv.emoji||'') + ' ' + sv.name; }
  const list = document.getElementById('channelList');
  list.innerHTML = '';
  const chs = sv.channels || {};
@@ -421,7 +420,6 @@ function renderChannels(sid) {
  makeCategory('💬 القنوات النصية', sid+'_text', texts, (cid,ch) => makeChItem(cid,ch,'#'));
  makeCategory('🔊 القنوات الصوتية', sid+'_voice', voices, (cid,ch) => makeChItem(cid,ch,'🔊'));
 
- // قسم الرسائل الخاصة
  const dmSection = document.createElement('div');
  dmSection.style.cssText = 'margin-top:8px';
  const dmBtn = document.createElement('div');
@@ -586,7 +584,8 @@ async function openMemberMgmt() {
  const row = document.createElement('div');
  row.className = 'member-row';
  const av = document.createElement('div');
- av.style.cssText = 'width:36px;height:36px;border-radius:50%;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--teal),var(--acc));display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff';if (data.avatar) av.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = name[0]||'?';
+ av.style.cssText = 'width:36px;height:36px;border-radius:50%;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--teal),var(--acc));display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff';
+ if (data.avatar) av.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = name[0]||'?';
  const info = document.createElement('div');
  info.style.cssText = 'flex:1;min-width:0';
  const roleLabel = role==='owner'?'👑 مالك':role==='admin'?'🛡️ أدمن':'👤 عضو';
@@ -747,7 +746,8 @@ function openServerCustomize() {
  if (!isOwner) { toast('❌ هذه الصلاحية للمالك فقط'); return; }
  _svCustomEmoji = sv.emoji || '🌍';
  document.getElementById('svCustomNameInp').value = sv.name || '';
- const preview = document.getElementById('svAvatarPreview');if (sv.avatarUrl) preview.innerHTML = `<img src="${escHtml(sv.avatarUrl)}" style="width:100%;height:100%;object-fit:cover">`; else preview.textContent = _svCustomEmoji;
+ const preview = document.getElementById('svAvatarPreview');
+ if (sv.avatarUrl) preview.innerHTML = `<img src="${escHtml(sv.avatarUrl)}" style="width:100%;height:100%;object-fit:cover">`; else preview.textContent = _svCustomEmoji;
  const picker = document.getElementById('svEmojiPicker');
  picker.innerHTML = '';
  SV_EMOJIS.forEach(em => {
@@ -772,7 +772,9 @@ async function handleSvAvatarUpload(input) {
  toast('⏳ جاري تحميل الصورة...');
  try {
  const url = await uploadToStorage(file, `servers/${currentServer}/avatar.jpg`);
- const preview = document.getElementById('svAvatarPreview');preview.innerHTML = `<img src="${escHtml(url)}" style="width:100%;height:100%;object-fit:cover">`; window._svAvatarPending = url;
+ const preview = document.getElementById('svAvatarPreview');
+ preview.innerHTML = `<img src="${escHtml(url)}" style="width:100%;height:100%;object-fit:cover">`;
+ window._svAvatarPending = url;
  toast('✅ الصورة جاهزة — اضغط حفظ');
  } catch(e) { toast('❌ فشل رفع الصورة'); }
  input.value = '';
@@ -823,3 +825,47 @@ async function renderMembersList() {
  item.className = 'member-item';
  const av = document.createElement('div');
  av.className = 'member-av';
+ if (data.avatar) av.innerHTML = `<img src="${escHtml(data.avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = name[0] || '?';
+ const info = document.createElement('div');
+ info.className = 'member-info';
+ info.innerHTML = `<div class="member-name">${escHtml(name)}</div><div class="member-role">${role === 'owner' ? '👑 مالك' : role === 'admin' ? '🛡️ أدمن' : '👤 عضو'}</div>`;
+ item.appendChild(av); item.appendChild(info);
+ item.addEventListener('click', () => openMemberCard(uid, name, data.avatar || null));
+ container.appendChild(item);
+ });
+}
+
+// ════ استعادة آخر سيرفر ════
+function restoreLastServer() {
+ const lastSid = localStorage.getItem('awalem_lastServer');
+ const lastCid = localStorage.getItem('awalem_lastChannel');
+ if (lastSid && servers[lastSid]) {
+ selectServer(lastSid);
+ if (lastCid && servers[lastSid]?.channels?.[lastCid]) {
+ selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
+ }
+ } else {
+ showView('home');
+ }
+}
+
+// ════ فتح نافذة إنشاء سيرفر ════
+function openCreateServer() {
+ document.getElementById('svNameInp').value = '';
+ openModal('createServerModal');
+}
+
+// ════ فتح نافذة الانضمام ════
+function openJoinServer() {
+ document.getElementById('joinCodeInp').value = '';
+ openModal('joinServerModal');
+}
+
+// ════ فتح نافذة إضافة قناة ════
+function openAddChannel() {
+ document.getElementById('chNameInp').value = '';
+ selectedChType = 'text';
+ document.getElementById('chTypeText').className = 'ch-type-tab active';
+ document.getElementById('chTypeVoice').className = 'ch-type-tab';
+ openModal('addChannelModal');
+}
