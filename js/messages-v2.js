@@ -1,908 +1,607 @@
-// ════ MESSAGES ════
-const PAGE_SIZE = 20;
-let _oldestMsgKey = null;
-let _allLoaded = false;
-let _currentMsgPath = null;
-let _replyTo = null;
-let _editingKey = null;
-let _typingTimer = null;
-let _msgLoadGen = 0;
-let _searchResults = [], _searchIndex = 0;
+// ════ DIRECT MESSAGES ════
 
-// ════ عرض الرسائل ════
-function showMessages(sid, cid) {
- window._sendingMedia = false;
- if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
- showView('messages');
- if (typeof _currentUserMuted !== 'undefined') _applyMuteState(_currentUserMuted);
- if (typeof _ensureMemberRegistered === 'function') _ensureMemberRegistered(sid);
- _oldestMsgKey = null;
- _allLoaded = false;
- _currentMsgPath = 'messages/' + sid + '/' + cid;
- const area = document.getElementById('messagesArea');
- const loadBtn = document.getElementById('loadMoreBtn');
- area.innerHTML = '';
- if (loadBtn) { loadBtn.style.display = 'none'; area.appendChild(loadBtn); }
- cleanupMessagesListener();
- clearUnread(sid, cid);
- listenTyping(sid, cid);
- if (currentUser && !_notifListener) listenNotifications(currentUser.uid);
- const gen = ++_msgLoadGen;
- let _initialDone = false;
- const fn = snap => {
- if (gen !== _msgLoadGen) return;
- const msg = snap.val();
- if (!msg) return;
- if (area.querySelector(`[data-key="${snap.key}"]`)) return;
- const _d = buildMsgDiv(msg, snap.key); if (!_d) return;
- area.appendChild(_d);
- if (!_oldestMsgKey || snap.key < _oldestMsgKey) _oldestMsgKey = snap.key;
- if (_initialDone) {
- const dist = area.scrollHeight - area.scrollTop - area.clientHeight;
- if (dist < 250 || msg.uid === currentUser?.uid) area.scrollTop = area.scrollHeight;
- if (msg.uid !== currentUser?.uid) {
- const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
- const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
- if (!(activeSid === sid && activeCid === cid)) showInAppNotif(msg, sid, cid);
- }
- }
- };
- const changeFn = snap => {
- const msg = snap.val();
- if (!msg) return;
- const el = document.querySelector(`[data-key="${snap.key}"]`);
- if (!el) return;
- const body = el.querySelector('.msg-body');
- if (!body) return;
- const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
- if (progWrap) {
- if (msg.uploading) _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
- else if (!msg.uploading && msg.mediaUrl) {
- _cleanupUploadState(snap.key);
- progWrap.remove();
- if (msg.mediaType === 'video') body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
- else {
- const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
- const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
- loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
- mediaWrap.appendChild(img); body.appendChild(mediaWrap);
- }
- const a = document.getElementById('messagesArea');
- if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
- } else if (!msg.uploading && msg.uploadFailed) _showUploadFailedEl(progWrap, snap.key);
- }
- renderReactions(msg.reactions || null, snap.key, body);
- const a = document.getElementById('messagesArea');
- if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
- if (msg.text !== undefined) {
- const contentEl = body.querySelector('.msg-content');
- if (contentEl && contentEl.textContent !== msg.text) contentEl.textContent = msg.text;
- if (msg.edited && !body.querySelector('.msg-edited')) {
- const metaEl = body.querySelector('.msg-meta');
- if (metaEl) metaEl.insertAdjacentHTML('beforeend', '(معدّل)');
- }
- }
- };
- const mainRef = db.ref(_currentMsgPath).limitToLast(PAGE_SIZE);
- mainRef.on('child_added', fn);
- db.ref(_currentMsgPath).on('child_changed', changeFn);
- messagesListener = { path: _currentMsgPath, mainRef, fn, changeFn };
- mainRef.once('value', snap => {
- if (gen !== _msgLoadGen) return;
- _initialDone = true;
- const count = snap.numChildren ? snap.numChildren() : Object.keys(snap.val() || {}).length;
- if (loadBtn) loadBtn.style.display = count >= PAGE_SIZE ? 'block' : 'none';
- area.scrollTop = area.scrollHeight;
- setTimeout(() => { area.scrollTop = area.scrollHeight; }, 150);
- setTimeout(() => { area.scrollTop = area.scrollHeight; }, 500);
- });
+// ── متغيرات الحالة ──
+let _currentDmUid = null;
+let _dmListener = null;
+let _dmTypingListener = null;
+let _dmReplyTo = null;
+let _dmTypingTimer = null;
+let _lastServerId = null;
+const _dmUnread = {};
+const _dmGlobalListeners = {};
+window._pendingDmMedia = [];
+
+function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
+
+// ── فتح شاشة الرسائل الخاصة ──
+window.openDMFromSvBar = function() {
+  if (typeof isMobile === 'function' && isMobile()) {
+    if (typeof openDrawer === 'function') openDrawer();
+  } else {
+    openDMScreen();
+  }
+};
+
+function openDMScreen() {
+  closeSidebar();
+  if (currentServer) _lastServerId = currentServer;
+  currentServer = null; currentChannel = null; _currentDmUid = null;
+  const chBtn = document.getElementById('chSettingsBtn');
+  if (chBtn) chBtn.style.display = 'none';
+  document.getElementById('mhIcon').textContent = '💬';
+  document.getElementById('mhName').textContent = 'الرسائل الخاصة';
+  document.getElementById('searchToggleBtn').style.display = 'none';
+  document.getElementById('membersToggleBtn').style.display = 'none';
+  const oldBtns = document.getElementById('dmCallBtns');
+  if (oldBtns) oldBtns.remove();
+  if (typeof renderServerList === 'function') renderServerList();
+  showView('dm');
+  const dmPicker = document.getElementById('dmPickerScreen');
+  if (dmPicker) dmPicker.style.display = 'flex';
+  const dmChat = document.getElementById('dmChatArea');
+  if (dmChat) dmChat.style.display = 'none';
+  renderDmPickerList();
 }
 
-// ════ تحميل رسائل أقدم ════
-async function loadMoreMessages() {
- if (!_currentMsgPath || !_oldestMsgKey || _allLoaded) return;
- const btn = document.getElementById('loadMoreBtn');
- if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ جاري التحميل...'; }
- const area = document.getElementById('messagesArea');
- const prevHeight = area.scrollHeight;
- const snap = await db.ref(_currentMsgPath).orderByKey().endBefore(_oldestMsgKey).limitToLast(PAGE_SIZE).once('value');
- const msgs = snap.val() || {};
- const entries = Object.entries(msgs).sort((a,b) => a[1].ts - b[1].ts);
- if (entries.length === 0) {
- _allLoaded = true;
- if (btn) btn.style.display = 'none';
- toast('📜 لا توجد رسائل أقدم');
- return;
- }
- const firstMsg = area.querySelector('.msg-group');
- entries.reverse().forEach(([key, msg]) => {
- if (area.querySelector(`[data-key="${key}"]`)) return;
- const div = buildMsgDiv(msg, key);
- if (!div) return;
- if (firstMsg) area.insertBefore(div, firstMsg);
- else area.appendChild(div);
- });
- _oldestMsgKey = entries[entries.length-1][0];
- area.scrollTop = area.scrollHeight - prevHeight;
- if (btn) {
- btn.classList.remove('loading');
- btn.textContent = '⬆ تحميل رسائل أقدم';
- if (entries.length < PAGE_SIZE) { btn.style.display = 'none'; _allLoaded = true; }
- }
+// ── عرض قائمة الأعضاء ──
+function renderDmPickerList() {
+  const container = document.getElementById('dmPickerList');
+  if (!container || !currentUser) return;
+  const activeServer = currentServer || _lastServerId;
+  const svMembers = {};
+  if (activeServer && typeof servers !== 'undefined' && servers[activeServer]?.members) {
+    Object.entries(servers[activeServer].members).forEach(([uid, m]) => {
+      if (uid !== currentUser.uid) svMembers[uid] = m;
+    });
+  }
+  const memberUids = Object.keys(svMembers);
+  container.innerHTML = '';
+  if (!memberUids.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-family:Tajawal,sans-serif">لا يوجد أعضاء آخرون في هذا العالم</div>';
+    return;
+  }
+  Promise.all(memberUids.map(uid =>
+    db.ref('users/' + uid).once('value').then(s => {
+      const live = s.val() || {};
+      const member = svMembers[uid] || {};
+      return { uid, name: live.displayName || member.name || 'عضو', avatar: live.avatar || member.avatar || null };
+    })
+  )).then(list => {
+    container.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.id = 'dmPickerGrid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:8px 4px 16px';
+    list.forEach(({ uid, name, avatar }) => {
+      const card = document.createElement('div');
+      card.dataset.dmUid = uid;
+      card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s';
+      const av = document.createElement('div');
+      av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
+      if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = (name[0] || '?').toUpperCase();
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif';
+      nameEl.textContent = name;
+      card.appendChild(av);
+      card.appendChild(nameEl);
+      card.addEventListener('mouseenter', () => { card.style.background='rgba(26,95,95,0.07)'; card.style.borderColor='var(--acc)'; });
+      card.addEventListener('mouseleave', () => { card.style.background='rgba(0,0,0,0.03)'; card.style.borderColor='rgba(0,0,0,0.07)'; });
+      card.addEventListener('click', () => openDM(uid, name));
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  });
 }
 
-// ════ بناء رسالة ════
-function buildMsgDiv(msg, key) {
- if ((msg.mediaUrl || msg.voiceUrl) && msg.expiresAt && msg.saved !== true && Date.now() > msg.expiresAt) return null;
- if (!msg.text && !msg.mediaUrl && !msg.voiceUrl && !msg.replyTo && !msg.uploading) return null;
- if ((msg.mediaUrl || msg.voiceUrl) && !msg.saved && msg.ts && Date.now() - msg.ts > 86400000) return null;
- const isAdmin = msg.role === 'owner' || msg.role === 'admin';
- const isMine = msg.uid === currentUser?.uid;
- const sv = servers[currentServer];
- const myRole = sv?.members?.[currentUser?.uid]?.role;
- const isAdminUser = myRole === 'owner' || myRole === 'admin';
- const targetRole = sv?.members?.[msg.uid]?.role;
- const canModerate = isAdminUser && !isMine && !(myRole === 'admin' && (targetRole === 'owner' || targetRole === 'admin'));
- const div = document.createElement('div');
- div.className = 'msg-group';
- div.dataset.key = key;
- div.dataset.ts = msg.ts;
+// ── فتح محادثة ──
+function openDM(uid, name) {
+  closeSidebar();
+  _currentDmUid = uid;
+  document.getElementById('mhIcon').textContent = '💬';
+  document.getElementById('mhName').textContent = name;
+  document.getElementById('searchToggleBtn').style.display = 'none';
+  document.getElementById('membersToggleBtn').style.display = 'none';
 
- const av = document.createElement('div');
- av.className = 'msg-av';
- const _memberAv = sv?.members?.[msg.uid]?.avatar || null;
- if (_memberAv) {av.innerHTML = `<img src="${_memberAv}" style="width:100%;height:100%;object-fit:cover">`; } else {
- av.textContent = (msg.name || '?')[0];
- }
- if (canModerate) {
- av.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); _openModCtx(msg.uid, msg.name, e); });
- av.style.cursor = 'context-menu';
- av.title = 'انقر بالزر الأيمن لإجراءات الإشراف';
- let _avLp;
- av.addEventListener('touchstart', () => {
- const r = av.getBoundingClientRect();
- _avLp = setTimeout(() => _openModCtx(msg.uid, msg.name, { clientX: r.left + r.width / 2, clientY: r.top }), 600);
- }, {passive: true});
- av.addEventListener('touchend',  () => clearTimeout(_avLp), {passive: true});
- av.addEventListener('touchmove', () => clearTimeout(_avLp), {passive: true});
- }
+  const oldBtns = document.getElementById('dmCallBtns');
+  if (oldBtns) oldBtns.remove();
+  const btns = document.createElement('div');
+  btns.id = 'dmCallBtns';
+  btns.style.cssText = 'display:flex;gap:8px;margin-right:auto';
+  const audioBtn = document.createElement('button');
+  audioBtn.textContent = '📞';
+  audioBtn.style.cssText = 'background:rgba(35,165,90,0.2);border:1px solid rgba(35,165,90,0.4);color:#23a55a;border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer';
+  audioBtn.addEventListener('click', () => startCall(uid, name, 'audio'));
+  const videoBtn = document.createElement('button');
+  videoBtn.textContent = '📹';
+  videoBtn.style.cssText = 'background:rgba(26,95,95,0.2);border:1px solid rgba(26,95,95,0.4);color:var(--gold);border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer';
+  videoBtn.addEventListener('click', () => startCall(uid, name, 'video'));
+  btns.appendChild(audioBtn);
+  btns.appendChild(videoBtn);
+  const header = document.querySelector('.main-header');
+  if (header) header.appendChild(btns);
 
- // ✅ FIX FINAL: معالج click بسيط وواضح — يستدعي openMemberCard فقط
- av.addEventListener('click', (e) => { 
-   console.log('[DEBUG] Avatar clicked, calling openMemberCard for', msg.name);
-   e.stopPropagation(); 
-   e.preventDefault(); 
-   openMemberCard(msg.uid, msg.name, _memberAv); 
- });
+  showView('dm');
+  document.getElementById('dmPickerScreen').style.display = 'none';
+  const chat = document.getElementById('dmChatArea');
+  if (chat) { chat.style.display = 'flex'; chat.style.flexDirection = 'column'; }
 
- if (!canModerate) av.style.cursor = 'pointer';
+  clearDmUnread(uid);
 
- const body = document.createElement('div');
- body.className = 'msg-body';
+  // تحديث آخر 10 رسائل كمقروءة
+  const dmId = getDmId(currentUser.uid, uid);
+  db.ref('dm_messages/' + dmId).limitToLast(10).once('value').then(snap => {
+    const updates = {};
+    const now = Date.now();
+    snap.forEach(ch => {
+      const msg = ch.val();
+      if (msg && msg.uid === uid && msg.status !== 'read') {
+        updates[ch.key + '/status'] = 'read';
+        updates[ch.key + '/readAt'] = now;
+      }
+    });
+    if (Object.keys(updates).length) db.ref('dm_messages/' + dmId).update(updates);
+  });
 
- const meta = document.createElement('div');
- meta.className = 'msg-meta';
- meta.innerHTML = `
- <span class="msg-name">${escHtml(msg.name||'')}</span>
- ${isAdmin ? '<span class="msg-role">مشرف</span>' : ''}
- <span class="msg-time">${formatTime(msg.ts)}</span>
- ${msg.edited ? '<span class="msg-edited">(معدّل)</span>' : ''}
- `;
- body.appendChild(meta);
+  renderDmList();
 
- if (msg.replyTo) {
- const quote = document.createElement('div');
- quote.className = 'msg-reply-quote';
- quote.innerHTML = `
- <div class="msg-reply-name">${escHtml(msg.replyTo.name||'')}</div>
- <div class="msg-reply-text">${escHtml(msg.replyTo.text||'🖼️ وسائط')}</div>
- `;
- quote.addEventListener('click', () => {
- const target = document.querySelector(`[data-key="${msg.replyTo.key}"]`);
- if (target) target.scrollIntoView({ behavior:'smooth', block:'center' });
- });
- body.appendChild(quote);
- }
+  const dmArea = document.getElementById('dmMessages');
+  dmArea.innerHTML = '';
 
- if (msg.text) {
- const txt = document.createElement('div');
- txt.className = 'msg-content';
- const mentionRegex = /@([^\s@]+)/g;
- const highlighted = escHtml(msg.text).replace(mentionRegex, (match, name) => {
- const isMentioned = userProfile?.displayName && name === userProfile.displayName;
- return `<span class="mention${isMentioned ? ' mentioned' : ''}">@${escHtml(name)}</span>`;
- });
- txt.innerHTML = highlighted;
- body.appendChild(txt);
- }
+  // تنظيف المستمعات القديمة
+  if (_dmListener) {
+    const _r = _dmListener.mainRef || null;
+    if (_r) _r.off('child_added', _dmListener.fn);
+    else db.ref(_dmListener.path).off('child_added', _dmListener.fn);
+    if (_dmListener.changeFn) db.ref('dm_messages/' + getDmId(currentUser.uid, _dmListener._uid || uid)).off('child_changed', _dmListener.changeFn);
+    _dmListener = null;
+  }
+  if (_dmTypingListener) { db.ref(_dmTypingListener).off('value'); _dmTypingListener = null; }
 
- if (msg.voiceUrl && !msg.mediaUrl) {
- const vw = document.createElement('div');
- vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
- body.appendChild(vw);
- }
+  const path = 'dm_messages/' + dmId;
+  let _dmInitialDone = false;
 
- if (msg.uploading && !msg.mediaUrl) {
- body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
- }
+  const fn = snap => {
+    const msg = snap.val();
+    if (!msg || dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
+    const _d = buildDmMsgDiv(msg, snap.key, uid, name);
+    if (!_d) return;
+    dmArea.appendChild(_d);
+    // علّم الرسائل الواردة كمقروءة فوراً
+    if (msg.uid === uid && msg.status !== 'read') {
+      db.ref('dm_messages/' + dmId + '/' + snap.key).update({ status: 'read', readAt: Date.now() });
+    }
+    if (_dmInitialDone) dmArea.scrollTop = dmArea.scrollHeight;
+  };
 
- if (msg.mediaUrl) {
- if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) return null;
- if (msg.mediaType === 'video') {
- body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
- } else {
- const mediaWrap = document.createElement('div');
- mediaWrap.className = 'msg-media-wrap';
- const img = document.createElement('img');
- img.decoding = 'async';
- img.className = 'msg-media-img';
- img.src = '';
- img.dataset.msgKey = key;
- img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
- img.addEventListener('load', () => {
- const a = document.getElementById('messagesArea');
- if (!a) return;
- requestAnimationFrame(() => {
- const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
- if (dist < 300) a.scrollTop = a.scrollHeight;
- });
- });
- loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
- if (img.dataset.msgKey !== key) return;
- if (src) img.src = src;
- else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
- });
- mediaWrap.appendChild(img);
- body.appendChild(mediaWrap);
- }
- }
+  const changeFn = snap => {
+    const msg = snap.val();
+    if (!msg) return;
+    // تحديث علامة القراءة للمُرسل
+    if (msg.status === 'read' && msg.uid === currentUser.uid) {
+      const statusEl = dmArea.querySelector(`.msg-status[data-key="${snap.key}"]`);
+      if (statusEl) {
+        statusEl.textContent = '✓✓';
+        statusEl.style.color = '#5865f2';
+        if (msg.readAt) {
+          statusEl.title = 'قرأ الساعة ' + new Date(msg.readAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+          statusEl.style.cursor = 'help';
+        }
+      }
+    }
+    // تحديث الميديا عند اكتمال الرفع
+    const el = dmArea.querySelector(`[data-key="${snap.key}"]`);
+    if (!el) return;
+    const body = el.querySelector('.msg-body');
+    if (!body) return;
+    const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
+    if (progWrap) {
+      if (msg.uploading) {
+        if (typeof _updateUploadProgressEl === 'function') _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
+      } else if (!msg.uploading && msg.mediaUrl) {
+        if (typeof _cleanupUploadState === 'function') _cleanupUploadState(snap.key);
+        progWrap.remove();
+        if (msg.mediaType === 'video') {
+          body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+        } else {
+          const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
+          const img = document.createElement('img');
+          img.loading = 'lazy'; img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+          img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
+          loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+          mediaWrap.appendChild(img);
+          body.appendChild(mediaWrap);
+        }
+        requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
+      } else if (!msg.uploading && msg.uploadFailed) {
+        if (typeof _showUploadFailedEl === 'function') _showUploadFailedEl(progWrap, snap.key);
+      }
+    }
+  };
 
- if (msg.reactions) renderReactions(msg.reactions, key, body);
+  const dmRef = db.ref(path).limitToLast(40);
+  dmRef.on('child_added', fn);
+  db.ref('dm_messages/' + dmId).on('child_changed', changeFn);
+  _dmListener = { path, mainRef: dmRef, fn, changeFn, _uid: uid };
 
- div.appendChild(av); div.appendChild(body);
+  dmRef.once('value', () => {
+    _dmInitialDone = true;
+    dmArea.scrollTop = dmArea.scrollHeight;
+    setTimeout(() => { dmArea.scrollTop = dmArea.scrollHeight; }, 150);
+  });
 
- if (!window._ctxDismissReady) {
- window._ctxDismissReady = true;
- document.addEventListener('click', () => {
- document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
- });
- }
- const ctxBar = document.createElement('div');
- ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
- const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
- [
- { icon: '↩️', label: 'رد', fn: () => setReply(key, msg.name, msg.text) },
- { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
- { icon: '⭐', label: 'تثبيت', fn: () => toast('⭐ قريباً') },
- ...((isMine || isAdminUser) ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteMessage(key) }] : []),
- ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
- ].forEach(ac => {
- const b = document.createElement('button');
- b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
- b.title = ac.label;
- b.innerHTML = `${ac.icon}${ac.label}`;
- b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
- ctxBar.appendChild(b);
- });
- body.style.position = 'relative';
- body.appendChild(ctxBar);
- div.addEventListener('contextmenu', e => {
- e.preventDefault();
- document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
- ctxBar.classList.add('visible');
- });
- let _ctxLp;
- div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
- div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
- div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
-
- return div;
+  const typPath = 'dm_typing/' + dmId + '/' + uid;
+  _dmTypingListener = typPath;
+  db.ref(typPath).on('value', snap => {
+    const el = document.getElementById('dmTypingIndicator');
+    if (el) el.textContent = snap.val() ? name + ' يكتب...' : '';
+  });
 }
 
-// ════ قائمة سياق المشرف ════
-async function _openModCtx(targetUid, targetName, ev) {
- if (!currentServer || !currentUser) return;
- document.getElementById('modCtxMenu')?.remove();
- const snap = await db.ref('servers/' + currentServer + '/restrictions/' + targetUid + '/muted').once('value');
- const isMuted = !!snap.val();
- const menu = document.createElement('div');
- menu.id = 'modCtxMenu';
- menu.style.cssText = 'position:fixed;z-index:9000;background:linear-gradient(160deg,#122530,#0d1e28);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:6px;min-width:188px;box-shadow:0 8px 30px rgba(0,0,0,0.6);font-family:Tajawal,sans-serif;';
- const lbl = document.createElement('div');
- lbl.style.cssText = 'font-size:11px;color:var(--muted);padding:6px 12px 8px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:164px';
- lbl.textContent = '⚙️ ' + (targetName || 'مستخدم');
- menu.appendChild(lbl);
- const mkBtn = (icon, text, color, fn) => {
- const b = document.createElement('button');
- b.style.cssText = `display:block;width:100%;padding:10px 14px;background:transparent;border:none;color:${color};font-family:Tajawal,sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-align:right;border-radius:8px;white-space:nowrap`;
- b.textContent = icon + ' ' + text;
- b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.07)');
- b.addEventListener('mouseleave', () => b.style.background = 'transparent');
- b.addEventListener('click', e => { e.stopPropagation(); menu.remove(); fn(); });
- return b;
- };
- menu.appendChild(mkBtn(
- isMuted ? '🔊' : '🔇',
- isMuted ? 'رفع الكتم' : 'كتم المستخدم',
- 'var(--text)',
- () => isMuted ? _unmuteUser(targetUid, targetName) : _muteUser(targetUid, targetName)
- ));
- menu.appendChild(mkBtn('🚫', 'طرد المستخدم', '#e06060', () => _kickUserFromChat(targetUid, targetName)));
- document.body.appendChild(menu);
- const pw = 200, ph = 120;
- const px = Math.min(ev.clientX || 0, window.innerWidth - pw - 8);
- const py = Math.min(ev.clientY || 0, window.innerHeight - ph - 8);
- menu.style.left = Math.max(8, px) + 'px';
- menu.style.top = Math.max(8, py) + 'px';
- const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', close, true); } };
- setTimeout(() => document.addEventListener('click', close, true), 50);
+// ── بناء رسالة ──
+function buildDmMsgDiv(msg, key, otherUid, otherName) {
+  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
+  if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) {
+    return null;
+  }
+
+  const isMine = msg.uid === currentUser?.uid;
+  const div = document.createElement('div');
+  div.className = 'msg-group'; div.dataset.key = key;
+  const av = document.createElement('div'); av.className = 'msg-av'; av.textContent = (msg.name || '?')[0];
+  const body = document.createElement('div'); body.className = 'msg-body';
+  const meta = document.createElement('div'); meta.className = 'msg-meta';
+  meta.innerHTML = `${escHtml(msg.name || '')} ${formatTime(msg.ts)}`;
+
+  // ✅ إصلاح علامة القراءة — إدراجها في البداية لضمان الظهور
+  if (isMine) {
+    const statusEl = document.createElement('span');
+    statusEl.className = 'msg-status';
+    statusEl.dataset.key = key;
+    statusEl.style.cssText = 'font-size:11px;margin-left:4px;display:inline-block;font-weight:700;';
+    statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+    statusEl.style.color = msg.status === 'read' ? '#5865f2' : '#8899aa';
+    if (msg.status === 'read' && msg.readAt) {
+      statusEl.title = 'قرأ الساعة ' + new Date(msg.readAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      statusEl.style.cursor = 'help';
+    }
+    meta.insertBefore(statusEl, meta.firstChild);
+  }
+
+  body.appendChild(meta);
+
+  if (msg.replyTo) {
+    const quote = document.createElement('div'); quote.className = 'msg-reply-quote';
+    quote.innerHTML = `<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:2px">${escHtml(msg.replyTo.name || '')}</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(msg.replyTo.text || '🖼️')}</div>`;
+    body.appendChild(quote);
+  }
+
+  if (msg.text) {
+    const txt = document.createElement('div'); txt.className = 'msg-content'; txt.textContent = msg.text;
+    body.appendChild(txt);
+  }
+
+  if (msg.uploading && !msg.mediaUrl) {
+    if (typeof _buildUploadProgressEl === 'function') body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
+  }
+
+  if (msg.mediaUrl) {
+    if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) {
+      // لا تُعرض الميديا منتهية الصلاحية — لكن النص يبقى
+    } else if (msg.mediaType === 'video') {
+      body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+    } else {
+      const wrap = document.createElement('div'); wrap.className = 'msg-media-wrap';
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+      img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
+      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+      wrap.appendChild(img);
+      body.appendChild(wrap);
+    }
+  }
+
+  if (msg.voiceUrl) {
+    const vw = document.createElement('div'); vw.style.cssText = 'margin-top:4px';
+    vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
+    body.appendChild(vw);
+  }
+
+  const actions = document.createElement('div'); actions.className = 'msg-actions';
+  const replyBtn = document.createElement('button'); replyBtn.className = 'ma-btn'; replyBtn.textContent = '↩️'; replyBtn.title = 'رد';
+  replyBtn.addEventListener('click', e => { e.stopPropagation(); setDmReply(key, msg.name, msg.text); });
+  actions.appendChild(replyBtn);
+  if (isMine) {
+    const delBtn = document.createElement('button'); delBtn.className = 'ma-btn danger'; delBtn.textContent = '🗑️'; delBtn.title = 'حذف';
+    delBtn.addEventListener('click', e => { e.stopPropagation(); deleteDmMessage(key, otherUid); });
+    actions.appendChild(delBtn);
+  }
+
+  div.appendChild(av); div.appendChild(body); div.appendChild(actions);
+
+  // Context bar
+  if (!window._ctxDismissReady) {
+    window._ctxDismissReady = true;
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    });
+  }
+  const ctxBar = document.createElement('div');
+  ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
+  const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
+  const ctxActions = [
+    { icon: '↩️', label: 'رد', fn: () => setDmReply(key, msg.name, msg.text) },
+    { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
+    { icon: '⭐', label: 'تثبيت', fn: () => saveDmMessage(key) },  // ✅ تثبيت مثل السناب
+    ...(isMine ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteDmMessage(key, otherUid) }] : []),
+    ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
+  ];
+  ctxActions.forEach(ac => {
+    const b = document.createElement('button');
+    b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
+    b.title = ac.label;
+    b.innerHTML = `${ac.icon}${ac.label}`;
+    b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
+    ctxBar.appendChild(b);
+  });
+  body.style.position = 'relative';
+  body.appendChild(ctxBar);
+  div.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+    ctxBar.classList.add('visible');
+  });
+  let _ctxLp;
+  div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
+  div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
+  div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
+
+  return div;
 }
 
-async function _muteUser(uid, name) {
- if (!currentServer || !currentUser) return;
- try {
- await db.ref('servers/' + currentServer + '/restrictions/' + uid).set({ muted: true, mutedBy: currentUser.uid, mutedAt: Date.now() });
- toast('🔇 تم كتم ' + name);
- } catch(e) { toast('❌ فشل الكتم: ' + (e.message || '')); }
+// ✅ دالة تثبيت الرسالة في الخاص (مثل السناب)
+async function saveDmMessage(key) {
+  if (!_currentDmUid || !currentUser) return;
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  try {
+    await db.ref('dm_messages/' + dmId + '/' + key).update({ 
+      saved: true, 
+      expiresAt: null 
+    });
+    toast('📌 تم تثبيت الرسالة — لن تختفي');
+  } catch(e) {
+    toast('❌ فشل التثبيت');
+  }
 }
 
-async function _unmuteUser(uid, name) {
- if (!currentServer || !currentUser) return;
- try {
- await db.ref('servers/' + currentServer + '/restrictions/' + uid).remove();
- toast('🔊 تم رفع الكتم عن ' + name);
- } catch(e) { toast('❌ فشل رفع الكتم: ' + (e.message || '')); }
+// ── إرسال رسالة ──
+window.sendDM = async function() {
+  if (!_currentDmUid || !currentUser) return;
+  const inp = document.getElementById('dmChatInp');
+  const text = inp ? inp.value.trim() : '';
+  const hasMedia = window._pendingDmMedia && window._pendingDmMedia.length > 0;
+  if (!text && !hasMedia) return;
+
+  if (inp) { inp.value = ''; inp.style.height = ''; }
+  const sendBtn = document.getElementById('dmSendBtn');
+  if (sendBtn) sendBtn.classList.remove('active');
+  stopDmTyping();
+
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+
+  // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة
+  const msgBase = { 
+    uid: currentUser.uid, 
+    name: userProfile.displayName || 'مستخدم', 
+    ts: Date.now(), 
+    status: 'sent',
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // ⏰ 24 ساعة
+    saved: false                                    // 📌 لم تُثبت
+  };
+
+  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
+
+  // إرسال النص
+  if (text) {
+    await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+    try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
+  }
+
+  // إرسال الميديا
+  const media = window._pendingDmMedia.slice();
+  window._pendingDmMedia = [];
+  const dmPreview = document.getElementById('dmMediaPreview');
+  if (dmPreview) { dmPreview.innerHTML = ''; dmPreview.style.display = 'none'; }
+
+  for (const m of media) {
+    const dmMsgPath = 'dm_messages/' + dmId;
+    const msgRef = db.ref(dmMsgPath).push();
+    const msgKey = msgRef.key;
+    await msgRef.set({
+      ...msgBase, text: '',
+      mediaType: m.type, mediaName: m.name,
+      uploading: true, uploadProgress: 1,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      saved: false
+    });
+    try {
+      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, () => {});
+      await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+      try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
+    } catch(e) {
+      db.ref(dmMsgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true });
+      toast('❌ فشل رفع الملف');
+    }
+    if (m.localUrl) URL.revokeObjectURL(m.localUrl);
+  }
+
+  // تحديث قائمة المحادثات
+  const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
+  const otherName = otherSnap.val() || 'مستخدم';
+  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
+  await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+};
+
+// ── اختيار ميديا ──
+async function handleDmMediaSelect(input) {
+  const files = Array.from(input.files);
+  input.value = '';
+  if (!files.length) return;
+  if (!window._pendingDmMedia) window._pendingDmMedia = [];
+
+  for (const file of files) {
+    const isVideo = file.type.startsWith('video');
+    const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${isVideo ? '500MB' : '50MB'}`); continue; }
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      let blob = new Blob([arrayBuffer], { type: file.type });
+      if (!isVideo && typeof compressImage === 'function') blob = await compressImage(blob);
+      const mimeType = blob.type || file.type;
+      const localUrl = URL.createObjectURL(blob);
+      window._pendingDmMedia.push({ blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl });
+      // عرض معاينة الصورة
+      let preview = document.getElementById('dmMediaPreview');
+      if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'dmMediaPreview';
+        preview.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;background:rgba(0,0,0,0.05);border-radius:8px;margin:4px 0';
+        const dmInput = document.querySelector('#dmChatArea .chat-input-wrap');
+        if (dmInput) dmInput.insertBefore(preview, dmInput.firstChild);
+      }
+      preview.style.display = 'flex';
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-flex';
+      const thumb = document.createElement(isVideo ? 'video' : 'img');
+      thumb.src = localUrl;
+      thumb.style.cssText = 'height:60px;max-width:90px;border-radius:6px;object-fit:cover;display:block';
+      wrap.appendChild(thumb);
+      preview.appendChild(wrap);
+      const sendBtn = document.getElementById('dmSendBtn');
+      if (sendBtn) sendBtn.classList.add('active');
+    } catch(e) { toast('❌ تعذّر قراءة الملف'); }
+  }
 }
 
-async function _kickUserFromChat(uid, name) {
- if (!currentServer || !currentUser) return;
- if (!confirm('طرد "' + name + '" من العالم؟')) return;
- try {
- await db.ref('servers/' + currentServer + '/members/' + uid).remove();
- await db.ref('users/' + uid + '/servers/' + currentServer).remove();
- await db.ref('servers/' + currentServer + '/restrictions/' + uid).remove();
- if (servers[currentServer]?.members) delete servers[currentServer].members[uid];
- toast('🚫 تم طرد ' + name);
- } catch(e) { toast('❌ فشل الطرد: ' + (e.message || '')); }
+// ── دوال مساعدة ──
+function clearDmUnread(uid) {
+  _dmUnread[uid] = 0;
+  if (typeof updateDmBadge === 'function') updateDmBadge();
+  renderDmList();
 }
 
-// ════ إرسال رسالة ════
-async function sendMessage() {
- console.log('[sendMessage] called, pendingMedia:', window._pendingMedia?.length, 'text:', document.getElementById('mainChatInp')?.value?.trim()?.slice(0,20));
- console.log('[sendMessage] currentServer:', currentServer, 'currentChannel:', currentChannel, 'muted:', _currentUserMuted);
- if (_currentUserMuted) { toast('🔇 أنت مكتوم في هذا العالم'); return; }
- const inp = document.getElementById('mainChatInp');
- const text = inp ? inp.value.trim() : '';
- const media = [...(window._pendingMedia || [])];
- if (window._sendingMedia && media.length) { toast('⏳ يوجد رفع جارٍ، رجاءً انتظر...'); return; }
- if (!text && !media.length) return;
- if (!currentServer || !currentChannel) return;
-
- stopTyping();
- if (inp) { inp.value = ''; inp.style.height = ''; }
- document.getElementById('sendBtn').classList.remove('active');
- window._pendingMedia = [];
- const preview = document.getElementById('mediaPreviewArea');
- if (preview) { preview.innerHTML = ''; preview.style.display = 'none'; }
-
- if (_editingKey) {
- const key = _editingKey;
- cancelEdit();
- await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key)
- .update({ text, edited: true, editedAt: Date.now() });
- const msgEl = document.querySelector(`[data-key="${key}"] .msg-content`);
- if (msgEl) msgEl.textContent = text;
- if (!document.querySelector(`[data-key="${key}"] .msg-edited`)) {
- const metaEl = document.querySelector(`[data-key="${key}"] .msg-meta`);
- if (metaEl) metaEl.insertAdjacentHTML('beforeend', '(معدّل)');
- }
- toast('✅ تم تعديل الرسالة');
- return;
- }
-
- const sv = servers[currentServer];
- const role = sv?.members?.[currentUser.uid]?.role || 'member';
- const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), role };
- if (_replyTo) {
- msgBase.replyTo = { key: _replyTo.key, name: _replyTo.name, text: _replyTo.text || '' };
- clearReply();
- }
-
- if (auth.currentUser) { try { await auth.currentUser.getIdToken(true); } catch(e) {} }
-
- if (text) {
- await db.ref('messages/' + currentServer + '/' + currentChannel).push({ ...msgBase, text });
- const _pSid = currentServer, _pCid = currentChannel;
- setTimeout(() => {
- try {
- const members = servers[_pSid]?.members || {};
- Object.keys(members).forEach(uid => {
- if (uid !== currentUser.uid) {
- sendPushToUser(uid, userProfile.displayName || 'عوالم', text.slice(0, 80), {
- serverId: _pSid, channelId: _pCid,
- senderName: userProfile.displayName, type: 'message'
- });
- }
- });
- } catch(e) {}
- }, 0);
- }
-
- if (!media.length) return;
- if (!_isConnected) {
- try { await waitForConnection(5000); }
- catch(e) { toast('❌ لا يوجد اتصال — تحقق من الإنترنت وأعد المحاولة'); return; }
- }
- if (!auth.currentUser) { toast('❌ يجب تسجيل الدخول أولاً'); return; }
- console.log('[sendMessage] starting media upload, count:', media.length);
- toast('⏱️ ميديا مؤقتة: تختفي تلقائياً بعد 24 ساعة');
-
- window._sendingMedia = true;
- try {
- for (const m of media) {
- console.log('[sendMessage] uploading:', m.name, m.type);
- await _uploadOneMedia(m, msgBase);
- console.log('[sendMessage] done:', m.name);
- }
- } catch(uploadErr) {
- console.error('[sendMessage] upload error:', uploadErr);
- } finally {
- window._sendingMedia = false;
- }
+function updateDmBadge() {
+  const total = Object.values(_dmUnread || {}).reduce((a, b) => a + b, 0);
+  const svBadge = document.getElementById('dmSvBadge');
+  if (svBadge) { svBadge.textContent = total > 99 ? '99+' : total; svBadge.style.display = total > 0 ? 'block' : 'none'; }
 }
 
-// ════ رفع ملف واحد ════
-async function _uploadOneMedia(m, msgBase) {
- const _sid = currentServer, _cid = currentChannel;
- const msgPath = 'messages/' + _sid + '/' + _cid;
- const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
- const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
- const msgRef = db.ref(msgPath).push();
- const msgKey = msgRef.key;
-
- if (m.type !== 'video') {
- (window._uploadPreviews = window._uploadPreviews || {})[msgKey] = URL.createObjectURL(m.blob);
- }
- (window._uploadBlobs = window._uploadBlobs || {})[msgKey] = {
- blob: m.blob, name: m.name, type: m.type, mimeType: m.mimeType, msgPath
- };
-
- await msgRef.set({
- ...msgBase,
- text: '',
- mediaType: m.type,
- mediaName: m.name,
- uploading: true,
- uploadProgress: 1,
- expiresAt,
- saved: false
- });
-
- const area = document.getElementById('messagesArea');
- if (area) area.scrollTop = area.scrollHeight;
-
- const updatePct = (pct) => {
- db.ref(msgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
- };
-
- try {
- let mediaUrl;
-
- if (m.type === 'video') {
- mediaUrl = await uploadToCloudinary(
- new File([m.blob], m.name, { type: m.mimeType }),
- 3,
- (pct) => updatePct(pct)
- );
- } else {
- const ext = (m.name.split('.').pop() || 'jpg').toLowerCase();
- const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
- const uploadTask = storageRef.put(m.blob, { contentType: m.mimeType || 'application/octet-stream' });
- await new Promise((resolve, reject) => {
- uploadTask.on('state_changed',
- (snap) => { if (snap.totalBytes > 0) updatePct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)); },
- reject,
- resolve
- );
- });
- mediaUrl = await uploadTask.snapshot.ref.getDownloadURL();
- }
-
- if (!mediaUrl) throw new Error('الرابط فارغ بعد اكتمال الرفع');
-
- await db.ref(msgPath + '/' + msgKey).update({
- mediaUrl,
- uploading: false,
- uploadProgress: null
- });
- console.log('[_uploadOneMedia] DB updated with mediaUrl:', mediaUrl?.slice(0,50));
-
- if (area) area.scrollTop = area.scrollHeight;
-
- } catch(e) {
- window._sendingMedia = false;
- db.ref(msgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true }).catch(() => {});
- if (e.code === 'storage/unauthorized') {
- toast('❌ لا صلاحية للرفع — تحقق من قواعد Firebase Storage');
- } else if (!navigator.onLine || (e.message || '').toLowerCase().includes('network')) {
- toast('❌ فشل الرفع — تحقق من الاتصال وأعد المحاولة');
- } else {
- toast('❌ فشل رفع الملف: ' + (e.message || ''));
- }
- } finally {
- clearTimeout(_guardTimer);
- if (m.localUrl) { URL.revokeObjectURL(m.localUrl); m.localUrl = null; }
- }
+function renderDmList() {
+  const container = document.getElementById('dmList');
+  if (!container || !currentUser) return;
+  db.ref('dms/' + currentUser.uid).once('value').then(snap => {
+    const dms = snap.val() || {};
+    container.innerHTML = '';
+    if (!Object.keys(dms).length) return;
+    Object.entries(dms).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0)).forEach(([uid, info]) => {
+      const item = document.createElement('div');
+      item.className = 'dm-item' + (_currentDmUid === uid ? ' active' : '');
+      const unread = _dmUnread[uid] || 0;
+      item.innerHTML = `
+        <div class="dm-av">${(info.name || '?')[0]}</div>
+        <div class="dm-info">
+          <div class="dm-name">${escHtml(info.name || 'مستخدم')}</div>
+        </div>
+        ${unread > 0 ? `<div class="dm-badge">${unread > 99 ? '99+' : unread}</div>` : ''}`;
+      item.addEventListener('click', () => openDM(uid, info.name || 'مستخدم'));
+      container.appendChild(item);
+    });
+  });
 }
 
-// ════ حذف رسالة ════
-async function deleteMessage(key) {
- if (!currentServer || !currentChannel) return;
- if (!confirm('هل تريد حذف هذه الرسالة؟')) return;
- await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key).remove();
- document.querySelector(`[data-key="${key}"]`)?.remove();
- toast('🗑️ تم حذف الرسالة');
+function setDmReply(key, name, text) {
+  _dmReplyTo = { key, name, text };
+  document.getElementById('dmReplyName').textContent = name;
+  document.getElementById('dmReplyText').textContent = text || '🖼️';
+  document.getElementById('dmReplyBar').style.display = 'flex';
+  document.getElementById('dmChatInp').focus();
 }
 
-// ════ تعديل رسالة ════
-function startEditMessage(key, currentText) {
- _editingKey = key;
- const inp = document.getElementById('mainChatInp');
- inp.value = currentText; inp.focus();
- inp.style.height = ''; inp.style.height = Math.min(inp.scrollHeight, 140) + 'px';
- document.getElementById('sendBtn').classList.add('active');
- document.querySelector('.chat-input-box').style.borderColor = 'rgba(88,101,242,0.7)';
- toast('✏️ وضع التعديل — اضغط ESC للإلغاء');
-}
-function cancelEdit() {
- _editingKey = null;
- const inp = document.getElementById('mainChatInp');
- inp.value = ''; inp.style.height = '';
- document.getElementById('sendBtn').classList.remove('active');
- document.querySelector('.chat-input-box').style.borderColor = '';
+function clearDmReply() {
+  _dmReplyTo = null;
+  document.getElementById('dmReplyBar').style.display = 'none';
 }
 
-// ════ الرد على رسالة ════
-function setReply(key, name, text) {
- _replyTo = { key, name, text };
- document.getElementById('replyName').textContent = name;
- document.getElementById('replyText').textContent = text || '🖼️ وسائط';
- document.getElementById('replyBar').classList.add('show');
- document.getElementById('mainChatInp').focus();
-}
-function clearReply() {
- _replyTo = null;
- document.getElementById('replyBar').classList.remove('show');
+function startDmTyping() {
+  if (!_currentDmUid || !currentUser) return;
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  db.ref('dm_typing/' + dmId + '/' + currentUser.uid).set(true);
+  clearTimeout(_dmTypingTimer);
+  _dmTypingTimer = setTimeout(() => db.ref('dm_typing/' + dmId + '/' + currentUser.uid).remove(), 4000);
 }
 
-// ════ التفاعلات ════
-const REACTION_EMOJIS = ['👍','😂','🔥','❤️','😮','😢'];
-
-function showReactionPicker(msgKey, anchorEl) {
- const old = document.getElementById('reactionPicker');
- if (old) { old.remove(); return; }
- const picker = document.createElement('div');
- picker.id = 'reactionPicker';
- picker.className = 'reaction-picker';
- REACTION_EMOJIS.forEach(emoji => {
- const span = document.createElement('span');
- span.textContent = emoji;
- span.title = emoji;
- span.addEventListener('click', e => { e.stopPropagation(); toggleReaction(msgKey, emoji); picker.remove(); });
- picker.appendChild(span);
- });
- document.body.appendChild(picker);
- const rect = anchorEl.getBoundingClientRect();
- const pw = picker.offsetWidth || 232;
- const ph = picker.offsetHeight || 48;
- let left = rect.left + rect.width / 2 - pw / 2;
- left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
- const topAbove = rect.top - ph - 6;
- const top = topAbove >= 8 ? topAbove : rect.bottom + 6;
- picker.style.position = 'fixed';
- picker.style.left = left + 'px';
- picker.style.top = top + 'px';
- const close = e => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close, true); } };
- setTimeout(() => document.addEventListener('click', close, true), 50);
+function stopDmTyping() {
+  if (!_currentDmUid || !currentUser) return;
+  clearTimeout(_dmTypingTimer);
+  db.ref('dm_typing/' + getDmId(currentUser.uid, _currentDmUid) + '/' + currentUser.uid).remove();
 }
 
-async function toggleReaction(msgKey, emoji) {
- if (!currentServer || !currentChannel || !currentUser) return;
- const path = 'messages/' + currentServer + '/' + currentChannel + '/' + msgKey + '/reactions/' + emoji + '/' + currentUser.uid;
- const snap = await db.ref(path).once('value');
- if (snap.exists()) await db.ref(path).remove();
- else await db.ref(path).set(true);
+async function deleteDmMessage(key, otherUid) {
+  if (!confirm('حذف هذه الرسالة؟')) return;
+  const dmId = getDmId(currentUser.uid, otherUid);
+  await db.ref('dm_messages/' + dmId + '/' + key).remove();
+  document.querySelector(`[data-key="${key}"]`)?.remove();
 }
 
-function renderReactions(reactions, msgKey, container) {
- const old = container.querySelector('.msg-reactions');
- if (old) old.remove();
- if (!reactions || !Object.keys(reactions).length) return;
- const wrap = document.createElement('div');
- wrap.className = 'msg-reactions';
- Object.entries(reactions).forEach(([emoji, users]) => {
- const uids = Object.keys(users || {});
- if (!uids.length) return;
- const isMine = uids.includes(currentUser?.uid);
- const chip = document.createElement('div');
- chip.className = 'reaction-chip' + (isMine ? ' mine' : '');
- chip.innerHTML = `${emoji}${uids.length}`;
- const names = uids.slice(0, 3)
- .map(uid => servers[currentServer]?.members?.[uid]?.name || 'مستخدم')
- .join('، ');
- chip.title = names + (uids.length > 3 ? ' +' + (uids.length - 3) : '');
- chip.addEventListener('click', () => toggleReaction(msgKey, emoji));
- wrap.appendChild(chip);
- });
- if (wrap.children.length) container.appendChild(wrap);
+function listenDMs() {
+  if (!currentUser) return;
+  const dmsRef = db.ref('dms/' + currentUser.uid);
+  dmsRef.off('value');
+  dmsRef.on('value', snap => {
+    renderDmList();
+    if (!snap.exists()) return;
+    snap.forEach(ch => {
+      const uid = ch.key;
+      if (!_dmGlobalListeners[uid]) _addDmListener(uid);
+    });
+  });
 }
 
-// ════ الكتابة ════
-function startTyping() {
- if (!currentServer || !currentChannel || !currentUser) return;
- const path = 'typing/' + currentServer + '/' + currentChannel + '/' + currentUser.uid;
- db.ref(path).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
- db.ref(path).onDisconnect().remove();
- clearTimeout(_typingTimer);
- _typingTimer = setTimeout(() => db.ref(path).remove(), 3000);
-}
-function stopTyping() {
- if (!currentServer || !currentChannel || !currentUser) return;
- clearTimeout(_typingTimer);
- db.ref('typing/' + currentServer + '/' + currentChannel + '/' + currentUser.uid).remove();
-}
-function listenTyping(sid, cid) {
- if (_typingListener) { db.ref(_typingListener).off('value'); _typingListener = null; }
- const path = 'typing/' + sid + '/' + cid;
- _typingListener = path;
- db.ref(path).on('value', snap => {
- const users = snap.val() || {};
- const others = Object.entries(users)
- .filter(([uid]) => uid !== currentUser?.uid)
- .map(([, u]) => u.name);
- const el = document.getElementById('typingIndicator');
- if (!el) return;
- if (!others.length) { el.innerHTML = ''; el.classList.remove('active'); return; }
-
- let nameStr;
- if (others.length === 1) {
- nameStr = `<strong>${escHtml(others[0])}</strong>`;
- } else if (others.length === 2) {
- nameStr = `<strong>${escHtml(others[0])}</strong> و <strong>${escHtml(others[1])}</strong>`;
- } else {
- nameStr = `<strong>${escHtml(others[0])}</strong> و <strong>${escHtml(others[1])}</strong> و${others.length - 2} آخرون`;
- }
- const verb = others.length === 1 ? 'يكتب' : others.length === 2 ? 'يكتبان' : 'يكتبون';
-
- el.innerHTML = `${nameStr} ${verb}...`;
- el.classList.add('active');
- });
+function _addDmListener(uid) {
+  if (_dmGlobalListeners[uid]) {
+    const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
+    try { oldQ.off('child_added', oldFn); } catch(e) {}
+    delete _dmGlobalListeners[uid];
+  }
+  const dmId = getDmId(currentUser.uid, uid);
+  const q = db.ref('dm_messages/' + dmId).limitToLast(1);
+  let initialized = false;
+  const fn = msgSnap => {
+    if (!initialized) return;
+    const msg = msgSnap.val();
+    if (!msg || msg.uid === currentUser.uid) return;
+    if (_currentDmUid === uid) return;
+    if (typeof showDmNotif === 'function') showDmNotif(msg, uid);
+    _refreshPickerBadge(uid);
+  };
+  q.on('child_added', fn);
+  q.once('value', () => { initialized = true; });
+  _dmGlobalListeners[uid] = { q, fn };
 }
 
-// ════ تنظيف الـ listener ════
-function cleanupMessagesListener() {
- if (messagesListener) {
- const ref = messagesListener.mainRef || messagesListener.queryRef;
- if (ref) ref.off('child_added', messagesListener.fn);
- if (messagesListener.changeFn) db.ref(messagesListener.path).off('child_changed', messagesListener.changeFn);
- messagesListener = null;
- }
- stopTyping();
- if (_typingListener) { db.ref(_typingListener).off('value'); _typingListener = null; }
- const el = document.getElementById('typingIndicator');
- if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+function _refreshPickerBadge(uid) {
+  const card = document.querySelector(`#dmPickerGrid [data-dm-uid="${uid}"]`);
+  if (!card) return;
+  const existing = card.querySelector('.dm-picker-badge');
+  if (existing) existing.remove();
+  const count = _dmUnread[uid] || 0;
+  if (count > 0) {
+    const badge = document.createElement('div');
+    badge.className = 'dm-picker-badge';
+    badge.style.cssText = 'position:absolute;top:-3px;right:-3px;background:#ed4245;color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:Tajawal,sans-serif;padding:0 4px;border:2px solid #fff;z-index:2';
+    badge.textContent = count > 99 ? '99+' : String(count);
+    card.appendChild(badge);
+  }
 }
 
-// ════ الإشارة (@mention) ════
-let _mentionIndex = 0, _mentionResults = [];
-
-function handleChatKeydown(e) {
- const popup = document.getElementById('mentionPopup');
- if (popup.classList.contains('show')) {
- if (e.key === 'ArrowDown') { e.preventDefault(); _mentionIndex = Math.min(_mentionIndex+1, _mentionResults.length-1); updateMentionSelection(); return; }
- if (e.key === 'ArrowUp') { e.preventDefault(); _mentionIndex = Math.max(_mentionIndex-1, 0); updateMentionSelection(); return; }
- if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(_mentionResults[_mentionIndex]); return; }
- if (e.key === 'Escape') { closeMentionPopup(); }
- }
- if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+async function toggleDmVoiceRecording() {
+  toast('🎤 قريباً');
 }
-
-function handleChatInput(el) {
- el.style.height = ''; el.style.height = Math.min(el.scrollHeight,140)+'px';
- document.getElementById('sendBtn').classList.toggle('active', !!(el.value.trim()||(window._pendingMedia?.length)));
- startTyping();
- const val = el.value, cursor = el.selectionStart;
- const atIdx = val.lastIndexOf('@', cursor-1);
- if (atIdx !== -1 && (atIdx===0 || /\s/.test(val[atIdx-1]))) showMentionPopup(val.substring(atIdx+1, cursor));
- else closeMentionPopup();
-}
-
-function showMentionPopup(query) {
- if (!currentServer) return;
- const members = servers[currentServer]?.members || {};
- _mentionResults = Object.entries(members).filter(([uid,m]) => uid!==currentUser?.uid && (m.name||'').toLowerCase().includes(query.toLowerCase())).slice(0,6);
- const popup = document.getElementById('mentionPopup');
- if (!_mentionResults.length) { closeMentionPopup(); return; }
- popup.innerHTML = ''; _mentionIndex = 0;
- _mentionResults.forEach(([uid,m],i) => {
- const item = document.createElement('div');
- item.className = 'mention-item' + (i===0?' selected':'');
- item.innerHTML = `
- <div class="mention-av">${(m.name||'?')[0]}</div>
- <div class="mention-info">
- <div class="mention-name">${escHtml(m.name||'')}</div>
- <div class="mention-tag">#${m.tag||'0000'}</div>
- </div>
- `;
- item.addEventListener('click', () => insertMention([uid,m]));
- popup.appendChild(item);
- });
- popup.classList.add('show');
-}
-function updateMentionSelection() {
- document.querySelectorAll('#mentionPopup .mention-item').forEach((el,i) => el.classList.toggle('selected', i===_mentionIndex));
-}
-function insertMention([uid,m]) {
- const inp = document.getElementById('mainChatInp');
- const val = inp.value, cursor = inp.selectionStart;
- const atIdx = val.lastIndexOf('@', cursor-1);
- inp.value = val.substring(0,atIdx) + '@' + (m.name||'') + ' ' + val.substring(cursor);
- inp.selectionStart = inp.selectionEnd = atIdx + (m.name||'').length + 2;
- closeMentionPopup(); inp.focus();
- document.getElementById('sendBtn').classList.add('active');
-}
-function closeMentionPopup() {
- const popup = document.getElementById('mentionPopup');
- if (popup) { popup.classList.remove('show'); popup.innerHTML=''; }
- _mentionResults = [];
-}
-
-// ════ اختيار الوسائط ════
-window._pendingMedia = [];
-window._sendingMedia = false;
-async function handleMediaSelect(input) {
- const files = Array.from(input.files);
- input.value = '';
- if (!files.length) return;
- const preview = document.getElementById('mediaPreviewArea');
- if (!preview) return;
-
- for (const file of files) {
- const isVideo = file.type.startsWith('video');
- const maxSize = isVideo ? 500*1024*1024 : 50*1024*1024;
- const maxLabel = isVideo ? '500MB' : '50MB';
- if (file.size > maxSize) { toast(`❌ الملف أكبر من ${maxLabel}`); continue; }
-
- const wrap = document.createElement('div');
- wrap.style.cssText = 'position:relative;display:inline-flex;flex-shrink:0;align-items:center;justify-content:center';
- const loadingEl = document.createElement('div');
- loadingEl.style.cssText = 'width:72px;height:72px;border-radius:8px;background:#23272a;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;font-family:Tajawal,sans-serif';
- loadingEl.textContent = '⏳';
- wrap.appendChild(loadingEl);
- preview.style.display = 'flex';
- preview.appendChild(wrap);
-
- try {
- const arrayBuffer = await file.arrayBuffer();
- let blob = new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' });
- if (!isVideo) blob = await compressImage(blob);
- console.log('[handleMediaSelect] file:', file.name, 'blob size:', blob.size, 'type:', blob.type);
-
- const mimeType = blob.type || file.type || 'application/octet-stream';
- const localUrl = URL.createObjectURL(blob);
- const entry = { blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl };
- window._pendingMedia.push(entry);
-
- loadingEl.remove();
- if (isVideo) {
- const vid = document.createElement('video');
- vid.src = localUrl; vid.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
- wrap.appendChild(vid);
- } else {
- const img = document.createElement('img');
- img.src = localUrl; img.style.cssText = 'height:72px;max-width:110px;border-radius:8px;object-fit:cover;display:block';
- wrap.appendChild(img);
- }
-
- const rm = document.createElement('button');
- rm.type='button'; rm.textContent='✕';
- rm.style.cssText = 'position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:#c04040;color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2';
- rm.addEventListener('click', () => {
- if (entry.localUrl) { URL.revokeObjectURL(entry.localUrl); entry.localUrl = null; }
- window._pendingMedia = window._pendingMedia.filter(e => e!==entry);
- wrap.remove();
- if (!window._pendingMedia.length) preview.style.display='none';
- document.getElementById('sendBtn').classList.toggle('active', !!(window._pendingMedia.length||document.getElementById('mainChatInp')?.value.trim()));
- });
- wrap.appendChild(rm);
- document.getElementById('sendBtn').classList.add('active');
- } catch(e) {
- wrap.remove();
- if (!window._pendingMedia.length) preview.style.display='none';
- console.error('[handleMediaSelect] ERROR:', e);
- toast('❌ تعذّر قراءة الملف: ' + (e.message || ''));
- }
- }
-}
-
-// ════ البحث ════
-function toggleSearch() {
- const bar = document.getElementById('searchBar');
- const isOpen = bar.classList.contains('show');
- if (isOpen) {
- bar.classList.remove('show'); clearSearchHighlights();
- _searchResults=[]; _searchIndex=0;
- document.getElementById('searchInput').value='';
- document.getElementById('searchCount').textContent='';
- } else {
- bar.classList.add('show');
- setTimeout(() => document.getElementById('searchInput').focus(), 50);
- }
-}
-function searchMessages(query) {
- clearSearchHighlights(); _searchResults=[]; _searchIndex=0;
- const countEl = document.getElementById('searchCount');
- if (!query.trim()) { countEl.textContent=''; return; }
- document.querySelectorAll('#messagesArea .msg-content').forEach(el => {
- if (el.textContent.toLowerCase().includes(query.toLowerCase())) {
- const text = el.textContent, idx = text.toLowerCase().indexOf(query.toLowerCase());
- el.innerHTML = escHtml(text.substring(0,idx)) + `<mark class="msg-highlight">${escHtml(text.substring(idx,idx+query.length))}</mark>` + escHtml(text.substring(idx+query.length));
- _searchResults.push(el);
- }
- });
- if (!_searchResults.length) { countEl.textContent='لا نتائج'; return; }
- highlightCurrent(); countEl.textContent=`1 / ${_searchResults.length}`;
-}
-function navigateSearch(dir) {
- if (!_searchResults.length) return;
- _searchIndex = (_searchIndex+dir+_searchResults.length)%_searchResults.length;
- highlightCurrent();
- document.getElementById('searchCount').textContent=`${_searchIndex+1} / ${_searchResults.length}`;
-}
-function highlightCurrent() {
- _searchResults.forEach((el,i) => { const m=el.querySelector('mark'); if(m) m.className=i===_searchIndex?'msg-highlight-current':'msg-highlight'; });
- _searchResults[_searchIndex]?.closest('.msg-group')?.scrollIntoView({behavior:'smooth',block:'center'});
-}
-function clearSearchHighlights() {
- document.querySelectorAll('#messagesArea .msg-content mark').forEach(m => { m.parentNode.replaceChild(document.createTextNode(m.textContent),m); m.parentNode.normalize(); });
-}
-
-// ════ Lightbox ════
-let _lightboxUrl='', _lightboxType='', _lightboxName='';
-function openLightbox(url, type, name) {
- _lightboxUrl=url; _lightboxType=type; _lightboxName=name||'media';
- const bg=document.getElementById('lightboxBg');
- const img=document.getElementById('lightboxImg');
- const vid=document.getElementById('lightboxVid');
- if (!bg) return;
- bg.style.display='flex';
- if (type==='video') { if(img) img.style.display='none'; if(vid){vid.src=url;vid.style.display='block';} }
- else { if(vid){vid.style.display='none';vid.src='';} if(img){img.src=url;img.style.display='block';} }
-}
-function closeLightbox() {
- const bg=document.getElementById('lightboxBg');
- const vid=document.getElementById('lightboxVid');
- if (bg) bg.style.display='none';
- if (vid){vid.pause();vid.src='';}
-}
-function lightboxDownload() { downloadMedia(_lightboxUrl,_lightboxName,_lightboxType); }
-function downloadMedia(url, name, type) {
- const ext = type==='video'?'.mp4':'.jpg';
- const filename = name.includes('.')?name:name+ext;
- fetch(url).then(r=>r.blob()).then(blob=>{
- const a=document.createElement('a');
- a.href=URL.createObjectURL(blob); a.download=filename;
- document.body.appendChild(a); a.click(); document.body.removeChild(a);
- toast('✅ تم الحفظ!');
- }).catch(()=>window.open(url,'_blank'));
-}
-
-// ESC key
-document.addEventListener('keydown', e => {
- if (e.key==='Escape') {
- if (_editingKey) cancelEdit();
- else if (document.getElementById('searchBar')?.classList.contains('show')) toggleSearch();
- }
-});
