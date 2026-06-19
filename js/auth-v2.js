@@ -26,16 +26,24 @@ function _dismissSplash() {
 setTimeout(_dismissSplash, 2500);
 
 // ════ وظيفة حالة الاتصال الحية (Online Status System) ════
+let _onDisconnectSet = false; // ✅ تتبع: هل onDisconnect مُعين؟
+
 function updateOnlineStatus(isOnline) {
  if (!currentUser) return;
  db.ref('users/' + currentUser.uid).update({
  online: isOnline,
  lastSeen: Date.now()
  });
- if (isOnline) {
+ // ✅ تعيين onDisconnect مرة واحدة فقط
+ if (isOnline && !_onDisconnectSet) {
  db.ref('users/' + currentUser.uid + '/online').onDisconnect().set(false);
  db.ref('users/' + currentUser.uid + '/lastSeen').onDisconnect().set(Date.now());
+ _onDisconnectSet = true;
  }
+}
+
+function resetOnDisconnect() {
+ _onDisconnectSet = false;
 }
 
 // ════ رسم لوحة المستخدم السفلى فوراً بمجرد توفّر بيانات Auth ════
@@ -63,6 +71,11 @@ auth.onAuthStateChanged(user => {
  updateOnlineStatus(true);
  window.addEventListener('beforeunload', () => updateOnlineStatus(false));
 
+ // ✅ تعيين onDisconnect مرة واحدة فقط عند تسجيل الدخول
+ db.ref('users/' + currentUser.uid + '/online').onDisconnect().set(false);
+ db.ref('users/' + currentUser.uid + '/lastSeen').onDisconnect().set(Date.now());
+ _onDisconnectSet = true;
+
  // تسجيل مستمع المكالمات الواردة
  if (typeof listenIncomingCalls === 'function') {
  console.log('[CALL] 📞 استدعاء listenIncomingCalls بعد تسجيل الدخول لـ', user.uid);
@@ -78,6 +91,7 @@ auth.onAuthStateChanged(user => {
  _notifListener.ref.off('child_added', _notifListener.fn);
  _notifListener = null;
  }
+ resetOnDisconnect(); // ✅ إعادة تعيين عند الخروج
  document.getElementById('loginScreen').style.display = 'flex';
  const app = document.getElementById('app');
  if (app) app.style.display = 'none';
