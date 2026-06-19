@@ -9,6 +9,32 @@ let _typingTimer = null;
 let _msgLoadGen = 0;
 let _searchResults = [], _searchIndex = 0;
 
+
+// ════ إدارة الرسائل غير المقروءة ════
+function clearUnread(sid, cid) {
+ const key = sid + '/' + cid;
+ if (_unreadCounts[key]) {
+ _unreadCounts[key] = 0;
+ const badge = document.querySelector(`.ch-item[data-cid="${cid}"] .ch-unread-badge`);
+ if (badge) badge.remove();
+ }
+}
+
+function incrementUnread(sid, cid) {
+ const key = sid + '/' + cid;
+ _unreadCounts[key] = (_unreadCounts[key] || 0) + 1;
+ const chItem = document.querySelector(`.ch-item[data-cid="${cid}"]`);
+ if (chItem && !chItem.querySelector('.ch-unread-badge')) {
+ const badge = document.createElement('div');
+ badge.className = 'ch-unread-badge';
+ badge.textContent = _unreadCounts[key];
+ chItem.appendChild(badge);
+ } else if (chItem) {
+ const badge = chItem.querySelector('.ch-unread-badge');
+ if (badge) badge.textContent = _unreadCounts[key] > 99 ? '99+' : _unreadCounts[key];
+ }
+}
+
 // ════ عرض الرسائل ════
 function showMessages(sid, cid) {
  window._sendingMedia = false;
