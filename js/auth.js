@@ -182,9 +182,7 @@ function updateUserPanel() {
  const av = document.getElementById('upAv');
  if (av) {
  const src = userProfile.avatar || auth.currentUser?.photoURL || null;
- if (src) {av.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`; } else {
- av.textContent = (userProfile.displayName || '?')[0];
- }
+ if (src) { av.innerHTML = `<img src="${escHtml(src)}" style="width:100%;height:100%;object-fit:cover">`; } else { av.textContent = (userProfile.displayName || '?')[0]; }
  }
  document.getElementById('upName').textContent = userProfile.displayName || '—';
  document.getElementById('upTag').textContent = '#' + (userProfile.tag || '0000');
@@ -198,11 +196,7 @@ function openEditProfile() {
  const fileInp = document.getElementById('epAvatarInput');
  if (fileInp) fileInp.value = '';
  const prev = document.getElementById('epAvatarPreview');
- if (prev) {
- if (userProfile.avatar) {prev.innerHTML = `<img src="${userProfile.avatar}" style="width:100%;height:100%;object-fit:cover">`; } else {
- prev.textContent = (userProfile.displayName || '?')[0];
- }
- }
+ if (prev) { if (userProfile.avatar) { prev.innerHTML = `<img src="${escHtml(userProfile.avatar)}" style="width:100%;height:100%;object-fit:cover">`; } else { prev.textContent = (userProfile.displayName || '?')[0]; } }
  openModal('settingsModal');
 }
 
@@ -211,9 +205,7 @@ function previewEditAvatar(input) {
  if (!file) return;
  if (file.size > 3 * 1024 * 1024) { toast('❌ الصورة أكبر من 3MB'); input.value = ''; return; }
  const reader = new FileReader();
- reader.onload = e => {
- const prev = document.getElementById('epAvatarPreview');if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`; };
- reader.readAsDataURL(file);
+ reader.onload = e => { const prev = document.getElementById('epAvatarPreview'); if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`; }; reader.readAsDataURL(file);
 }
 
 async function _syncProfileToServers(name, avatarUrl) {
@@ -283,16 +275,16 @@ async function uploadAvatar(input) {
  await db.ref('users/' + currentUser.uid + '/avatar').set(url);
  await auth.currentUser.updateProfile({ photoURL: url });
  userProfile.avatar = url;
- const av = document.getElementById('profileAvatar');if (av) av.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`; updateUserPanel();
+ const av = document.getElementById('profileAvatar');
+ if (av) av.innerHTML = `<img src="${escHtml(url)}" style="width:100%;height:100%;object-fit:cover">`;
+ updateUserPanel();
  await _syncProfileToServers(userProfile.displayName || '', url);
  toast('✅ تم تحديث الصورة');
  } catch(e) { toast('❌ فشل رفع الصورة: ' + (e.message || '')); }
 }
 
 function openProfile() {
- db.ref('users/' + currentUser.uid + '/avatar').once('value').then(snap => {
- const av = document.getElementById('profileAvatar');if (snap.val()) { if(av) av.innerHTML = `<img src="${snap.val()}" style="width:100%;height:100%;object-fit:cover">`; } else { if(av) av.textContent = (userProfile.displayName||'?')[0]; }
- });
+ db.ref('users/' + currentUser.uid + '/avatar').once('value').then(snap => { const av = document.getElementById('profileAvatar'); if (snap.val()) { if(av) av.innerHTML = `<img src="${escHtml(snap.val())}" style="width:100%;height:100%;object-fit:cover">`; } else { if(av) av.textContent = (userProfile.displayName||'?')[0]; } });
  const nameEl = document.getElementById('profileName');
  const tagEl = document.getElementById('profileTag');
  const codeEl = document.getElementById('profileAdminCode');
@@ -315,107 +307,98 @@ function openProfile() {
 // 🆕 دالة بطاقة العضو البارزة الفخمة (Quick Action Member Card)
 // ═════════════════════════════════════════════════════════════════
 function openMemberCard(uid, name, avatar) {
-  console.log('[DEBUG] openMemberCard called', uid, name);
-  const existing = document.getElementById('memberCardOverlay');
-  if (existing) {
-    console.log('[DEBUG] Removing existing card');
-    existing.remove();
-  }
+ console.log('[DEBUG] openMemberCard called', uid, name);
+ const existing = document.getElementById('memberCardOverlay');
+ if (existing) {
+ console.log('[DEBUG] Removing existing card');
+ existing.remove();
+ }
 
-  // ✅ FIX v7: إنشاء البطاقة فوراً لكن مع pointer-events:none
-  // هذا يمنع Ghost Click من ضرب الأزرار لأنها غير قابلة للنقر
-  _buildMemberCard(uid, name, avatar);
+ // ✅ FIX: إنشاء البطاقة فوراً — بدون تأخير pointer-events
+ _buildMemberCard(uid, name, avatar);
 
-  const overlay = document.getElementById('memberCardOverlay');
-  if (!overlay) {
-    console.error('[DEBUG] Failed to create overlay!');
-    return;
-  }
+ const overlay = document.getElementById('memberCardOverlay');
+ if (!overlay) {
+ console.error('[DEBUG] Failed to create overlay!');
+ return;
+ }
 
-  // ✅ تعطيل كل أحداث المؤشر على الـ overlay والأطفال (الأزرار)
-  overlay.style.pointerEvents = 'none';
-  console.log('[DEBUG] Card created, pointer-events disabled');
-
-  // ✅ إعادة التفعيل بعد انتهاء نافذة Ghost Click (600ms)
-  setTimeout(() => {
-    overlay.style.pointerEvents = 'auto';
-    console.log('[DEBUG] pointer-events enabled, card now clickable');
-  }, 600);
+ // ✅ لا نعطل pointer-events — البطاقة قابلة للنقر فوراً
+ overlay.style.pointerEvents = 'auto';
+ console.log('[DEBUG] Card created and clickable immediately');
 }
 
 // ✅ دالة بناء البطاقة منفصلة
 function _buildMemberCard(uid, name, avatar) {
-  const overlay = document.createElement('div');
-  overlay.id = 'memberCardOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
+ const overlay = document.createElement('div');
+ overlay.id = 'memberCardOverlay';
+ overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;border:none;outline:none;overflow:visible;margin:0;max-width:none;max-height:none;';
 
-  const card = document.createElement('div');
-  card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;';
+ const card = document.createElement('div');
+ card.style.cssText = 'background:#1e2d3d;border-radius:20px;padding:32px 28px;min-width:260px;max-width:320px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);font-family:Tajawal,sans-serif;';
 
-  const avEl = document.createElement('div');
-  avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
-  if (avatar) avEl.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover">`;
-  else avEl.textContent = (name || '?')[0];
+ const avEl = document.createElement('div');
+ avEl.style.cssText = 'width:86px;height:86px;border-radius:50%;background:#253040;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0';
+ if (avatar) avEl.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover">`; else avEl.textContent = (name || '?')[0];
 
-  const nameEl = document.createElement('div');
-  nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#fff;margin-top:4px;text-align:center';
-  nameEl.textContent = name || '—';
+ const nameEl = document.createElement('div');
+ nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#fff;margin-top:4px;text-align:center';
+ nameEl.textContent = name || '—';
 
-  const tagEl = document.createElement('div');
-  tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
-  db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
+ const tagEl = document.createElement('div');
+ tagEl.style.cssText = 'font-size:13px;color:var(--muted,#8899aa)';
+ db.ref('users/' + uid + '/tag').once('value').then(s => { if (s.val()) tagEl.textContent = '#' + s.val(); });
 
-  // حالة الاتصال الحية
-  const onlineEl = document.createElement('div');
-  onlineEl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;margin-top:2px;';
-  db.ref('users/' + uid + '/online').once('value').then(s => {
-    const isOn = s.val() === true;
-    onlineEl.innerHTML = isOn
-      ? '<span style="width:8px;height:8px;border-radius:50%;background:#3ba55c;display:inline-block"></span> متصل الآن'
-      : '<span style="width:8px;height:8px;border-radius:50%;background:#888;display:inline-block"></span> غير متصل';
-  });
+ // حالة الاتصال الحية
+ const onlineEl = document.createElement('div');
+ onlineEl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;margin-top:2px;';
+ db.ref('users/' + uid + '/online').once('value').then(s => {
+ const isOn = s.val() === true;
+ onlineEl.innerHTML = isOn
+ ? '<span style="color:#23a55a">●</span> متصل الآن'
+ : '<span style="color:#8899aa">●</span> غير متصل';
+ });
 
-  const btns = document.createElement('div');
-  btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
+ const btns = document.createElement('div');
+ btns.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center';
 
-  const mkBtn = (icon, label, fn) => {
-    const b = document.createElement('button');
-    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;';
-    b.innerHTML = `${icon}<span style="font-size:11px">${label}</span>`;
-    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
-    b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
-    // ✅ debug logging
-    b.addEventListener('click', (e) => { 
-      console.log('[DEBUG] Button clicked:', label);
-      e.stopPropagation(); 
-      overlay.remove(); 
-      fn(); 
-    });
-    return b;
-  };
+ const mkBtn = (icon, label, fn) => {
+ const b = document.createElement('button');
+ b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:14px;color:#fff;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;min-width:72px;';
+ b.innerHTML = `${icon}<span>${label}</span>`;
+ b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.13)');
+ b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,0.07)');
+ b.addEventListener('click', (e) => {
+ console.log('[DEBUG] Button clicked:', label);
+ e.stopPropagation();
+ overlay.remove();
+ fn();
+ });
+ return b;
+ };
 
-  btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => { setTimeout(() => openDM(uid, name), 50); }));
-  if (uid !== currentUser?.uid) {
-    btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
-    btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
-  }
+ btns.appendChild(mkBtn('💬', 'رسالة خاصة', () => { setTimeout(() => openDM(uid, name), 50); }));
+ if (uid !== currentUser?.uid) {
+ btns.appendChild(mkBtn('📞', 'صوتي', () => startCall(uid, name, 'audio')));
+ btns.appendChild(mkBtn('📹', 'فيديو', () => startCall(uid, name, 'video')));
+ }
 
-  card.appendChild(avEl);
-  card.appendChild(nameEl);
-  card.appendChild(tagEl);
-  card.appendChild(onlineEl);
-  card.appendChild(btns);
+ card.appendChild(avEl);
+ card.appendChild(nameEl);
+ card.appendChild(tagEl);
+ card.appendChild(onlineEl);
+ card.appendChild(btns);
 
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
+ overlay.appendChild(card);
+ document.body.appendChild(overlay);
 
-  // ✅ إغلاق عند الضغط على الخلفية (مع debug)
-  overlay.addEventListener('click', (e) => {
-    console.log('[DEBUG] Overlay clicked, target:', e.target === overlay ? 'overlay' : 'child');
-    if (e.target === overlay) {
-      overlay.remove();
-    }
-  });
+ // ✅ إغلاق عند الضغط على الخلفية (مع debug)
+ overlay.addEventListener('click', (e) => {
+ console.log('[DEBUG] Overlay clicked, target:', e.target === overlay ? 'overlay' : 'child');
+ if (e.target === overlay) {
+ overlay.remove();
+ }
+ });
 }
 
 function copyAdminCode() {
