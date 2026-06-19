@@ -57,7 +57,7 @@ function renderDmPickerList() {
   const memberUids = Object.keys(svMembers);
   container.innerHTML = '';
   if (!memberUids.length) {
-    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-family:Tajawal,sans-serif;font-size:14px">لا يوجد أعضاء آخرون في هذا العالم</div>';
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-family:Tajawal,sans-serif">لا يوجد أعضاء آخرون في هذا العالم</div>';
     return;
   }
   Promise.all(memberUids.map(uid =>
@@ -77,8 +77,7 @@ function renderDmPickerList() {
       card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s';
       const av = document.createElement('div');
       av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
-      if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover;display:block">`;
-      else av.textContent = (name[0] || '?').toUpperCase();
+      if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = (name[0] || '?').toUpperCase();
       const nameEl = document.createElement('div');
       nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif';
       nameEl.textContent = name;
@@ -203,10 +202,9 @@ function openDM(uid, name) {
         if (msg.mediaType === 'video') {
           body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
         } else {
-          const mediaWrap = document.createElement('div');
-          mediaWrap.className = 'msg-media-wrap';
+          const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
           const img = document.createElement('img');
-          img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+          img.loading = 'lazy'; img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
           img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
           loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
           mediaWrap.appendChild(img);
@@ -238,92 +236,41 @@ function openDM(uid, name) {
   });
 }
 
-// ── إرسال رسالة ──
-window.sendDM = async function() {
-  if (!_currentDmUid || !currentUser) return;
-  const inp = document.getElementById('dmChatInp');
-  const text = inp ? inp.value.trim() : '';
-  const hasMedia = window._pendingDmMedia && window._pendingDmMedia.length > 0;
-  if (!text && !hasMedia) return;
-
-  if (inp) { inp.value = ''; inp.style.height = ''; }
-  const sendBtn = document.getElementById('dmSendBtn');
-  if (sendBtn) sendBtn.classList.remove('active');
-  stopDmTyping();
-
-  const dmId = getDmId(currentUser.uid, _currentDmUid);
-  const msgBase = { uid: currentUser.uid, name: userProfile.displayName || 'مستخدم', ts: Date.now(), status: 'sent' };
-  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
-
-  // إرسال النص
-  if (text) {
-    await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
-    try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
-  }
-
-  // إرسال الميديا
-  const media = window._pendingDmMedia.slice();
-  window._pendingDmMedia = [];
-  const dmPreview = document.getElementById('dmMediaPreview');
-  if (dmPreview) { dmPreview.innerHTML = ''; dmPreview.style.display = 'none'; }
-
-  for (const m of media) {
-    const dmMsgPath = 'dm_messages/' + dmId;
-    const msgRef = db.ref(dmMsgPath).push();
-    const msgKey = msgRef.key;
-    await msgRef.set({
-      ...msgBase, text: '',
-      mediaType: m.type, mediaName: m.name,
-      uploading: true, uploadProgress: 1,
-      expiresAt: Date.now() + 86400000, saved: false
-    });
-    try {
-      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, () => {});
-      await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
-      try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
-    } catch(e) {
-      db.ref(dmMsgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true });
-      toast('❌ فشل رفع الملف');
-    }
-    if (m.localUrl) URL.revokeObjectURL(m.localUrl);
-  }
-
-  // تحديث قائمة المحادثات
-  const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
-  const otherName = otherSnap.val() || 'مستخدم';
-  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
-  await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
-};
-
 // ── بناء رسالة ──
 function buildDmMsgDiv(msg, key, otherUid, otherName) {
+  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
+  if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) {
+    return null;
+  }
+
   const isMine = msg.uid === currentUser?.uid;
   const div = document.createElement('div');
   div.className = 'msg-group'; div.dataset.key = key;
   const av = document.createElement('div'); av.className = 'msg-av'; av.textContent = (msg.name || '?')[0];
   const body = document.createElement('div'); body.className = 'msg-body';
   const meta = document.createElement('div'); meta.className = 'msg-meta';
-  meta.innerHTML = `<span class="msg-name">${escHtml(msg.name || '')}</span><span class="msg-time">${formatTime(msg.ts)}</span>`;
+  meta.innerHTML = `${escHtml(msg.name || '')} ${formatTime(msg.ts)}`;
 
+  // ✅ إصلاح علامة القراءة — إدراجها في البداية لضمان الظهور
   if (isMine) {
     const statusEl = document.createElement('span');
     statusEl.className = 'msg-status';
     statusEl.dataset.key = key;
-    statusEl.style.cssText = 'font-size:11px;margin-right:4px;display:inline-block;';
+    statusEl.style.cssText = 'font-size:11px;margin-left:4px;display:inline-block;font-weight:700;';
     statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
     statusEl.style.color = msg.status === 'read' ? '#5865f2' : '#8899aa';
     if (msg.status === 'read' && msg.readAt) {
       statusEl.title = 'قرأ الساعة ' + new Date(msg.readAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
       statusEl.style.cursor = 'help';
     }
-    meta.appendChild(statusEl);
+    meta.insertBefore(statusEl, meta.firstChild);
   }
 
   body.appendChild(meta);
 
   if (msg.replyTo) {
     const quote = document.createElement('div'); quote.className = 'msg-reply-quote';
-    quote.innerHTML = `<div class="rq-name">${escHtml(msg.replyTo.name || '')}</div><div class="rq-text">${escHtml(msg.replyTo.text || '🖼️')}</div>`;
+    quote.innerHTML = `<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:2px">${escHtml(msg.replyTo.name || '')}</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(msg.replyTo.text || '🖼️')}</div>`;
     body.appendChild(quote);
   }
 
@@ -337,8 +284,9 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   }
 
   if (msg.mediaUrl) {
-    if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) return null;
-    if (msg.mediaType === 'video') {
+    if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) {
+      // لا تُعرض الميديا منتهية الصلاحية — لكن النص يبقى
+    } else if (msg.mediaType === 'video') {
       body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
       const wrap = document.createElement('div'); wrap.className = 'msg-media-wrap';
@@ -379,17 +327,18 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   const ctxBar = document.createElement('div');
   ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
   const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
-  [
+  const ctxActions = [
     { icon: '↩️', label: 'رد', fn: () => setDmReply(key, msg.name, msg.text) },
     { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
-    { icon: '⭐', label: 'تثبيت', fn: () => toast('⭐ قريباً') },
+    { icon: '⭐', label: 'تثبيت', fn: () => saveDmMessage(key) },  // ✅ تثبيت مثل السناب
     ...(isMine ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteDmMessage(key, otherUid) }] : []),
     ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
-  ].forEach(ac => {
+  ];
+  ctxActions.forEach(ac => {
     const b = document.createElement('button');
     b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
     b.title = ac.label;
-    b.innerHTML = `<span class="mc-icon">${ac.icon}</span><span class="mc-label">${ac.label}</span>`;
+    b.innerHTML = `${ac.icon}${ac.label}`;
     b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
     ctxBar.appendChild(b);
   });
@@ -407,6 +356,89 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
 
   return div;
 }
+
+// ✅ دالة تثبيت الرسالة في الخاص (مثل السناب)
+async function saveDmMessage(key) {
+  if (!_currentDmUid || !currentUser) return;
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+  try {
+    await db.ref('dm_messages/' + dmId + '/' + key).update({ 
+      saved: true, 
+      expiresAt: null 
+    });
+    toast('📌 تم تثبيت الرسالة — لن تختفي');
+  } catch(e) {
+    toast('❌ فشل التثبيت');
+  }
+}
+
+// ── إرسال رسالة ──
+window.sendDM = async function() {
+  if (!_currentDmUid || !currentUser) return;
+  const inp = document.getElementById('dmChatInp');
+  const text = inp ? inp.value.trim() : '';
+  const hasMedia = window._pendingDmMedia && window._pendingDmMedia.length > 0;
+  if (!text && !hasMedia) return;
+
+  if (inp) { inp.value = ''; inp.style.height = ''; }
+  const sendBtn = document.getElementById('dmSendBtn');
+  if (sendBtn) sendBtn.classList.remove('active');
+  stopDmTyping();
+
+  const dmId = getDmId(currentUser.uid, _currentDmUid);
+
+  // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة
+  const msgBase = { 
+    uid: currentUser.uid, 
+    name: userProfile.displayName || 'مستخدم', 
+    ts: Date.now(), 
+    status: 'sent',
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // ⏰ 24 ساعة
+    saved: false                                    // 📌 لم تُثبت
+  };
+
+  if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
+
+  // إرسال النص
+  if (text) {
+    await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
+    try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
+  }
+
+  // إرسال الميديا
+  const media = window._pendingDmMedia.slice();
+  window._pendingDmMedia = [];
+  const dmPreview = document.getElementById('dmMediaPreview');
+  if (dmPreview) { dmPreview.innerHTML = ''; dmPreview.style.display = 'none'; }
+
+  for (const m of media) {
+    const dmMsgPath = 'dm_messages/' + dmId;
+    const msgRef = db.ref(dmMsgPath).push();
+    const msgKey = msgRef.key;
+    await msgRef.set({
+      ...msgBase, text: '',
+      mediaType: m.type, mediaName: m.name,
+      uploading: true, uploadProgress: 1,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      saved: false
+    });
+    try {
+      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, () => {});
+      await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+      try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
+    } catch(e) {
+      db.ref(dmMsgPath + '/' + msgKey).update({ uploading: false, uploadFailed: true });
+      toast('❌ فشل رفع الملف');
+    }
+    if (m.localUrl) URL.revokeObjectURL(m.localUrl);
+  }
+
+  // تحديث قائمة المحادثات
+  const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
+  const otherName = otherSnap.val() || 'مستخدم';
+  await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
+  await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+};
 
 // ── اختيار ميديا ──
 async function handleDmMediaSelect(input) {
@@ -427,22 +459,22 @@ async function handleDmMediaSelect(input) {
       const localUrl = URL.createObjectURL(blob);
       window._pendingDmMedia.push({ blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl });
       // عرض معاينة الصورة
-let preview = document.getElementById('dmMediaPreview');
-if (!preview) {
-  preview = document.createElement('div');
-  preview.id = 'dmMediaPreview';
-  preview.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;background:rgba(0,0,0,0.05);border-radius:8px;margin:4px 0';
-  const dmInput = document.querySelector('#dmChatArea .chat-input-wrap');
-  if (dmInput) dmInput.insertBefore(preview, dmInput.firstChild);
-}
-preview.style.display = 'flex';
-const wrap = document.createElement('div');
-wrap.style.cssText = 'position:relative;display:inline-flex';
-const thumb = document.createElement(isVideo ? 'video' : 'img');
-thumb.src = localUrl;
-thumb.style.cssText = 'height:60px;max-width:90px;border-radius:6px;object-fit:cover;display:block';
-wrap.appendChild(thumb);
-preview.appendChild(wrap);
+      let preview = document.getElementById('dmMediaPreview');
+      if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'dmMediaPreview';
+        preview.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;background:rgba(0,0,0,0.05);border-radius:8px;margin:4px 0';
+        const dmInput = document.querySelector('#dmChatArea .chat-input-wrap');
+        if (dmInput) dmInput.insertBefore(preview, dmInput.firstChild);
+      }
+      preview.style.display = 'flex';
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-flex';
+      const thumb = document.createElement(isVideo ? 'video' : 'img');
+      thumb.src = localUrl;
+      thumb.style.cssText = 'height:60px;max-width:90px;border-radius:6px;object-fit:cover;display:block';
+      wrap.appendChild(thumb);
+      preview.appendChild(wrap);
       const sendBtn = document.getElementById('dmSendBtn');
       if (sendBtn) sendBtn.classList.add('active');
     } catch(e) { toast('❌ تعذّر قراءة الملف'); }
@@ -473,7 +505,12 @@ function renderDmList() {
       const item = document.createElement('div');
       item.className = 'dm-item' + (_currentDmUid === uid ? ' active' : '');
       const unread = _dmUnread[uid] || 0;
-      item.innerHTML = `<div class="dm-av">${(info.name || '?')[0]}</div><div class="dm-name">${escHtml(info.name || 'مستخدم')}</div>${unread > 0 ? `<div class="dm-unread">${unread > 99 ? '99+' : unread}</div>` : ''}`;
+      item.innerHTML = `
+        <div class="dm-av">${(info.name || '?')[0]}</div>
+        <div class="dm-info">
+          <div class="dm-name">${escHtml(info.name || 'مستخدم')}</div>
+        </div>
+        ${unread > 0 ? `<div class="dm-badge">${unread > 99 ? '99+' : unread}</div>` : ''}`;
       item.addEventListener('click', () => openDM(uid, info.name || 'مستخدم'));
       container.appendChild(item);
     });
