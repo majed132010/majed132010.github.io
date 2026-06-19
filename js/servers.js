@@ -256,8 +256,8 @@ async function joinServer() {
  toast('✅ انضممت للسيرفر!');
 }
 
-// ════ اختيار سيرفر ════
-function selectServer(sid) {
+// ════ اختيار سيرفر — ✅ FIX: الجوال يدخل للقناة مباشرة ════
+function selectServer(sid, skipDrawer) {
  cleanupMessagesListener();
  cleanupVoiceListener();
  currentServer = sid;
@@ -269,7 +269,7 @@ function selectServer(sid) {
  _listenMembership(sid);
  _listenRestrictions(sid);
  _ensureMemberRegistered(sid);
- if (isMobile() && !window._restoringSession) openDrawer();
+ if (isMobile() && !window._restoringSession && !skipDrawer) openDrawer();
  else {
  const sv = servers[sid];
  if (sv && sv.channels) {
@@ -835,15 +835,17 @@ async function renderMembersList() {
  });
 }
 
-// ════ استعادة آخر سيرفر ════
+// ════ استعادة آخر سيرفر — ✅ FIX: الجوال يدخل للقناة مباشرة ════
 function restoreLastServer() {
  const lastSid = localStorage.getItem('awalem_lastServer');
  const lastCid = localStorage.getItem('awalem_lastChannel');
  if (lastSid && servers[lastSid]) {
- selectServer(lastSid);
+ window._restoringSession = true;
+ selectServer(lastSid, true); // true = skipDrawer
  if (lastCid && servers[lastSid]?.channels?.[lastCid]) {
  selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
  }
+ window._restoringSession = false;
  } else {
  showView('home');
  }
