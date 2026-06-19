@@ -284,40 +284,13 @@ function buildMsgDiv(msg, key) {
 
  div.appendChild(av); div.appendChild(body);
 
- if (!window._ctxDismissReady) {
- window._ctxDismissReady = true;
- document.addEventListener('click', () => {
- document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
- });
- }
- const ctxBar = document.createElement('div');
- ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
- const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
- [
+ _attachContextBar(div, body, [
  { icon: '↩️', label: 'رد', fn: () => setReply(key, msg.name, msg.text) },
  { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
  { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
  ...((isMine || isAdminUser) ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteMessage(key) }] : []),
  ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
- ].forEach(ac => {
- const b = document.createElement('button');
- b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
- b.title = ac.label;
- b.innerHTML = `${ac.icon}${ac.label}`;
- b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
- ctxBar.appendChild(b);
- });
- body.style.position = 'relative';
- body.appendChild(ctxBar);
- div.addEventListener('contextmenu', e => {
- e.preventDefault();
- document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
- ctxBar.classList.add('visible');
- });
- let _ctxLp;
- div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
- div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
- div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
+ ], isMine);
 
  return div;
 }
@@ -955,3 +928,34 @@ document.addEventListener('keydown', e => {
  else if (document.getElementById('searchBar')?.classList.contains('show')) toggleSearch();
  }
 });
+
+// ════ دالة شريط السياق المشتركة (messages-v2.js + dm.js) ════
+function _attachContextBar(div, body, actions, isMine) {
+ if (!window._ctxDismissReady) {
+ window._ctxDismissReady = true;
+ document.addEventListener('click', () => {
+ document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+ });
+ }
+ const ctxBar = document.createElement('div');
+ ctxBar.className = 'msg-ctx-bar' + (isMine ? ' mine' : '');
+ actions.forEach(ac => {
+ const b = document.createElement('button');
+ b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
+ b.title = ac.label;
+ b.innerHTML = `${ac.icon}${ac.label}`;
+ b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
+ ctxBar.appendChild(b);
+ });
+ body.style.position = 'relative';
+ body.appendChild(ctxBar);
+ div.addEventListener('contextmenu', e => {
+ e.preventDefault();
+ document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible'));
+ ctxBar.classList.add('visible');
+ });
+ let _ctxLp;
+ div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
+ div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
+ div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
+}
