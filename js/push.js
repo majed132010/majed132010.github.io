@@ -7,7 +7,10 @@ async function sendPushToUser(targetUid, title, body, data = {}) {
       await db.ref('fcm_queue').push({
         token: fcmToken,
         title, body,
-        data: { ...data, click_action: 'https://majed132010-github-io.vercel.app' },
+        data: { 
+          ...data, 
+          click_action: (typeof location !== 'undefined' ? location.origin + location.pathname : 'https://majed132010.github.io/')
+        },
         ts: Date.now()
       });
     }
