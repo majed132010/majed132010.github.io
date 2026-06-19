@@ -882,11 +882,19 @@ function searchMessages(query) {
  const countEl = document.getElementById('searchCount');
  if (!query.trim()) { countEl.textContent=''; return; }
  document.querySelectorAll('#messagesArea .msg-content').forEach(el => {
- if (el.textContent.toLowerCase().includes(query.toLowerCase())) {
- const text = el.textContent, idx = text.toLowerCase().indexOf(query.toLowerCase());
- el.innerHTML = escHtml(text.substring(0,idx)) + `<mark>${escHtml(text.substring(idx,idx+query.length))}</mark>` + escHtml(text.substring(idx+query.length));
+ if (!el.textContent.toLowerCase().includes(query.toLowerCase())) return;
+ // ✅ تخزين HTML الأصلي لاستعادته لاحقاً
+ if (!el.dataset.originalHtml) el.dataset.originalHtml = el.innerHTML;
+ const text = el.textContent;
+ const idx = text.toLowerCase().indexOf(query.toLowerCase());
+ // ✅ إعادة بناء DOM بدون تدمير الأحداث على العنصر الأب
+ el.innerHTML = '';
+ el.appendChild(document.createTextNode(text.substring(0, idx)));
+ const mark = document.createElement('mark');
+ mark.textContent = text.substring(idx, idx + query.length);
+ el.appendChild(mark);
+ el.appendChild(document.createTextNode(text.substring(idx + query.length)));
  _searchResults.push(el);
- }
  });
  if (!_searchResults.length) { countEl.textContent='لا نتائج'; return; }
  highlightCurrent(); countEl.textContent=`1 / ${_searchResults.length}`;
@@ -902,7 +910,12 @@ function highlightCurrent() {
  _searchResults[_searchIndex]?.closest('.msg-group')?.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function clearSearchHighlights() {
- document.querySelectorAll('#messagesArea .msg-content mark').forEach(m => { m.parentNode.replaceChild(document.createTextNode(m.textContent),m); m.parentNode.normalize(); });
+ document.querySelectorAll('#messagesArea .msg-content').forEach(el => {
+ if (el.dataset.originalHtml) {
+ el.innerHTML = el.dataset.originalHtml;
+ delete el.dataset.originalHtml;
+ }
+ });
 }
 
 // ════ Lightbox ════
