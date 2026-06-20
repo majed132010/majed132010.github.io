@@ -1,7 +1,7 @@
 // ════ NOTIFICATIONS ════
 let _notifListener = null;
 let _notifTimeout = null;
-let _lastNotifSet = new Set();
+let _lastNotifSet = new Set();  // ✅ Set (was _lastNotifTag string)
 let _notifDebounceTimer = null;
 
 // ════ initFCM ════
@@ -20,14 +20,13 @@ function initFCM(uid) {
   }).catch(e => console.warn('[FCM] getToken failed:', e.message));
 }
 
-// ════ listenNotifications (معطل — messages-v2.js تتولى الإشعارات) ════
+// ════ listenNotifications (معطل — messages-v2.js تتولى الأمر) ════
 function listenNotifications(uid) {
-  // ✅ معطل لأن messages-v2.js تستدعي showInAppNotif مباشرة عند وصول رسالة جديدة
-  // هذا يمنع التكرار بين messages-v2.js و notifications.js
+  // ✅ معطل لمنع التكرار مع messages-v2.js
   console.log('[Notif] listenNotifications skipped — messages-v2.js handles notifications');
 }
 
-// ════ إشعار داخلي من messages-v2.js ════
+// ════ إشعار من messages-v2.js ════
 function showInAppNotif(msg, sid, cid) {
   if (!sid || !cid) return;
   if (_isActiveChannel(sid, cid)) return;
@@ -39,7 +38,7 @@ function showInAppNotif(msg, sid, cid) {
   _displayInAppNotif(msg.name || 'مستخدم', msg.text || '🖼️ وسائط', sid, cid, msg.name || '');
 }
 
-// ════ إشعار من listener (احتياطي — إذا أُعيد تفعيل listenNotifications لاحقاً) ════
+// ════ إشعار من listener (احتياطي) ════
 function showInAppNotifFromListener(notif) {
   _displayInAppNotif(
     notif.senderName || 'مستخدم',
@@ -50,7 +49,7 @@ function showInAppNotifFromListener(notif) {
   );
 }
 
-// ════ عرض الإشعار الداخلي (مرة واحدة فقط) ════
+// ════ عرض الإشعار ════
 function _displayInAppNotif(name, text, sid, cid, senderName) {
   incrementUnread(sid, cid);
   playMsgSound();
