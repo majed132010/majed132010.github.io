@@ -1,10 +1,10 @@
 // ════ NOTIFICATIONS ════
 let _notifListener = null;
 let _notifTimeout = null;
-let _lastNotifSet = new Set();  // ✅ Set بدلاً من string واحد
+let _lastNotifSet = new Set();
 let _notifDebounceTimer = null;
 
-// ════ initFCM (مُعرفة هنا لأن auth-v2.js تستدعيها) ════
+// ════ initFCM ════
 function initFCM(uid) {
   console.log('[FCM] initFCM called for', uid);
   if (typeof firebase === 'undefined' || !firebase.messaging) {
@@ -20,42 +20,26 @@ function initFCM(uid) {
   }).catch(e => console.warn('[FCM] getToken failed:', e.message));
 }
 
-// ════ استماع الإشعارات من Firebase ════
+// ════ listenNotifications (معطل — messages-v2.js تتولى الإشعارات) ════
 function listenNotifications(uid) {
-  if (_notifListener) {
-    _notifListener.ref.off('child_added', _notifListener.fn);
-    _notifListener = null;
-  }
-  if (!uid) return;
-  const notifPath = 'notifications/' + uid;
-  const notifRef = db.ref(notifPath).limitToLast(1);
-  const fn = snap => {
-    const notif = snap.val();
-    if (!notif) return;
-    // ✅ تجاهل الإشعارات القديمة (أكثر من 30 ثانية)
-    if (Date.now() - (notif.ts || 0) > 30000) return;
-    // ✅ تجاهل إذا كان المستخدم في نفس القناة
-    if (_isActiveChannel(notif.serverId, notif.channelId)) return;
-    // ✅ منع التكرار باستخدام Set (مع ts كجزء من المفتاح)
-    const tag = notif.serverId + '/' + notif.channelId + '/' + (notif.text || '').slice(0, 20) + '/' + (notif.ts || 0);
-    if (_lastNotifSet.has(tag)) return;
-    _lastNotifSet.add(tag);
-    clearTimeout(_notifDebounceTimer);
-    _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000); // ✅ 5 ثوانٍ بدلاً من 2
-    showInAppNotifFromListener(notif);
-  };
-  notifRef.on('child_added', fn);
-  _notifListener = { ref: notifRef, fn };
+  // ✅ معطل لأن messages-v2.js تستدعي showInAppNotif مباشرة عند وصول رسالة جديدة
+  // هذا يمنع التكرار بين messages-v2.js و notifications.js
+  console.log('[Notif] listenNotifications skipped — messages-v2.js handles notifications');
 }
 
-// ════ إشعار داخلي من messages-v2.js (معطل — notifications.js تتولى الأمر) ════
+// ════ إشعار داخلي من messages-v2.js ════
 function showInAppNotif(msg, sid, cid) {
-  // ✅ تم تعطيلها هنا لأن listenNotifications في notifications.js تتولى الإشعارات
-  // إذا كنت تريد تفعيلها، ألغِ listenNotifications في auth-v2.js
-  console.log('[Notif] showInAppNotif skipped — listenNotifications handles notifications');
+  if (!sid || !cid) return;
+  if (_isActiveChannel(sid, cid)) return;
+  const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
+  if (_lastNotifSet.has(tag)) return;
+  _lastNotifSet.add(tag);
+  clearTimeout(_notifDebounceTimer);
+  _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+  _displayInAppNotif(msg.name || 'مستخدم', msg.text || '🖼️ وسائط', sid, cid, msg.name || '');
 }
 
-// ════ إشعار داخلي من listener ════
+// ════ إشعار من listener (احتياطي — إذا أُعيد تفعيل listenNotifications لاحقاً) ════
 function showInAppNotifFromListener(notif) {
   _displayInAppNotif(
     notif.senderName || 'مستخدم',
@@ -98,7 +82,7 @@ function _displayInAppNotif(name, text, sid, cid, senderName) {
   _notifTimeout = setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 5000);
 }
 
-// ════ إشعار داخلي للرسائل الخاصة ════
+// ════ إشعار DM ════
 function showDmNotif(msg, fromUid) {
   if (_currentDmUid === fromUid) return;
   const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
