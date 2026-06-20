@@ -689,4 +689,8 @@ async function sendDmVoiceMessage(blob, duration, mimeType) {
     toast('✅ تم إرسال الرسالة الصوتية');
     try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
   } catch(e) { toast('❌ فشل إرسال الرسالة الصوتية'); }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> a43ea7dca1866f4f897dbc4b2441cfdf70900554
