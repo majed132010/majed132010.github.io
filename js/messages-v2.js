@@ -69,7 +69,7 @@ function showMessages(sid, cid) {
  if (msg.uid !== currentUser?.uid) {
  const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
- if (!(activeSid === sid && activeCid === cid)) showInAppNotif(msg, sid, cid);
+ if (!(activeSid === sid && activeCid === cid)) { /* showInAppNotif disabled — listenNotifications handles this */ }
  }
  }
  };
@@ -196,7 +196,7 @@ function buildMsgDiv(msg, key) {
  av.addEventListener('click', (e) => {
  console.log('[DEBUG] Avatar clicked, calling openMemberCard for', msg.name);
  e.stopPropagation();
- e.preventDefault();
+ // ✅ e.preventDefault() removed — div doesn't need it, may block mobile
  openMemberCard(msg.uid, msg.name, _memberAv);
  });
 
@@ -507,11 +507,18 @@ async function _uploadOneMedia(m, msgBase) {
  let mediaUrl;
 
  if (m.type === 'video') {
- mediaUrl = await uploadToCloudinary(
- new File([m.blob], m.name, { type: m.mimeType }),
- 3,
- (pct) => updatePct(pct)
+ // ✅ استخدام Firebase Storage للفيديو (أكثر موثوقية)
+ const ext = (m.name.split('.').pop() || 'mp4').toLowerCase();
+ const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
+ const uploadTask = storageRef.put(m.blob, { contentType: m.mimeType || 'video/mp4' });
+ await new Promise((resolve, reject) => {
+ uploadTask.on('state_changed',
+ (snap) => { if (snap.totalBytes > 0) updatePct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)); },
+ reject,
+ resolve
  );
+ });
+ mediaUrl = await uploadTask.snapshot.ref.getDownloadURL();
  } else {
  const ext = (m.name.split('.').pop() || 'jpg').toLowerCase();
  const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
