@@ -602,6 +602,91 @@ function _refreshPickerBadge(uid) {
   }
 }
 
+// ════ رسائل صوتية في الخاص ════
+let _dmMediaRecorder = null, _dmAudioChunks = [], _dmRecordingTimer = null;
+let _dmRecordingSeconds = 0, _dmVoiceRecordingBusy = false;
+let _dmRecordingMaxTimer = null;
+
 async function toggleDmVoiceRecording() {
-  toast('🎤 قريباً');
+  if (_dmVoiceRecordingBusy) return;
+  const btn = document.getElementById('dmVoiceRecordBtn');
+  if (!btn) return;
+  if (_dmMediaRecorder && _dmMediaRecorder.state === 'recording') {
+    _dmVoiceRecordingBusy = true;
+    clearInterval(_dmRecordingTimer);
+    clearTimeout(_dmRecordingMaxTimer);
+    _dmRecordingMaxTimer = null;
+    btn.classList.remove('recording'); btn.textContent = '🎤'; btn.disabled = true;
+    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
+    clearInterval(window._dmRecTimer);
+    if (window._dmRecTimerEl) { window._dmRecTimerEl.remove(); window._dmRecTimerEl = null; }
+    _dmMediaRecorder.stop();
+  } else if (!_dmMediaRecorder || _dmMediaRecorder.state === 'inactive') {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _dmAudioChunks = []; _dmRecordingSeconds = 0;
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']
+        .find(t => MediaRecorder.isTypeSupported(t)) || '';
+      _dmMediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      _dmMediaRecorder.ondataavailable = e => { if (e.data.size > 0) _dmAudioChunks.push(e.data); };
+      _dmMediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(_dmAudioChunks, { type: mimeType });
+        btn.disabled = false; _dmVoiceRecordingBusy = false; _dmMediaRecorder = null;
+        if (blob.size < 1000) { toast('⚠️ التسجيل قصير جداً'); return; }
+        await sendDmVoiceMessage(blob, _dmRecordingSeconds, mimeType);
+      };
+      _dmMediaRecorder.start();
+      btn.classList.add('recording'); btn.textContent = '⏹ 0s';
+      btn.style.background = 'rgba(220,50,50,0.3)';
+      btn.style.borderColor = 'rgba(220,50,50,0.6)';
+      btn.style.color = '#e04040';
+      let _recSeconds = 0;
+      window._dmRecTimerEl = document.createElement('span');
+      window._dmRecTimerEl.id = 'dmRecTimerDisplay';
+      window._dmRecTimerEl.style.cssText = 'font-size:13px;font-weight:700;color:#e04040;font-family:Tajawal,sans-serif;min-width:38px;text-align:center';
+      window._dmRecTimerEl.textContent = '0:00';
+      btn.insertAdjacentElement('afterend', window._dmRecTimerEl);
+      window._dmRecTimer = setInterval(() => {
+        _recSeconds++;
+        const m = Math.floor(_recSeconds/60);
+        const s = String(_recSeconds%60).padStart(2,'0');
+        if (window._dmRecTimerEl) window._dmRecTimerEl.textContent = m+':'+s;
+      }, 1000);
+      _dmRecordingTimer = setInterval(() => {
+        _dmRecordingSeconds++;
+        btn.textContent = `⏹ ${_dmRecordingSeconds}s`;
+      }, 1000);
+      _dmRecordingMaxTimer = setTimeout(() => {
+        toast('⏱️ 5 ثوانٍ متبقية — التسجيل سيتوقف تلقائياً');
+      }, 55000);
+      toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال (الحد: 60 ثانية)');
+    } catch(e) { toast('❌ لا يمكن الوصول للميكروفون'); }
+  }
+}
+
+async function sendDmVoiceMessage(blob, duration, mimeType) {
+  if (!_currentDmUid || !currentUser) return;
+  toast('⏳ جاري إرسال الرسالة الصوتية...');
+  const ct = (mimeType || 'audio/webm').split(';')[0];
+  const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
+  try {
+    const url = await uploadToCloudinary(new File([blob], `voice.${ext}`, { type: ct }));
+    const dmId = getDmId(currentUser.uid, _currentDmUid);
+    await db.ref('dm_messages/' + dmId).push({
+      uid: currentUser.uid,
+      name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(),
+      voiceUrl: url,
+      voiceDuration: duration,
+      text: '',
+      status: 'sent',
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      saved: false
+    });
+    toast('✅ تم إرسال الرسالة الصوتية');
+    try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
+  } catch(e) { toast('❌ فشل إرسال الرسالة الصوتية'); }
 }
