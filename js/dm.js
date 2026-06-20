@@ -609,7 +609,7 @@ let _dmRecordingMaxTimer = null;
 
 async function toggleDmVoiceRecording() {
   if (_dmVoiceRecordingBusy) return;
-  const btn = document.getElementById('dmVoiceRecordBtn');
+  const btn = document.getElementById('dmVoiceBtn');
   if (!btn) return;
   if (_dmMediaRecorder && _dmMediaRecorder.state === 'recording') {
     _dmVoiceRecordingBusy = true;
