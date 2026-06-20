@@ -65,8 +65,26 @@ function listenNotifications(uid) {
 
 // ════ إشعار من messages-v2.js (معطل — listenNotifications تتولى الأمر) ════
 function showInAppNotif(msg, sid, cid) {
-  // ✅ معطل — listenNotifications تتولى الإشعارات في كل مكان
-  console.log('[Notif] showInAppNotif skipped — listenNotifications handles this');
+  console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name});
+  if (!sid || !cid) return;
+  
+  const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
+  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
+  if (activeSid === sid && activeCid === cid) return;
+  
+  const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
+  if (_lastNotifSet.has(tag)) return;
+  _lastNotifSet.add(tag);
+  clearTimeout(_notifDebounceTimer);
+  _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+  
+  _displayChannelNotif({
+    serverId: sid,
+    channelId: cid,
+    senderName: msg.name,
+    text: msg.text,
+    ts: msg.ts
+  });
 }
 
 // ════ إشعار من listener (احتياطي) ════
@@ -177,8 +195,21 @@ function _displayDmNotif(notif) {
 
 // ════ إشعار DM (من dm.js) ════
 function showDmNotif(msg, fromUid) {
-  // ✅ معطل — listenNotifications تتولى DM أيضاً
-  console.log('[Notif] showDmNotif skipped — listenNotifications handles this');
+  console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
+  if (typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
+  
+  const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
+  if (_lastNotifSet.has(tag)) return;
+  _lastNotifSet.add(tag);
+  clearTimeout(_notifDebounceTimer);
+  _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+  
+  _displayDmNotif({
+    fromUid: fromUid,
+    senderName: msg.name,
+    text: msg.text,
+    ts: msg.ts
+  });
 }
 
 // ════ صوت الإشعار ════
