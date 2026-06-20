@@ -1,5 +1,4 @@
 // ════ NOTIFICATIONS ════
-let _notifListener = null;
 let _notifTimeout = null;
 let _lastNotifSet = new Set();
 let _notifDebounceTimer = null;
@@ -27,25 +26,27 @@ function listenNotifications(uid) {
 
 // ════ إشعار من messages-v2.js ════
 function showInAppNotif(msg, sid, cid) {
-  console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name, text: msg.text?.slice(0,20)});
-  if (!sid || !cid) {
-    console.log('[Notif] ABORTED: missing sid or cid');
+  // ✅ لا نعتمد على _lastNotifSet من ملف آخر — نتحقق محلياً
+  if (!sid || !cid) return;
+
+  // تجاهل إذا كان المستخدم في نفس القناة
+  const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
+  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
+  if (activeSid === sid && activeCid === cid) {
+    console.log('[Notif] skipped — active channel');
     return;
   }
-  if (_isActiveChannel(sid, cid)) {
-    console.log('[Notif] ABORTED: active channel');
-    return;
-  }
+
+  // منع التكرار
   const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-  console.log('[Notif] tag:', tag, 'has:', _lastNotifSet.has(tag));
   if (_lastNotifSet.has(tag)) {
-    console.log('[Notif] ABORTED: duplicate tag');
+    console.log('[Notif] skipped — duplicate');
     return;
   }
   _lastNotifSet.add(tag);
   clearTimeout(_notifDebounceTimer);
   _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
-  console.log('[Notif] calling _displayInAppNotif');
+
   _displayInAppNotif(msg.name || 'مستخدم', msg.text || '🖼️ وسائط', sid, cid, msg.name || '');
 }
 
@@ -60,42 +61,80 @@ function showInAppNotifFromListener(notif) {
   );
 }
 
-// ════ عرض الإشعار ════
+// ════ عرض الإشعار الداخلي (مثل السناب) ════
 function _displayInAppNotif(name, text, sid, cid, senderName) {
-  console.log('[Notif] _displayInAppNotif', {name, text: text?.slice(0,20), sid, cid});
+  console.log('[Notif] displaying:', name, text.slice(0, 30));
+
+  // ✅ لا نفشل إذا لم تُحمّل بيانات العوالم
+  const sv = typeof servers !== 'undefined' ? servers[sid] : null;
+  const ch = sv?.channels?.[cid];
+  const serverName = sv?.name || 'عوالم';
+  const channelName = ch?.name || 'قناة';
+
   incrementUnread(sid, cid);
   playMsgSound();
+
   const old = document.getElementById('notifToast');
   if (old) old.remove();
   clearTimeout(_notifTimeout);
-  const sv = servers[sid];
-  const ch = sv?.channels?.[cid];
-  if (!sv || !ch) {
-    console.log('[Notif] ABORTED: server or channel not found', {sid, cid, hasSv: !!sv, hasCh: !!ch});
-    return;
-  }
-  console.log('[Notif] creating toast for', sv.name, ch.name);
+
   const t = document.createElement('div');
   t.id = 'notifToast';
-  t.className = 'notif-toast';
-  t.innerHTML = `
-    <div class="notif-av">${(senderName || '?')[0]}</div>
-    <div class="notif-body">
-      <div class="notif-title">${escHtml(sv.name || '')} · #${escHtml(ch.name || '')}</div>
-      <div class="notif-text">${escHtml(name)}: ${escHtml(text)}</div>
-    </div>
-    <div style="font-size:18px;opacity:0.5;padding-right:4px">✕</div>
+  t.className = 'notif-toast snap-style';
+  t.style.cssText = `
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-120%);
+    z-index: 10000;
+    background: rgba(15, 25, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    font-family: Tajawal, sans-serif;
+    opacity: 0;
   `;
-  t.addEventListener('click', () => {
+
+  t.innerHTML = `
+    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#1a6a6a);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0">${(senderName || '?')[0]}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:2px">${escHtml(serverName)} · #${escHtml(channelName)}</div>
+      <div style="font-size:14px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}: ${escHtml(text)}</div>
+    </div>
+    <div style="font-size:16px;opacity:0.4;padding:0 4px;flex-shrink:0">✕</div>
+  `;
+
+  t.addEventListener('click', (e) => {
+    if (e.target.textContent === '✕') { t.remove(); return; }
     t.remove();
-    selectServer(sid);
-    setTimeout(() => { const ch2 = servers[sid]?.channels?.[cid]; if (ch2) selectChannel(sid, cid, ch2); }, 200);
+    if (typeof selectServer === 'function') selectServer(sid);
+    if (ch && typeof selectChannel === 'function') {
+      setTimeout(() => selectChannel(sid, cid, ch), 200);
+    }
   });
+
   document.body.appendChild(t);
-  t.getBoundingClientRect();
-  t.classList.add('show');
-  _notifTimeout = setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 5000);
-  console.log('[Notif] toast displayed successfully');
+
+  // Animation: slide in
+  requestAnimationFrame(() => {
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+  });
+
+  _notifTimeout = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(-120%)';
+    setTimeout(() => t.remove(), 400);
+  }, 5000);
 }
 
 // ════ إشعار DM ════
@@ -109,37 +148,63 @@ function showDmNotif(msg, fromUid) {
   _dmUnread[fromUid] = (_dmUnread[fromUid] || 0) + 1;
   if (typeof updateDmBadge === 'function') updateDmBadge();
   playMsgSound();
+
   const old = document.getElementById('notifToast');
   if (old) old.remove();
   clearTimeout(_notifTimeout);
+
   const t = document.createElement('div');
   t.id = 'notifToast';
-  t.className = 'notif-toast';
-  t.innerHTML = `
-    <div class="notif-av">💬</div>
-    <div class="notif-body">
-      <div class="notif-title">رسالة خاصة</div>
-      <div class="notif-text">${escHtml(msg.name || 'مستخدم')}: ${escHtml(msg.text || '🖼️')}</div>
-    </div>
-    <div style="font-size:18px;opacity:0.5;padding-right:4px">✕</div>
+  t.className = 'notif-toast snap-style';
+  t.style.cssText = `
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-120%);
+    z-index: 10000;
+    background: rgba(15, 25, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    font-family: Tajawal, sans-serif;
+    opacity: 0;
   `;
-  t.addEventListener('click', () => {
-    t.remove();
-    openDM(fromUid, msg.name || 'مستخدم');
-  });
-  document.body.appendChild(t);
-  t.getBoundingClientRect();
-  t.classList.add('show');
-  _notifTimeout = setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 5000);
-}
 
-// ════ التحقق من القناة النشطة ════
-function _isActiveChannel(sid, cid) {
-  const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
-  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
-  const isActive = activeSid === sid && activeCid === cid;
-  console.log('[Notif] _isActiveChannel:', {sid, cid, activeSid, activeCid, isActive});
-  return isActive;
+  t.innerHTML = `
+    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5865f2,#4752c4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0">💬</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:2px">رسالة خاصة</div>
+      <div style="font-size:14px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(msg.name || 'مستخدم')}: ${escHtml(msg.text || '🖼️')}</div>
+    </div>
+    <div style="font-size:16px;opacity:0.4;padding:0 4px;flex-shrink:0">✕</div>
+  `;
+
+  t.addEventListener('click', (e) => {
+    if (e.target.textContent === '✕') { t.remove(); return; }
+    t.remove();
+    if (typeof openDM === 'function') openDM(fromUid, msg.name || 'مستخدم');
+  });
+
+  document.body.appendChild(t);
+  requestAnimationFrame(() => {
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+  });
+
+  _notifTimeout = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(-120%)';
+    setTimeout(() => t.remove(), 400);
+  }, 5000);
 }
 
 // ════ صوت الإشعار ════
@@ -155,7 +220,5 @@ function playMsgSound() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.15);
     setTimeout(() => ctx.close(), 300);
-  } catch(e) {
-    console.log('[Notif] playMsgSound error:', e.message);
-  }
+  } catch(e) {}
 }
