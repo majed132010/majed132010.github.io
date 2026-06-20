@@ -1,7 +1,7 @@
 // ════ NOTIFICATIONS ════
 let _notifListener = null;
 let _notifTimeout = null;
-let _lastNotifSet = new Set();  // ✅ Set (was _lastNotifTag string)
+let _lastNotifSet = new Set();
 let _notifDebounceTimer = null;
 
 // ════ initFCM ════
@@ -22,19 +22,30 @@ function initFCM(uid) {
 
 // ════ listenNotifications (معطل — messages-v2.js تتولى الأمر) ════
 function listenNotifications(uid) {
-  // ✅ معطل لمنع التكرار مع messages-v2.js
   console.log('[Notif] listenNotifications skipped — messages-v2.js handles notifications');
 }
 
 // ════ إشعار من messages-v2.js ════
 function showInAppNotif(msg, sid, cid) {
-  if (!sid || !cid) return;
-  if (_isActiveChannel(sid, cid)) return;
+  console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name, text: msg.text?.slice(0,20)});
+  if (!sid || !cid) {
+    console.log('[Notif] ABORTED: missing sid or cid');
+    return;
+  }
+  if (_isActiveChannel(sid, cid)) {
+    console.log('[Notif] ABORTED: active channel');
+    return;
+  }
   const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-  if (_lastNotifSet.has(tag)) return;
+  console.log('[Notif] tag:', tag, 'has:', _lastNotifSet.has(tag));
+  if (_lastNotifSet.has(tag)) {
+    console.log('[Notif] ABORTED: duplicate tag');
+    return;
+  }
   _lastNotifSet.add(tag);
   clearTimeout(_notifDebounceTimer);
   _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+  console.log('[Notif] calling _displayInAppNotif');
   _displayInAppNotif(msg.name || 'مستخدم', msg.text || '🖼️ وسائط', sid, cid, msg.name || '');
 }
 
@@ -51,6 +62,7 @@ function showInAppNotifFromListener(notif) {
 
 // ════ عرض الإشعار ════
 function _displayInAppNotif(name, text, sid, cid, senderName) {
+  console.log('[Notif] _displayInAppNotif', {name, text: text?.slice(0,20), sid, cid});
   incrementUnread(sid, cid);
   playMsgSound();
   const old = document.getElementById('notifToast');
@@ -58,7 +70,11 @@ function _displayInAppNotif(name, text, sid, cid, senderName) {
   clearTimeout(_notifTimeout);
   const sv = servers[sid];
   const ch = sv?.channels?.[cid];
-  if (!sv || !ch) return;
+  if (!sv || !ch) {
+    console.log('[Notif] ABORTED: server or channel not found', {sid, cid, hasSv: !!sv, hasCh: !!ch});
+    return;
+  }
+  console.log('[Notif] creating toast for', sv.name, ch.name);
   const t = document.createElement('div');
   t.id = 'notifToast';
   t.className = 'notif-toast';
@@ -79,6 +95,7 @@ function _displayInAppNotif(name, text, sid, cid, senderName) {
   t.getBoundingClientRect();
   t.classList.add('show');
   _notifTimeout = setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 5000);
+  console.log('[Notif] toast displayed successfully');
 }
 
 // ════ إشعار DM ════
@@ -120,7 +137,9 @@ function showDmNotif(msg, fromUid) {
 function _isActiveChannel(sid, cid) {
   const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
   const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
-  return activeSid === sid && activeCid === cid;
+  const isActive = activeSid === sid && activeCid === cid;
+  console.log('[Notif] _isActiveChannel:', {sid, cid, activeSid, activeCid, isActive});
+  return isActive;
 }
 
 // ════ صوت الإشعار ════
@@ -136,5 +155,7 @@ function playMsgSound() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.15);
     setTimeout(() => ctx.close(), 300);
-  } catch(e) {}
+  } catch(e) {
+    console.log('[Notif] playMsgSound error:', e.message);
+  }
 }
