@@ -322,24 +322,21 @@ function openProfile() {
 // ═════════════════════════════════════════════════════════════════
 function openMemberCard(uid, name, avatar) {
  console.log('[DEBUG] openMemberCard called', uid, name);
+ // إزالة أي بطاقة قديمة فوراً
  const existing = document.getElementById('memberCardOverlay');
- if (existing) {
- console.log('[DEBUG] Removing existing card');
- existing.remove();
- }
+ if (existing) existing.remove();
 
- // ✅ FIX: إنشاء البطاقة فوراً — بدون تأخير pointer-events
+ // ✅ بناء البطاقة باستخدام requestAnimationFrame لضمان DOM جاهز
+ requestAnimationFrame(() => {
  _buildMemberCard(uid, name, avatar);
-
  const overlay = document.getElementById('memberCardOverlay');
  if (!overlay) {
  console.error('[DEBUG] Failed to create overlay!');
  return;
  }
-
- // ✅ لا نعطل pointer-events — البطاقة قابلة للنقر فوراً
  overlay.style.pointerEvents = 'auto';
- console.log('[DEBUG] Card created and clickable immediately');
+ console.log('[DEBUG] Card created and clickable');
+ });
 }
 
 // ✅ دالة بناء البطاقة منفصلة
