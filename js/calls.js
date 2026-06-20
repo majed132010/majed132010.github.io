@@ -276,6 +276,7 @@ function showOutgoingCallScreen(name, type) {
     <div style="font-size:64px;animation:callPulse 2s infinite">${type === 'video' ? '📹' : '📞'}</div>
     <div style="font-size:22px;font-weight:700">${escHtml(name)}</div>
     <div style="font-size:15px;color:var(--muted)">${type === 'video' ? 'مكالمة فيديو...' : 'مكالمة صوتية...'}</div>
+    <button onclick="endCall()" style="margin-top:20px;padding:14px 28px;background:#c04040;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:Tajawal,sans-serif">📵 إنهاء المكالمة</button>
   `;
   scr.style.display = 'flex';
 }
