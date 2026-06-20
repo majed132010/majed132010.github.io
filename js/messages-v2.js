@@ -67,12 +67,17 @@ function showMessages(sid, cid) {
  const dist = area.scrollHeight - area.scrollTop - area.clientHeight;
  if (dist < 250 || msg.uid === currentUser?.uid) area.scrollTop = area.scrollHeight;
  if (msg.uid !== currentUser?.uid) {
-if (!(activeSid === sid && activeCid === cid)) {
-  const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || 0);
-  if (typeof _lastNotifSet !== 'undefined' && _lastNotifSet.has(tag)) return;
-  if (typeof _lastNotifSet !== 'undefined') _lastNotifSet.add(tag);
-  showInAppNotif(msg, sid, cid);
-}
+ const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
+ const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
+ if (!(activeSid === sid && activeCid === cid)) {
+      // ✅ حماية ضد التكرار باستخدام _lastNotifSet من notifications.js
+      const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || 0);
+      if (typeof _lastNotifSet !== 'undefined' && _lastNotifSet.has(tag)) return;
+      if (typeof _lastNotifSet !== 'undefined') _lastNotifSet.add(tag);
+      showInAppNotif(msg, sid, cid);
+    }
+ }
+ }
  };
  const changeFn = snap => {
  const msg = snap.val();
