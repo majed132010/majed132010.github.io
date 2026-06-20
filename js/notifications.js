@@ -195,8 +195,21 @@ function _displayDmNotif(notif) {
 
 // ════ إشعار DM (من dm.js) ════
 function showDmNotif(msg, fromUid) {
-  // ✅ معطل — listenNotifications تتولى DM أيضاً
-  console.log('[Notif] showDmNotif skipped — listenNotifications handles this');
+  console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
+  if (typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
+  
+  const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
+  if (_lastNotifSet.has(tag)) return;
+  _lastNotifSet.add(tag);
+  clearTimeout(_notifDebounceTimer);
+  _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+  
+  _displayDmNotif({
+    fromUid: fromUid,
+    senderName: msg.name,
+    text: msg.text,
+    ts: msg.ts
+  });
 }
 
 // ════ صوت الإشعار ════
