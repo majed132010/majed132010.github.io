@@ -74,7 +74,7 @@ function renderDmPickerList() {
     list.forEach(({ uid, name, avatar }) => {
       const card = document.createElement('div');
       card.dataset.dmUid = uid;
-      card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s';
+      card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s;position:relative';
       const av = document.createElement('div');
       av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
       if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = (name[0] || '?').toUpperCase();
@@ -362,9 +362,9 @@ async function saveDmMessage(key) {
   if (!_currentDmUid || !currentUser) return;
   const dmId = getDmId(currentUser.uid, _currentDmUid);
   try {
-    await db.ref('dm_messages/' + dmId + '/' + key).update({ 
-      saved: true, 
-      expiresAt: null 
+    await db.ref('dm_messages/' + dmId + '/' + key).update({
+      saved: true,
+      expiresAt: null
     });
     toast('📌 تم تثبيت الرسالة — لن تختفي');
   } catch(e) {
@@ -388,10 +388,10 @@ window.sendDM = async function() {
   const dmId = getDmId(currentUser.uid, _currentDmUid);
 
   // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة
-  const msgBase = { 
-    uid: currentUser.uid, 
-    name: userProfile.displayName || 'مستخدم', 
-    ts: Date.now(), 
+  const msgBase = {
+    uid: currentUser.uid,
+    name: userProfile.displayName || 'مستخدم',
+    ts: Date.now(),
     status: 'sent',
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // ⏰ 24 ساعة
     saved: false                                    // 📌 لم تُثبت
@@ -578,7 +578,11 @@ function _addDmListener(uid) {
     if (!initialized) return;
     const msg = msgSnap.val();
     if (!msg || msg.uid === currentUser.uid) return;
-    if (_currentDmUid === uid) return;
+
+    // ✅ FIX: التحقق من أن المستخدم ليس في شاشة DM هذه المحادثة
+    const dmChatVisible = document.getElementById('dmChatArea')?.style.display === 'flex';
+    if (dmChatVisible && _currentDmUid === uid) return;
+
     if (typeof showDmNotif === 'function') showDmNotif(msg, uid);
     _refreshPickerBadge(uid);
   };
