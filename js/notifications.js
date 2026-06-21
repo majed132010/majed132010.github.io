@@ -24,7 +24,12 @@ function initFCM(uid) {
 
 // ════ استماع الإشعارات العالمي ════
 function listenNotifications(uid) {
-  console.log('[Notif] listenNotifications skipped — using listenAllChannels instead');
+  console.log('[Notif] listenNotifications starting for', uid);
+  if (_notifListener) { console.log('[Notif] already listening'); return; }
+  _notifListener = true;
+  listenAllChannels();
+  listenDMs();
+  console.log('[Notif] Global listeners started');
 }
 
 // ════ مستمع جميع القنوات في جميع العوالم ════
@@ -128,7 +133,10 @@ function showInAppNotif(msg, sid, cid) {
 // ════ إشعار DM ════
 function showDmNotif(msg, fromUid) {
   console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
-  if (typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
+
+  // ✅ التحقق: هل المستخدم في شاشة DM هذه المحادثة حالياً؟
+  const dmChatVisible = document.getElementById('dmChatArea')?.style.display === 'flex';
+  if (dmChatVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
 
   const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
   if (_lastNotifSet.has(tag)) return;
