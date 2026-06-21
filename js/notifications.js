@@ -27,7 +27,7 @@ function listenNotifications(uid) {
   console.log('[Notif] listenNotifications skipped — using listenAllChannels instead');
 }
 
-// ════ مستمع جميع القنوات (باستخدام timestamp — الأكثر موثوقية) ════
+// ════ مستمع جميع القنوات في جميع العوالم ════
 function listenAllChannels() {
   if (!currentUser) return;
   console.log('[Notif] Starting global channel listener for', currentUser.uid);
@@ -37,61 +37,63 @@ function listenAllChannels() {
 
   _globalServersListener = snap => {
     const userServers = snap.val() || {};
-    const activePaths = new Set();
+    const activeSids = new Set(Object.keys(userServers));
 
     Object.keys(userServers).forEach(sid => {
-      db.ref('servers/' + sid + '/channels').once('value').then(chSnap => {
-        const channels = chSnap.val() || {};
-        Object.keys(channels).forEach(cid => {
-          const path = 'messages/' + sid + '/' + cid;
-          activePaths.add(path);
+      if (_globalMsgListeners[sid]) return; // مستمع موجود
 
-          if (_globalMsgListeners[path]) return;
+      // ✅ استماع جميع القنوات في العالم بأكمله
+      const path = 'messages/' + sid;
+      const startTime = Date.now() - 5000;
+      const q = db.ref(path).orderByChild('ts').startAt(startTime);
 
-          // ✅ استخدام timestamp بدلاً من limitToLast — أكثر موثوقية
-          const startTime = Date.now() - 5000; // 5 ثوانٍ احتياطية
-          const q = db.ref(path).orderByChild('ts').startAt(startTime);
+      let initialized = false;
 
-          const fn = snap => {
-            const msg = snap.val();
-            console.log('[Notif] child_added for', path, 'msg:', msg?.name, msg?.text?.slice(0, 20));
+      const fn = snap => {
+        const msg = snap.val();
 
-            if (!msg) { console.log('[Notif] msg is null'); return; }
-            if (msg.uid === currentUser.uid) { console.log('[Notif] Same user'); return; }
+        if (!initialized) { initialized = true; return; }
+        if (!msg) return;
+        if (msg.uid === currentUser.uid) return;
 
-            const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
-            const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
-            if (activeSid === sid && activeCid === cid) { console.log('[Notif] Active channel'); return; }
+        // استخراج cid من المسار
+        const key = snap.key;
+        const cid = msg.channelId || snap.ref.parent.key;
 
-            const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-            if (_lastNotifSet.has(tag)) { console.log('[Notif] Duplicate'); return; }
-            _lastNotifSet.add(tag);
-            clearTimeout(_notifDebounceTimer);
-            _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+        console.log('[Notif] New message in', sid, cid, 'from', msg.name);
 
-            console.log('[Notif] SHOWING notification for', sid, cid);
-            _displayChannelNotif({
-              serverId: sid,
-              channelId: cid,
-              senderName: msg.name,
-              text: msg.text,
-              ts: msg.ts
-            });
-          };
+        const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
+        const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
+        if (activeSid === sid && activeCid === cid) { console.log('[Notif] Active channel'); return; }
 
-          q.on('child_added', fn);
-          _globalMsgListeners[path] = { q, fn, sid, cid };
-          console.log('[Notif] Listening to', path, 'from ts >=', startTime);
+        const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
+        if (_lastNotifSet.has(tag)) { console.log('[Notif] Duplicate'); return; }
+        _lastNotifSet.add(tag);
+        clearTimeout(_notifDebounceTimer);
+        _notifDebounceTimer = setTimeout(() => { _lastNotifSet.clear(); }, 5000);
+
+        console.log('[Notif] SHOWING notification');
+        _displayChannelNotif({
+          serverId: sid,
+          channelId: cid,
+          senderName: msg.name,
+          text: msg.text,
+          ts: msg.ts
         });
-      });
+      };
+
+      q.on('child_added', fn);
+      _globalMsgListeners[sid] = { q, fn };
+      console.log('[Notif] Listening to ALL channels in', sid);
     });
 
-    Object.keys(_globalMsgListeners).forEach(path => {
-      if (!activePaths.has(path)) {
-        const { q, fn } = _globalMsgListeners[path];
+    // تنظيف العوالم القديمة
+    Object.keys(_globalMsgListeners).forEach(sid => {
+      if (!activeSids.has(sid)) {
+        const { q, fn } = _globalMsgListeners[sid];
         q.off('child_added', fn);
-        delete _globalMsgListeners[path];
-        console.log('[Notif] Stopped listening to', path);
+        delete _globalMsgListeners[sid];
+        console.log('[Notif] Stopped listening to', sid);
       }
     });
   };
@@ -99,7 +101,7 @@ function listenAllChannels() {
   userServersRef.on('value', _globalServersListener);
 }
 
-// ════ إشعار من messages-v2.js ════
+// ════ إشعار من messages-v2.js (احتياطي) ════
 function showInAppNotif(msg, sid, cid) {
   console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name});
   if (!sid || !cid) return;
