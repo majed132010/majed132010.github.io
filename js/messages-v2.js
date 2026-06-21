@@ -9,7 +9,6 @@ let _typingTimer = null;
 let _msgLoadGen = 0;
 let _searchResults = [], _searchIndex = 0;
 
-
 // ════ إدارة الرسائل غير المقروءة ════
 function clearUnread(sid, cid) {
  const key = sid + '/' + cid;
@@ -52,7 +51,12 @@ function showMessages(sid, cid) {
  cleanupMessagesListener();
  clearUnread(sid, cid);
  listenTyping(sid, cid);
- if (currentUser && !_notifListener) listenNotifications(currentUser.uid);
+
+ // ✅ FIX: تشغيل الاستماع العالمي للإشعارات (مرة واحدة فقط)
+ if (currentUser && typeof listenNotifications === 'function') {
+   listenNotifications(currentUser.uid);
+ }
+
  const gen = ++_msgLoadGen;
  let _initialDone = false;
  const fn = snap => {
@@ -306,9 +310,9 @@ function buildMsgDiv(msg, key) {
 async function saveMessage(key) {
  if (!currentServer || !currentChannel) return;
  try {
- await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key).update({ 
-   saved: true, 
-   expiresAt: null 
+ await db.ref('messages/' + currentServer + '/' + currentChannel + '/' + key).update({
+   saved: true,
+   expiresAt: null
  });
  toast('📌 تم تثبيت الرسالة — لن تختفي');
  } catch(e) {
@@ -421,10 +425,10 @@ async function sendMessage() {
  const role = sv?.members?.[currentUser.uid]?.role || 'member';
 
  // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة إذا لم تُثبت
- const msgBase = { 
-   uid: currentUser.uid, 
-   name: userProfile.displayName || 'مستخدم', 
-   ts: Date.now(), 
+ const msgBase = {
+   uid: currentUser.uid,
+   name: userProfile.displayName || 'مستخدم',
+   ts: Date.now(),
    role,
    expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // ⏰ 24 ساعة
    saved: false                                    // 📌 لم تُثبت
