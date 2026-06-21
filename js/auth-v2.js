@@ -65,7 +65,7 @@ auth.onAuthStateChanged(user => {
  loadUserProfile().then(() => {
  initApp();
  initFCM(user.uid);
- listenNotifications(user.uid);
+ listenAllChannels();
 
  // 🆕 تفعيل بث حالة الاتصال الحية للمستخدم فور الدخول
  updateOnlineStatus(true);
