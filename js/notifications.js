@@ -108,29 +108,27 @@ function listenAllChannels() {
           let initialized = false;
           const q = db.ref(path).limitToLast(1);
 
-          const fn = snap => {
-            if (!initialized) return;
-            const msg = snap.val();
-            if (!msg || msg.uid === currentUser.uid) return;
+        const fn = snap => {
+  if (!initialized) return;
+  const msg = snap.val();
+  if (!msg || msg.uid === currentUser.uid) return;
 
-            const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
-            const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
-            if (activeSid === sid && activeCid === cid) return;
+  const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
+  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
+  if (activeSid === sid && activeCid === cid) return;
 
-            const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-            // ✅ FIX #4: استخدام مجموعة القنوات المنفصلة
-            if (_lastChannelNotifSet.has(tag)) return;
-            _lastChannelNotifSet.add(tag);
-            clearTimeout(_channelDebounceTimer);
-            _channelDebounceTimer = setTimeout(() => { _lastChannelNotifSet.clear(); }, 5000);
+  const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
+  if (_lastChannelNotifSet.has(tag)) return;
+  _lastChannelNotifSet.add(tag);
+  clearTimeout(_channelDebounceTimer);
+  _channelDebounceTimer = setTimeout(() => { _lastChannelNotifSet.clear(); }, 5000);
 
-            _displayChannelNotif({ serverId: sid, channelId: cid, senderName: msg.name, text: msg.text, ts: msg.ts });
-          };
+  _displayChannelNotif({ serverId: sid, channelId: cid, senderName: msg.name, text: msg.text, ts: msg.ts });
+};
 
-          // ✅ FIX #5: تسجيل child_added أولاً ثم once('value') يُعلمنا بانتهاء التهيئة
-          q.on('child_added', fn);
-          q.once('value', () => { initialized = true; });
-          _globalMsgListeners[key] = { q, fn };
+q.on('child_added', fn);
+q.once('value', () => { initialized = true; });
+_globalMsgListeners[key] = { q, fn };  // ← سطر واحد فقط
         });
       };
 
