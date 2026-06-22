@@ -23,7 +23,7 @@ function initFCM(uid) {
   }
 
   // ✅ FIX #1: التحقق من أن VAPID Key حقيقي وليس placeholder
-  const VAPID_KEY = 'YOUR_VAPID_KEY_HERE'; // ⚠️ استبدل هذا بمفتاح VAPID الحقيقي من Firebase Console
+const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
   if (!VAPID_KEY || VAPID_KEY === 'YOUR_VAPID_KEY_HERE') {
     console.error('[FCM] ❌ VAPID Key غير مضبوط! افتح Firebase Console → Project Settings → Cloud Messaging → Web Push certificates وانسخ المفتاح هنا.');
     return;
