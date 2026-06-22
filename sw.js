@@ -141,41 +141,6 @@ function _throttled(tag) {
   return false;
 }
 
-self.addEventListener('push', event => {
-  if (!event.data) return;
-  try {
-    const data = event.data.json();
-    const d = data.data || {};
-    const isCall = d.type === 'call';
-    const tag = isCall
-      ? 'call_' + (d.callId || '')
-      : (d.type || 'msg') + '_' + (d.fromUid || d.serverId || '');
-
-    event.waitUntil(
-      self.registration.getNotifications({ tag }).then(existing => {
-        if (existing.length || _throttled(tag)) return;
-        return self.registration.showNotification(data.title || 'عوالم', {
-          body: data.body || '',
-          // ✅ FIX #2: الاسم الصحيح للأيقونة
-          icon: ICON_URL,
-          badge: BADGE_URL,
-          dir: 'rtl',
-          lang: 'ar',
-          tag,
-          requireInteraction: isCall,
-          vibrate: isCall ? [300, 150, 300, 150, 300] : [200, 100, 200],
-          data: d,
-          // ✅ FIX #6: إضافة أزرار المكالمة في sw.js أيضاً
-          actions: isCall
-            ? [{ action: 'accept', title: 'قبول ✅' }, { action: 'reject', title: 'رفض ❌' }]
-            : [{ action: 'open', title: 'فتح عوالم' }, { action: 'close', title: 'إغلاق' }]
-        });
-      })
-    );
-  } catch(e) {
-    console.error('Push error:', e);
-  }
-});
 
 // رفض المكالمة من الخلفية
 const REJECT_FN_URL = 'https://us-central1-awalim2-5bdb1.cloudfunctions.net/rejectCall';
