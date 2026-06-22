@@ -838,18 +838,30 @@ async function renderMembersList() {
 
 // ════ استعادة آخر سيرفر — ✅ FIX: الجوال يدخل للقناة مباشرة ════
 function restoreLastServer() {
- const lastSid = localStorage.getItem('awalem_lastServer');
- const lastCid = localStorage.getItem('awalem_lastChannel');
- if (lastSid && servers[lastSid]) {
- window._restoringSession = true;
- selectServer(lastSid, true); // true = skipDrawer
- if (lastCid && servers[lastSid]?.channels?.[lastCid]) {
- selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
- }
- window._restoringSession = false;
- } else {
- showView('home');
- }
+  const lastSid = localStorage.getItem('awalem_lastServer');
+  const lastCid = localStorage.getItem('awalem_lastChannel');
+  if (lastSid && servers[lastSid]) {
+    window._restoringSession = true;
+    selectServer(lastSid, true);
+    if (lastCid && servers[lastSid]?.channels?.[lastCid]) {
+      selectChannel(lastSid, lastCid, servers[lastSid].channels[lastCid]);
+    }
+    window._restoringSession = false;
+  } else if (currentUser) {
+    db.ref('users/' + currentUser.uid + '/lastActive').once('value').then(snap => {
+      const last = snap.val();
+      if (last?.sid && servers[last.sid] && last?.cid && servers[last.sid]?.channels?.[last.cid]) {
+        window._restoringSession = true;
+        selectServer(last.sid, true);
+        selectChannel(last.sid, last.cid, servers[last.sid].channels[last.cid]);
+        window._restoringSession = false;
+      } else {
+        showView('home');
+      }
+    });
+  } else {
+    showView('home');
+  }
 }
 
 // ════ فتح نافذة إنشاء سيرفر ════
