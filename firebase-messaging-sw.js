@@ -1,4 +1,4 @@
-// Firebase Messaging Service Worker — عوالم (محدّث)
+// Firebase Messaging Service Worker — عوالم (مُصلح)
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -13,6 +13,10 @@ firebase.initializeApp({
   appId: "1:939518942115:web:404307d7b8e0677c335816"
 });
 const messaging = firebase.messaging();
+
+// ✅ FIX #2: اسم الأيقونة الصحيح (icon192.png بدون شرطة)
+const ICON_URL = '/icon192.png';
+const BADGE_URL = '/icon192.png';
 
 // كبح تكرار الإشعارات: آخر وقت عرض لكل tag
 const NOTIF_THROTTLE_MS = 10000;
@@ -33,10 +37,6 @@ messaging.onBackgroundMessage(payload => {
     const title = data.title || (payload.notification && payload.notification.title) || '🔥 عوالم';
     const body = data.body || (payload.notification && payload.notification.body) || 'لديك إشعار جديد';
 
-    // ✅ تم إصلاح مسارات الأيقونات — تستخدم الأيقونات من manifest
-    const iconUrl = '/icon-192.png';
-    const badgeUrl = '/icon-192.png';
-
     // مكالمة واردة
     if (data.type === 'call') {
       const tag = 'call_' + (data.callId || '');
@@ -44,8 +44,9 @@ messaging.onBackgroundMessage(payload => {
         if (existing.length || _throttled(tag)) return;
         return self.registration.showNotification(title, {
           body,
-          icon: iconUrl,
-          badge: badgeUrl,
+          // ✅ FIX #2: الاسم الصحيح للأيقونة
+          icon: ICON_URL,
+          badge: BADGE_URL,
           dir: 'rtl', lang: 'ar',
           vibrate: [300, 150, 300, 150, 300],
           tag,
@@ -64,8 +65,9 @@ messaging.onBackgroundMessage(payload => {
     if (_throttled(tag)) return;
     self.registration.showNotification(title, {
       body,
-      icon: iconUrl,
-      badge: badgeUrl,
+      // ✅ FIX #2: الاسم الصحيح للأيقونة
+      icon: ICON_URL,
+      badge: BADGE_URL,
       dir: 'rtl', lang: 'ar',
       vibrate: [200, 100, 200],
       tag,
