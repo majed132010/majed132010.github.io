@@ -173,8 +173,9 @@ function showInAppNotif(msg, sid, cid) {
 function showDmNotif(msg, fromUid) {
   console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
 
-  const dmChatVisible = document.getElementById('dmChatArea')?.style.display === 'flex';
-  if (dmChatVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
+ const messagesViewVisible = document.getElementById('messagesView')?.style.display === 'flex';
+const homeViewVisible = document.getElementById('homeView')?.style.display === 'flex';
+if (!messagesViewVisible && !homeViewVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
 
   const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
   if (_lastDmNotifSet.has(tag)) return;
