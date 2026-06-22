@@ -31,7 +31,8 @@ function initFCM(uid) {
   }
 
   const messaging = firebase.messaging();
-  messaging.getToken({ vapidKey: VAPID_KEY }).then(token => {
+ const swReg = window._fcmSwRegistration || undefined;
+messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg }).then(token => {
     if (token) {
       db.ref('users/' + uid + '/fcmToken').set(token).catch(() => {});
       console.log('[FCM] ✅ Token saved');
