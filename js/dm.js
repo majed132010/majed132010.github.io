@@ -568,11 +568,10 @@ function listenDMs() {
 }
 
 function _addDmListener(uid) {
-  if (_dmGlobalListeners[uid]) {
-    const { q: oldQ, fn: oldFn } = _dmGlobalListeners[uid];
-    try { oldQ.off('child_added', oldFn); } catch(e) {}
-    delete _dmGlobalListeners[uid];
-  }
+  // ✅ إذا كان المستمع موجوداً لا تُعد تسجيله
+  if (_dmGlobalListeners[uid]) return;
+
+  if (!currentUser) return;
   const dmId = getDmId(currentUser.uid, uid);
   const q = db.ref('dm_messages/' + dmId).limitToLast(1);
   let initialized = false;
@@ -581,10 +580,8 @@ function _addDmListener(uid) {
     const msg = msgSnap.val();
     if (!msg || msg.uid === currentUser.uid) return;
 
-    // ✅ FIX: التحقق من أن المستخدم ليس في شاشة DM هذه المحادثة
-   // التحقق الصحيح: هل الـ dmView نفسه مرئي وليس dmChatArea فقط
-const dmViewVisible = document.getElementById('dmView')?.style.display === 'flex';
-if (dmViewVisible && _currentDmUid === uid) return;
+    const dmViewVisible = document.getElementById('dmView')?.style.display === 'flex';
+    if (dmViewVisible && _currentDmUid === uid) return;
 
     if (typeof showDmNotif === 'function') showDmNotif(msg, uid);
     _refreshPickerBadge(uid);
@@ -593,7 +590,6 @@ if (dmViewVisible && _currentDmUid === uid) return;
   q.once('value', () => { initialized = true; });
   _dmGlobalListeners[uid] = { q, fn };
 }
-
 function _refreshPickerBadge(uid) {
   const card = document.querySelector(`#dmPickerGrid [data-dm-uid="${uid}"]`);
   if (!card) return;
