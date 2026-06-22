@@ -435,8 +435,9 @@ function renderChannels(sid) {
 
 // ════ اختيار قناة ════
 function selectChannel(sid, cid, ch) {
- localStorage.setItem('awalem_lastServer', sid);
- localStorage.setItem('awalem_lastChannel', cid);
+  localStorage.setItem('awalem_lastServer', sid);
+  localStorage.setItem('awalem_lastChannel', cid);
+  if (currentUser) db.ref('users/' + currentUser.uid + '/lastActive').set({ sid, cid, ts: Date.now() });
  currentServer = sid; currentChannel = cid;
  window.currentServerId = sid; window.currentChannelId = cid;
  renderChannels(sid);
