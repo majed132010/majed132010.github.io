@@ -25,7 +25,8 @@ window.openDMFromSvBar = function() {
 function openDMScreen() {
   closeSidebar();
   if (currentServer) _lastServerId = currentServer;
-  currentServer = null; currentChannel = null; _currentDmUid = null;
+ currentServer = null; currentChannel = null; _currentDmUid = null;
+window.currentServerId = null; window.currentChannelId = null;
   const chBtn = document.getElementById('chSettingsBtn');
   if (chBtn) chBtn.style.display = 'none';
   document.getElementById('mhIcon').textContent = '💬';
