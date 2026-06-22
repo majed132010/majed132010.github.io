@@ -127,15 +127,17 @@ if ('serviceWorker' in navigator) {
       const swReg = await navigator.serviceWorker.register('/sw.js');
       console.log('✅ SW registered:', swReg.scope);
 
-      // لا تسجّل firebase-messaging-sw.js يدوياً هنا: تسجيله بنفس نطاق sw.js ('/')
-      // كان يجعل كل تحميل يستبدل أحدهما بالآخر ويكرر الإشعارات.
-      // مكتبة FCM تسجّله تلقائياً بنطاقها الخاص عند getToken (notifications.js).
+      // سجّل firebase-messaging-sw.js لـ FCM
+      const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('✅ FCM SW registered:', fcmReg.scope);
+
+      // أعطِ FCM الـ registration الصحيح عند getToken
+      window._fcmSwRegistration = fcmReg;
     } catch(err) {
       console.warn('SW registration error:', err);
     }
   });
 }
-
 // ════ No-op stubs (للتوافق) ════
 function mobGoto(){}
 function mobSetActive(){}
