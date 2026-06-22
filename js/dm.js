@@ -93,7 +93,9 @@ function renderDmPickerList() {
 }
 
 // ── فتح محادثة ──
+// بعد
 function openDM(uid, name) {
+  if (!currentUser) { console.warn('[DM] openDM called before auth'); return; }
   closeSidebar();
   _currentDmUid = uid;
   document.getElementById('mhIcon').textContent = '💬';
