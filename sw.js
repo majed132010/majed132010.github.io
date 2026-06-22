@@ -1,21 +1,21 @@
-// ════ عوالم — Service Worker v5 (محدّث) ════
-const CACHE_NAME = 'awalem-v6';
+// ════ عوالم — Service Worker v6 (مُصلح) ════
+const CACHE_NAME = 'awalem-v7';
 const IMAGE_CACHE = 'awalem-images-v3';
 const CACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/css/style.css',
-  '/js/firebase-config.js',
-  '/js/ui.js',
-  '/js/notifications.js',
-  '/js/voice.js',
-  '/js/auth.js',
-  '/js/servers.js',
-  '/js/messages.js',
-  '/js/dm.js',
-  '/js/calls.js',
-  '/js/push.js',
+  '/style.css',
+  '/firebase-config.js',
+  '/ui.js',
+  '/notifications.js',
+  '/voice.js',
+  '/auth.js',
+  '/servers.js',
+  '/messages.js',
+  '/dm.js',
+  '/calls.js',
+  '/push.js',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap',
   'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
@@ -78,7 +78,7 @@ self.addEventListener('fetch', event => {
   }
 
   // ملفات JS و CSS — Network first
-  if (url.pathname.startsWith('/js/') || url.pathname.startsWith('/css/')) {
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
     event.respondWith(
       fetch(event.request)
         .then(async response => {
@@ -122,7 +122,16 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Push notifications — مع كبح التكرار
+// ════ Push Notifications ════
+// ✅ FIX #3: هذا الملف (sw.js) يعالج Push فقط عندما لا يكون firebase-messaging-sw.js نشطاً
+// إذا كان firebase-messaging-sw.js مسجلاً، احذف مستمع push من هنا لمنع التكرار.
+// الحل: sw.js يعمل كـ fallback فقط عندما لا يوجد FCM token.
+
+// ✅ FIX #2: اسم الأيقونة الصحيح (icon192.png بدون شرطة)
+const ICON_URL = '/icon192.png';
+const BADGE_URL = '/icon192.png';
+
+// كبح التكرار
 const NOTIF_THROTTLE_MS = 4000;
 const _lastShownByTag = {};
 function _throttled(tag) {
@@ -142,22 +151,24 @@ self.addEventListener('push', event => {
       ? 'call_' + (d.callId || '')
       : (d.type || 'msg') + '_' + (d.fromUid || d.serverId || '');
 
-    // ✅ استخدام الأيقونة الصحيحة
-    const iconUrl = '/icon-192.png';
-    const badgeUrl = '/icon-192.png';
-
     event.waitUntil(
       self.registration.getNotifications({ tag }).then(existing => {
         if (existing.length || _throttled(tag)) return;
         return self.registration.showNotification(data.title || 'عوالم', {
           body: data.body || '',
-          icon: iconUrl,
-          badge: badgeUrl,
+          // ✅ FIX #2: الاسم الصحيح للأيقونة
+          icon: ICON_URL,
+          badge: BADGE_URL,
           dir: 'rtl',
           lang: 'ar',
           tag,
           requireInteraction: isCall,
-          data: d
+          vibrate: isCall ? [300, 150, 300, 150, 300] : [200, 100, 200],
+          data: d,
+          // ✅ FIX #6: إضافة أزرار المكالمة في sw.js أيضاً
+          actions: isCall
+            ? [{ action: 'accept', title: 'قبول ✅' }, { action: 'reject', title: 'رفض ❌' }]
+            : [{ action: 'open', title: 'فتح عوالم' }, { action: 'close', title: 'إغلاق' }]
         });
       })
     );
@@ -166,16 +177,59 @@ self.addEventListener('push', event => {
   }
 });
 
+// رفض المكالمة من الخلفية
+const REJECT_FN_URL = 'https://us-central1-awalim2-5bdb1.cloudfunctions.net/rejectCall';
+
+async function rejectCallViaFunction(data) {
+  const callId = data.callId;
+  const secret = data.rejectSecret;
+  if (!callId || !secret) {
+    console.warn('[SW] رفض المكالمة: بيانات ناقصة (callId/rejectSecret)', data);
+    return;
+  }
+  try {
+    const r = await fetch(REJECT_FN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callId, secret })
+    });
+    if (r.ok) console.log('[SW] ✓ رُفضت المكالمة عبر الدالة السحابية:', callId);
+    else console.error('[SW] ✖ رفضت الدالة الطلب:', r.status, await r.text().catch(() => ''));
+  } catch (err) {
+    console.error('[SW] ✖ فشل الاتصال بدالة rejectCall:', err);
+  }
+}
+
+// ✅ FIX #6: notificationclick يعالج المكالمات بشكل صحيح (مثل firebase-messaging-sw.js)
 self.addEventListener('notificationclick', event => {
+  const data = event.notification.data || {};
   event.notification.close();
+
+  if (event.action === 'reject') {
+    event.waitUntil(rejectCallViaFunction(data));
+    return;
+  }
+
+  if (event.action === 'close') return;
+
+  // ✅ FIX #6: تمرير acceptCall عند الضغط على قبول المكالمة
+  const openUrl = (event.action === 'accept' && data.callId)
+    ? 'https://majed132010-github-io.vercel.app?acceptCall=' + encodeURIComponent(data.callId)
+    : 'https://majed132010-github-io.vercel.app';
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {
         if (client.url.includes('majed132010-github-io.vercel.app') && 'focus' in client) {
-          return client.focus();
+          client.focus();
+          // ✅ FIX #6: إرسال postMessage عند قبول المكالمة
+          if (event.action === 'accept' && data.callId) {
+            client.postMessage({ type: 'acceptCall', callId: data.callId });
+          }
+          return;
         }
       }
-      return clients.openWindow('https://majed132010-github-io.vercel.app');
+      return clients.openWindow(openUrl);
     })
   );
 });
