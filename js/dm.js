@@ -580,8 +580,9 @@ function _addDmListener(uid) {
     if (!msg || msg.uid === currentUser.uid) return;
 
     // ✅ FIX: التحقق من أن المستخدم ليس في شاشة DM هذه المحادثة
-    const dmChatVisible = document.getElementById('dmChatArea')?.style.display === 'flex';
-    if (dmChatVisible && _currentDmUid === uid) return;
+   // التحقق الصحيح: هل الـ dmView نفسه مرئي وليس dmChatArea فقط
+const dmViewVisible = document.getElementById('dmView')?.style.display === 'flex';
+if (dmViewVisible && _currentDmUid === uid) return;
 
     if (typeof showDmNotif === 'function') showDmNotif(msg, uid);
     _refreshPickerBadge(uid);
