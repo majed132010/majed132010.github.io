@@ -296,6 +296,7 @@ function buildMsgDiv(msg, key) {
 
  const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
  _attachContextBar(div, body, [
+  { icon: '😊', label: 'تفاعل', fn: () => showReactionPicker(key, div) },
  { icon: '↩️', label: 'رد', fn: () => setReply(key, msg.name, msg.text) },
  { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
  { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
