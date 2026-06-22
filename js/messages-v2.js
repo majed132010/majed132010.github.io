@@ -76,8 +76,8 @@ function showMessages(sid, cid) {
  if (!(activeSid === sid && activeCid === cid)) {
       // ✅ حماية ضد التكرار باستخدام _lastNotifSet من notifications.js
       const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || 0);
-      if (typeof _lastNotifSet !== 'undefined' && _lastNotifSet.has(tag)) return;
-      if (typeof _lastNotifSet !== 'undefined') _lastNotifSet.add(tag);
+     if (typeof _lastChannelNotifSet !== 'undefined' && _lastChannelNotifSet.has(tag)) return;
+if (typeof _lastChannelNotifSet !== 'undefined') _lastChannelNotifSet.add(tag);
       showInAppNotif(msg, sid, cid);
     }
  }
