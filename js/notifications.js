@@ -3,13 +3,15 @@ let _notifListener = null;
 let _notifTimeout = null;
 let _dmNotifTimeout = null;
 
-// ✅ FIX #4: مجموعتان منفصلتان لمنع إلغاء DM وقناة بعضهما
+// ✅ مجموعتان منفصلتان لمنع إلغاء DM وقناة بعضهما
 let _lastChannelNotifSet = new Set();
 let _lastDmNotifSet = new Set();
 let _channelDebounceTimer = null;
 let _dmDebounceTimer = null;
 
-// متغيرات المستمعين العالميين
+// للتوافق مع messages-v2.js القديم
+let _lastNotifSet = _lastChannelNotifSet;
+
 let _globalMsgListeners = {};
 let _globalChannelListeners = {};
 let _globalServersListener = null;
@@ -22,10 +24,9 @@ function initFCM(uid) {
     return;
   }
 
-  // ✅ FIX #1: التحقق من أن VAPID Key حقيقي وليس placeholder
-const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
+  const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
   if (!VAPID_KEY || VAPID_KEY === 'YOUR_VAPID_KEY_HERE') {
-    console.error('[FCM] ❌ VAPID Key غير مضبوط! افتح Firebase Console → Project Settings → Cloud Messaging → Web Push certificates وانسخ المفتاح هنا.');
+    console.error('[FCM] ❌ VAPID Key غير مضبوط!');
     return;
   }
 
@@ -35,7 +36,7 @@ const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU
       db.ref('users/' + uid + '/fcmToken').set(token).catch(() => {});
       console.log('[FCM] ✅ Token saved');
     } else {
-      console.warn('[FCM] لم يُعطَ token — تأكد من إذن الإشعارات في المتصفح');
+      console.warn('[FCM] لم يُعطَ token — تأكد من إذن الإشعارات');
     }
   }).catch(e => console.warn('[FCM] getToken failed:', e.message));
 }
@@ -104,31 +105,35 @@ function listenAllChannels() {
           if (_globalMsgListeners[key]) return;
 
           const path = 'messages/' + sid + '/' + cid;
-          // ✅ FIX #5: إصلاح race condition — initialized يُفعَّل بعد once('value') مباشرة
           let initialized = false;
           const q = db.ref(path).limitToLast(1);
 
-        const fn = snap => {
-  if (!initialized) return;
-  const msg = snap.val();
-  if (!msg || msg.uid === currentUser.uid) return;
+          const fn = snap => {
+            if (!initialized) return; // ✅ لا تُفعّل initialized هنا — تُفعّل من once('value')
+            const msg = snap.val();
+            if (!msg || msg.uid === currentUser.uid) return;
 
-  const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
-  const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
-  if (activeSid === sid && activeCid === cid) return;
+            const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
+            const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : (typeof currentChannel !== 'undefined' ? currentChannel : null);
+            if (activeSid === sid && activeCid === cid) return;
 
-  const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-  if (_lastChannelNotifSet.has(tag)) return;
-  _lastChannelNotifSet.add(tag);
-  clearTimeout(_channelDebounceTimer);
-  _channelDebounceTimer = setTimeout(() => { _lastChannelNotifSet.clear(); }, 5000);
+            const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
+            if (_lastChannelNotifSet.has(tag)) return;
+            _lastChannelNotifSet.add(tag);
+            clearTimeout(_channelDebounceTimer);
+            _channelDebounceTimer = setTimeout(() => { _lastChannelNotifSet.clear(); }, 5000);
 
-  _displayChannelNotif({ serverId: sid, channelId: cid, senderName: msg.name, text: msg.text, ts: msg.ts });
-};
+            console.log('[Notif] 🔔 إشعار قناة:', msg.name, '←', cid);
+            _displayChannelNotif({ serverId: sid, channelId: cid, senderName: msg.name, text: msg.text, ts: msg.ts });
+          };
 
-q.on('child_added', fn);
-q.once('value', () => { initialized = true; });
-_globalMsgListeners[key] = { q, fn };  // ← سطر واحد فقط
+          // ✅ تسجيل child_added أولاً ثم once('value') يُعلمنا بانتهاء التهيئة
+          q.on('child_added', fn);
+          q.once('value', () => {
+            initialized = true;
+            console.log('[Notif] ✅ مستمع جاهز للقناة:', cid, 'في العالم:', sid);
+          });
+          _globalMsgListeners[key] = { q, fn };
         });
       };
 
@@ -140,7 +145,7 @@ _globalMsgListeners[key] = { q, fn };  // ← سطر واحد فقط
   userServersRef.on('value', _globalServersListener);
 }
 
-// ════ إشعار من messages.js (احتياطي) ════
+// ════ إشعار من messages.js / messages-v2.js (احتياطي) ════
 function showInAppNotif(msg, sid, cid) {
   console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name});
   if (!sid || !cid) return;
@@ -150,7 +155,6 @@ function showInAppNotif(msg, sid, cid) {
   if (activeSid === sid && activeCid === cid) return;
 
   const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.uid || '') + '/' + (msg.ts || 0);
-  // ✅ FIX #4: استخدام مجموعة القنوات المنفصلة
   if (_lastChannelNotifSet.has(tag)) return;
   _lastChannelNotifSet.add(tag);
   clearTimeout(_channelDebounceTimer);
@@ -169,12 +173,10 @@ function showInAppNotif(msg, sid, cid) {
 function showDmNotif(msg, fromUid) {
   console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
 
-  // التحقق: هل المستخدم في شاشة DM هذه المحادثة حالياً؟
   const dmChatVisible = document.getElementById('dmChatArea')?.style.display === 'flex';
   if (dmChatVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
 
   const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
-  // ✅ FIX #4: استخدام مجموعة DM المنفصلة
   if (_lastDmNotifSet.has(tag)) return;
   _lastDmNotifSet.add(tag);
   clearTimeout(_dmDebounceTimer);
@@ -251,7 +253,6 @@ function _displayDmNotif(notif) {
 
   const old = document.getElementById('notifToast');
   if (old) old.remove();
-  // ✅ FIX #4: استخدام timeout منفصل للـ DM
   clearTimeout(_dmNotifTimeout);
 
   const t = document.createElement('div');
