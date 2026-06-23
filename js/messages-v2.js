@@ -125,7 +125,7 @@ function showMessages(sid, cid) {
  else {
  const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
  const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName));
+ img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser));
  loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
  mediaWrap.appendChild(img); body.appendChild(mediaWrap);
  }
@@ -296,7 +296,7 @@ function buildMsgDiv(msg, key) {
  img.src = '';
  img.dataset.msgKey = key;
  img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName));
+ img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser));
  img.addEventListener('load', () => {
  const a = document.getElementById('messagesArea');
  if (!a) return;
@@ -946,13 +946,21 @@ function clearSearchHighlights() {
 
 // ════ Lightbox ════
 let _lightboxUrl='', _lightboxType='', _lightboxName='';
-function openLightbox(url, type, name) {
+// مفتاح الرسالة الحالية في lightbox (للحذف)
+let _lightboxMsgKey = null;
+
+function openLightbox(url, type, name, msgKey, canDelete) {
  _lightboxUrl=url; _lightboxType=type; _lightboxName=name||'media';
+ _lightboxMsgKey = msgKey || null;
  const bg=document.getElementById('lightboxBg');
  const img=document.getElementById('lightboxImg');
  const vid=document.getElementById('lightboxVid');
+ const nameEl=document.getElementById('lightboxName');
+ const delBtn=document.getElementById('lightboxDelBtn');
  if (!bg) return;
  bg.style.display='flex';
+ if (nameEl) nameEl.textContent = name || '';
+ if (delBtn) delBtn.style.display = (canDelete && msgKey) ? 'block' : 'none';
  if (type==='video') { if(img) img.style.display='none'; if(vid){vid.src=url;vid.style.display='block';} }
  else { if(vid){vid.style.display='none';vid.src='';} if(img){img.src=url;img.style.display='block';} }
 }
@@ -963,6 +971,27 @@ function closeLightbox() {
  if (vid){vid.pause();vid.src='';}
 }
 function lightboxDownload() { downloadMedia(_lightboxUrl,_lightboxName,_lightboxType); }
+
+async function lightboxShare() {
+  try {
+    const resp = await fetch(_lightboxUrl);
+    const blob = await resp.blob();
+    const ext = _lightboxType==='video'?'.mp4':'.jpg';
+    const filename = _lightboxName.includes('.')?_lightboxName:_lightboxName+ext;
+    const file = new File([blob], filename, { type: blob.type });
+    if (navigator.share && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+    } else {
+      window.open(_lightboxUrl, '_blank');
+    }
+  } catch(e) { window.open(_lightboxUrl, '_blank'); }
+}
+
+function lightboxDelete() {
+  if (!_lightboxMsgKey) return;
+  closeLightbox();
+  deleteMessage(_lightboxMsgKey);
+}
 function downloadMedia(url, name, type) {
  const ext = type==='video'?'.mp4':'.jpg';
  const filename = name.includes('.')?name:name+ext;
