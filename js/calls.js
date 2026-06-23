@@ -494,23 +494,28 @@ function _showMediaBlockedHelp(type) {
 
 let _ringtoneCtx = null;
 let _ringtoneInterval = null;
+let _ringing = false;
 
 function _playRingtone() {
+  _ringing = true;
+  _stopRingtone();
   try {
-    _stopRingtone();
-    _ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    _ringtoneCtx = ctx;
     let beat = 0;
     const playBeat = () => {
-      if (!_ringtoneCtx) return;
-      const osc = _ringtoneCtx.createOscillator();
-      const gain = _ringtoneCtx.createGain();
-      osc.connect(gain); gain.connect(_ringtoneCtx.destination);
-      osc.frequency.value = beat % 2 === 0 ? 880 : 660;
-      gain.gain.setValueAtTime(0.15, _ringtoneCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, _ringtoneCtx.currentTime + 0.4);
-      osc.start(_ringtoneCtx.currentTime);
-      osc.stop(_ringtoneCtx.currentTime + 0.4);
-      beat++;
+      if (!_ringing || ctx.state === 'closed') { clearInterval(_ringtoneInterval); _ringtoneInterval = null; return; }
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = beat % 2 === 0 ? 880 : 660;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+        beat++;
+      } catch(e) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
     };
     playBeat();
     _ringtoneInterval = setInterval(playBeat, 800);
@@ -518,6 +523,7 @@ function _playRingtone() {
 }
 
 function _stopRingtone() {
+  _ringing = false;
   if (_ringtoneInterval) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
   if (_ringtoneCtx) {
     try { _ringtoneCtx.suspend(); } catch(e) {}
