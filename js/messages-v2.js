@@ -24,7 +24,7 @@ async function compressImage(blob, maxWidth = 1280, quality = 0.82) {
   });
 }
 
-const PAGE_SIZE = 20;
+
 let _oldestMsgKey = null;
 let _allLoaded = false;
 let _currentMsgPath = null;
