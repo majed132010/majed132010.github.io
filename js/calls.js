@@ -517,7 +517,7 @@ function _playRingtone() {
         osc.start(ctx.currentTime + offset);
         osc.stop(ctx.currentTime + offset + 0.4);
       });
-      setTimeout(() => { try { ctx.close(); } catch(e) {} _ringtoneCtx = null; }, 1200);
+      setTimeout(() => { if (ctx.state !== 'closed') { try { ctx.close(); } catch(e) {} } _ringtoneCtx = null; }, 1200);
     } catch(e) {}
     if (_ringing) _ringtoneInterval = setTimeout(_beep, 1500);
   }
@@ -528,7 +528,7 @@ function _stopRingtone() {
   _ringing = false;
   if (_ringtoneInterval) { clearTimeout(_ringtoneInterval); _ringtoneInterval = null; }
   if (_ringtoneCtx) {
-    try { _ringtoneCtx.close(); } catch(e) {}
+    if (_ringtoneCtx.state !== 'closed') { try { _ringtoneCtx.close(); } catch(e) {} }
     _ringtoneCtx = null;
   }
 }
