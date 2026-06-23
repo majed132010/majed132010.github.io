@@ -1,5 +1,30 @@
 // ════ MESSAGES ════
 const PAGE_SIZE = 20;
+
+// ════ ضغط الصور قبل الرفع ════
+async function compressImage(blob, maxWidth = 1280, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width <= maxWidth) { resolve(blob); return; }
+      const ratio = maxWidth / width;
+      width = maxWidth;
+      height = Math.round(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(compressed => resolve(compressed || blob), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+    img.src = url;
+  });
+}
+
+const PAGE_SIZE = 20;
 let _oldestMsgKey = null;
 let _allLoaded = false;
 let _currentMsgPath = null;
@@ -76,8 +101,8 @@ function showMessages(sid, cid) {
  if (!(activeSid === sid && activeCid === cid)) {
       // ✅ حماية ضد التكرار باستخدام _lastNotifSet من notifications.js
       const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || 0);
-     if (typeof _lastChannelNotifSet !== 'undefined' && _lastChannelNotifSet.has(tag)) return;
-if (typeof _lastChannelNotifSet !== 'undefined') _lastChannelNotifSet.add(tag);
+      if (typeof _lastNotifSet !== 'undefined' && _lastNotifSet.has(tag)) return;
+      if (typeof _lastNotifSet !== 'undefined') _lastNotifSet.add(tag);
       showInAppNotif(msg, sid, cid);
     }
  }
@@ -296,7 +321,6 @@ function buildMsgDiv(msg, key) {
 
  const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
  _attachContextBar(div, body, [
-  { icon: '😊', label: 'تفاعل', fn: () => showReactionPicker(key, div) },
  { icon: '↩️', label: 'رد', fn: () => setReply(key, msg.name, msg.text) },
  { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
  { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
@@ -485,6 +509,16 @@ async function sendMessage() {
 
 // ════ رفع ملف واحد ════
 async function _uploadOneMedia(m, msgBase) {
+ // ✅ ضغط الصور قبل الرفع
+ if (m.type === "image") {
+   try {
+     const compressed = await compressImage(m.blob);
+     if (compressed.size < m.blob.size) {
+       console.log("[compress] " + Math.round(m.blob.size/1024) + "KB → " + Math.round(compressed.size/1024) + "KB");
+       m = { ...m, blob: compressed, mimeType: "image/jpeg", name: m.name.replace(/\.[^.]+$/, ".jpg") };
+     }
+   } catch(e) { console.warn("[compress] فشل الضغط:", e); }
+ }
  const _sid = currentServer, _cid = currentChannel;
  const msgPath = 'messages/' + _sid + '/' + _cid;
  const _guardTimer = setTimeout(() => { window._sendingMedia = false; }, 15000);
