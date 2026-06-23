@@ -1417,7 +1417,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 .mc-icon  { font-size: 19px; line-height: 1; }
 .mc-label {
   font-size: 10px;
-  color: rgba(255,255,255,0.85);
+  color: #ffffff !important;
   font-family: Tajawal, sans-serif;
   white-space: nowrap;
   font-weight: 600;
