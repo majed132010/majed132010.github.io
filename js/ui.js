@@ -119,7 +119,7 @@ function installPWA() {
   }
 }
 
-// ════ Service Workers — مُصلح ════
+// ════ Service Workers ════
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
@@ -127,17 +127,33 @@ if ('serviceWorker' in navigator) {
       const swReg = await navigator.serviceWorker.register('/sw.js');
       console.log('✅ SW registered:', swReg.scope);
 
-      // سجّل firebase-messaging-sw.js لـ FCM
+      // سجّل firebase-messaging-sw.js يدوياً وأجبره على التفعيل فوراً
       const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       console.log('✅ FCM SW registered:', fcmReg.scope);
 
-      // أعطِ FCM الـ registration الصحيح عند getToken
+      // أجبره على تخطي الانتظار إذا كان في حالة waiting
+      if (fcmReg.waiting) {
+        fcmReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      fcmReg.addEventListener('updatefound', () => {
+        const newWorker = fcmReg.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed') {
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        }
+      });
+
+      // مرر التسجيل لـ FCM getToken
       window._fcmSwRegistration = fcmReg;
     } catch(err) {
       console.warn('SW registration error:', err);
     }
   });
 }
+
 // ════ No-op stubs (للتوافق) ════
 function mobGoto(){}
 function mobSetActive(){}
