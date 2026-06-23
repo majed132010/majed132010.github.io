@@ -50,7 +50,8 @@
 </div>
 
 <!-- Drawer Overlay (mobile) -->
-<div id="drawerOverlay" onclick="closeDrawer()"></div>
+<div id="drawerOverlay" onclick="if(isMobile())_setMobState(_mobState-1);else closeDrawer();"></div>
+<div id="mobSwipeTab" onclick="_setMobState(1)" title="اسحب لفتح القائمة">‹</div>
 
 <!-- ════ APP ════ -->
 <div id="app">
