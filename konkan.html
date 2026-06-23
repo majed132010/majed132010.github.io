@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a1f12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🃏 الكونكان</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a5f3c;
+            --primary-light: #2d8a5a;
+            --primary-dark: #0f3d24;
+            --accent: #c9a227;
+            --accent-light: #e8d16d;
+            --danger: #c0392b;
+            --danger-light: #e74c3c;
+            --bg: #0a1f12;
+            --card-bg: #143d26;
+            --card-bg-light: #1a4d30;
+            --text: #e8f5e9;
+            --text-muted: #8fbc8f;
+            --border: #2d6a3e;
+            --winner: #ffd700;
+            --winner-bg: rgba(255, 215, 0, 0.15);
+            --jail: #e74c3c;
+            --jail-bg: rgba(231, 76, 60, 0.12);
+            --radius: 14px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.35);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { font-family: 'Tajawal', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        body { padding: 8px; }
+        .container { max-width: 100%; margin: 0 auto; }
+
+        .header { text-align: center; padding: 10px 6px 6px; margin-bottom: 8px; position: relative; }
+        .header h1 { font-size: 1.5rem; font-weight: 900; color: var(--accent); text-shadow: 0 2px 12px rgba(201, 162, 39, 0.35); letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 6px; }
+        .header p { color: var(--text-muted); font-size: 0.7rem; margin-top: 2px; }
+        .header-actions { position: absolute; left: 0; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
+        .icon-btn { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--text-muted); font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .icon-btn:active { transform: scale(0.9); border-color: var(--accent); color: var(--accent); }
+
+        .setup-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+        .setup-title { font-size: 0.9rem; font-weight: 800; color: var(--accent-light); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .players-input { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .player-name-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; text-align: center; }
+        .player-name-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15); }
+        .player-name-input::placeholder { color: var(--text-muted); opacity: 0.5; }
+        .setup-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .setup-label { font-size: 0.82rem; font-weight: 700; color: var(--accent-light); white-space: nowrap; }
+        .setup-number-input { width: 80px; padding: 10px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 1rem; font-weight: 700; text-align: center; }
+        .setup-number-input:focus { outline: none; border-color: var(--accent); }
+        .setup-desc { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+
+        .btn { padding: 10px 16px; border: none; border-radius: 12px; font-family: 'Tajawal', sans-serif; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 5px; touch-action: manipulation; }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-light), var(--primary)); color: white; box-shadow: 0 3px 12px rgba(26, 95, 60, 0.4); width: 100%; }
+        .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); font-size: 0.78rem; padding: 7px 12px; }
+        .btn-outline:active { border-color: var(--accent); color: var(--accent); }
+        .btn-danger { background: linear-gradient(135deg, var(--danger-light), var(--danger)); color: white; box-shadow: 0 3px 12px rgba(192, 57, 43, 0.4); }
+        .btn-accent { background: linear-gradient(135deg, var(--accent-light), var(--accent)); color: var(--primary-dark); box-shadow: 0 3px 12px rgba(201, 162, 39, 0.4); }
+        .btn-small { padding: 7px 12px; font-size: 0.78rem; }
+        .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); font-size: 0.75rem; padding: 6px 10px; }
+        .btn-ghost:active { border-color: var(--accent); color: var(--accent); }
+        .setup-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+        .game-board { display: none; }
+        .game-board.active { display: block; }
+
+        .target-banner { background: linear-gradient(135deg, rgba(201,162,39,0.15), rgba(201,162,39,0.05)); border: 1.5px solid rgba(201,162,39,0.3); border-radius: 12px; padding: 8px 14px; text-align: center; margin-bottom: 8px; font-size: 0.8rem; font-weight: 700; color: var(--accent-light); }
+        .target-banner span { color: var(--winner); font-size: 1.1rem; }
+
+        .stats-bar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
+        .stat-pill { background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); box-shadow: var(--shadow); }
+        .stat-pill span { color: var(--accent-light); font-weight: 800; }
+        .stat-pill.winner-pill { background: var(--winner-bg); border-color: rgba(255, 215, 0, 0.3); color: var(--winner); }
+        .stat-pill.danger-pill { background: var(--jail-bg); border-color: rgba(231,76,60,0.3); color: var(--jail); }
+        .stat-pill.resha-pill { background: var(--winner-bg); border-color: rgba(255, 215, 0, 0.3); color: var(--winner); }
+
+        .round-entry { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+        .round-entry::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary)); opacity: 0.6; }
+        .round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .round-title { font-size: 0.95rem; font-weight: 800; color: var(--accent-light); }
+        .round-number { background: linear-gradient(135deg, var(--accent-light), var(--accent)); color: var(--primary-dark); padding: 3px 12px; border-radius: 20px; font-weight: 900; font-size: 0.78rem; box-shadow: 0 2px 8px rgba(201, 162, 39, 0.3); }
+
+        .quick-fill-bar { display: flex; gap: 5px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; align-items: center; }
+        .quick-fill-bar::-webkit-scrollbar { display: none; }
+        .quick-fill-label { font-size: 0.65rem; color: var(--text-muted); padding: 6px 2px; flex-shrink: 0; font-weight: 700; }
+        .quick-fill-btn { flex-shrink: 0; min-width: 46px; height: 38px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card-bg-light); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.82rem; font-weight: 800; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .quick-fill-btn::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background 0.15s; }
+        .quick-fill-btn:active::after { background: rgba(255,255,255,0.1); }
+        .quick-fill-btn:active { transform: scale(0.93); }
+        .quick-fill-btn.negative { color: #ff7b7b; border-color: rgba(255, 107, 107, 0.3); }
+        .quick-fill-btn.zero { color: #999; }
+        .quick-fill-btn.positive { color: var(--accent-light); border-color: rgba(201, 162, 39, 0.3); }
+
+        .player-row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; margin-bottom: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; position: relative; }
+        .player-row:active { border-color: var(--primary-light); }
+        .player-row.winner-highlight { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.15); }
+        .player-row.jail-highlight { border-color: var(--danger); box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.15); }
+        .player-row.resha-highlight { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2); background: var(--winner-bg); }
+        .player-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-light), var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; border: 2px solid var(--border); }
+        .player-name { min-width: 55px; max-width: 80px; font-weight: 700; font-size: 0.75rem; color: var(--accent-light); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+        .player-input { width: 52px; height: 36px; padding: 0 4px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.85rem; font-weight: 700; text-align: center; transition: all 0.15s; flex-shrink: 0; }
+        .player-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15); }
+        .player-input.negative { color: #ff7b7b; }
+        .player-input.positive { color: var(--accent-light); }
+        .player-input.zero { color: #888; }
+        .player-quick-btns { display: flex; gap: 3px; flex: 1; justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
+        .player-quick-btns::-webkit-scrollbar { display: none; }
+        .pqb { min-width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg-light); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; overflow: hidden; }
+        .pqb::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background 0.1s; }
+        .pqb:active::after { background: rgba(255,255,255,0.12); }
+        .pqb:active { transform: scale(0.9); }
+        .pqb.negative { color: #ff7b7b; border-color: rgba(255,107,107,0.25); }
+        .pqb.zero { color: #888; }
+        .pqb.positive { color: var(--accent-light); border-color: rgba(201,162,39,0.25); }
+        .player-status-tag { font-size: 0.58rem; font-weight: 900; padding: 1px 6px; border-radius: 6px; flex-shrink: 0; white-space: nowrap; }
+        .status-resha { background: var(--accent); color: var(--primary-dark); }
+        .status-jail { background: var(--danger); color: white; }
+        .round-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .round-actions .btn { flex: 1; }
+        .input-hint { font-size: 0.62rem; color: var(--text-muted); text-align: center; margin-top: 4px; }
+
+        .scoreboard { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow); overflow-x: auto; }
+        .scoreboard-title { font-size: 0.95rem; font-weight: 800; color: var(--accent-light); margin-bottom: 10px; text-align: center; }
+        .score-table { width: 100%; border-collapse: collapse; min-width: 280px; font-size: 0.72rem; }
+        .score-table th, .score-table td { padding: 7px 4px; text-align: center; border-bottom: 1px solid rgba(45, 106, 62, 0.25); }
+        .score-table th { background: var(--primary-dark); color: var(--accent-light); font-weight: 700; font-size: 0.68rem; position: sticky; top: 0; }
+        .score-table td { font-weight: 500; }
+        .score-table .player-name-cell { font-weight: 700; color: var(--accent-light); text-align: right; padding-right: 8px; min-width: 65px; }
+        .score-table .total-cell { font-weight: 900; font-size: 0.82rem; color: var(--text); }
+        .score-table .winner-row { background: var(--winner-bg) !important; }
+        .score-table .winner-row .player-name-cell { color: var(--winner); }
+        .score-table .winner-row .total-cell { color: var(--winner); }
+        .score-table .jail-row { background: var(--jail-bg) !important; }
+        .score-table .jail-row .player-name-cell { color: var(--jail); }
+        .score-table .jail-row .total-cell { color: var(--jail); }
+        .winner-badge { display: inline-flex; align-items: center; gap: 2px; background: var(--accent); color: var(--primary-dark); padding: 1px 5px; border-radius: 6px; font-size: 0.58rem; font-weight: 900; margin-left: 4px; }
+        .jail-badge { display: inline-flex; align-items: center; gap: 2px; background: var(--danger); color: white; padding: 1px 5px; border-radius: 6px; font-size: 0.58rem; font-weight: 900; margin-left: 4px; }
+        .score-value { font-family: 'Courier New', monospace; font-weight: 700; }
+        .score-value.negative { color: #ff7b7b; }
+        .score-value.positive { color: var(--accent-light); }
+        .score-value.zero { color: #888; }
+        .delete-round-btn { background: none; border: none; color: var(--danger-light); cursor: pointer; font-size: 0.72rem; padding: 2px; border-radius: 4px; opacity: 0.4; transition: all 0.15s; }
+        .delete-round-btn:active { opacity: 1; background: rgba(231,76,60,0.1); }
+        .empty-state { text-align: center; padding: 28px 12px; color: var(--text-muted); font-size: 0.78rem; }
+        .empty-state .icon { font-size: 2.2rem; margin-bottom: 6px; opacity: 0.35; }
+
+        .archive-btn { width: 100%; margin-top: 8px; }
+        .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; padding: 8px 0; }
+        .archive-item { background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 6px; text-align: center; cursor: pointer; transition: all 0.15s; }
+        .archive-item:active { transform: scale(0.95); border-color: var(--accent); }
+        .archive-item-num { font-size: 1.1rem; font-weight: 900; color: var(--accent-light); }
+        .archive-item-label { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 16px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 380px; max-height: 85vh; overflow-y: auto; padding: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); animation: modalIn 0.25s ease-out; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .modal-title { font-size: 1.05rem; font-weight: 800; color: var(--accent-light); }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); color: var(--text-muted); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .modal-close:active { border-color: var(--danger); color: var(--danger-light); }
+
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid rgba(45, 106, 62, 0.2); }
+        .setting-label { font-size: 0.82rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .setting-desc { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+        .toggle-switch { width: 48px; height: 26px; border-radius: 13px; background: var(--bg); border: 1.5px solid var(--border); position: relative; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+        .toggle-switch.on { background: var(--primary-light); border-color: var(--primary-light); }
+        .toggle-switch .knob { width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); position: absolute; top: 2px; right: 2px; transition: all 0.2s; }
+        .toggle-switch.on .knob { right: 24px; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+
+        .round-detail-players { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+        .round-detail-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); }
+        .round-detail-item.winner { border-color: var(--accent); background: var(--winner-bg); }
+        .round-detail-item.jail { border-color: var(--danger); background: var(--jail-bg); }
+        .round-detail-name { font-weight: 700; font-size: 0.85rem; color: var(--accent-light); }
+        .round-detail-score { font-family: 'Courier New', monospace; font-weight: 900; font-size: 1rem; }
+        .round-detail-score.negative { color: #ff7b7b; }
+        .round-detail-score.positive { color: var(--accent-light); }
+        .round-detail-score.zero { color: #888; }
+        .round-detail-total { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; text-align: center; }
+
+        /* ===== GAME OVER CONFIRM MODAL ===== */
+        .gameover-modal { background: var(--card-bg); border: 2px solid var(--accent); border-radius: var(--radius); width: 100%; max-width: 360px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.7); animation: modalIn 0.3s ease-out; text-align: center; }
+        .gameover-title { font-size: 1.3rem; font-weight: 900; color: var(--accent-light); margin-bottom: 16px; }
+        .gameover-status { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .gameover-resha { background: var(--winner-bg); border: 1.5px solid var(--accent); border-radius: 12px; padding: 10px; font-size: 1rem; font-weight: 800; color: var(--winner); }
+        .gameover-jail { background: var(--jail-bg); border: 1.5px solid var(--danger); border-radius: 12px; padding: 8px; font-size: 0.85rem; font-weight: 700; color: var(--jail); }
+        .gameover-actions { display: flex; gap: 10px; }
+        .gameover-actions .btn { flex: 1; }
+
+        /* ===== CELEBRATION ===== */
+        .celebration-overlay { position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); }
+        .celebration-overlay.active { display: flex; }
+        .celebration-card { text-align: center; padding: 20px 24px; animation: celebrateIn 0.6s ease-out; width: 100%; max-width: 400px; }
+        @keyframes celebrateIn { from { opacity: 0; transform: scale(0.3) rotate(-5deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+        .celebration-crown { font-size: 3.5rem; margin-bottom: 8px; animation: crownBounce 1.2s ease-in-out infinite; }
+        @keyframes crownBounce { 0%, 100% { transform: translateY(0) rotate(-8deg) scale(1); } 50% { transform: translateY(-20px) rotate(8deg) scale(1.1); } }
+        .celebration-title { font-size: 1.2rem; font-weight: 900; color: var(--winner); margin-bottom: 4px; text-shadow: 0 2px 15px rgba(255, 215, 0, 0.5); }
+        .celebration-resha-name {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: white;
+            margin: 12px 0;
+            animation: dance 1.5s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.6), 0 0 60px rgba(255, 215, 0, 0.3);
+            letter-spacing: 1px;
+        }
+        @keyframes dance {
+            0% { transform: translateY(0) scale(1) rotate(0deg); }
+            20% { transform: translateY(-8px) scale(1.05) rotate(-2deg); }
+            40% { transform: translateY(0) scale(1) rotate(0deg); }
+            60% { transform: translateY(-5px) scale(1.03) rotate(2deg); }
+            80% { transform: translateY(-10px) scale(1.08) rotate(-1deg); }
+            100% { transform: translateY(0) scale(1) rotate(0deg); }
+        }
+        .celebration-score { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 16px; }
+        .celebration-jail-list { margin: 12px 0 20px; padding: 10px; background: var(--jail-bg); border: 1px solid rgba(231,76,60,0.3); border-radius: 10px; }
+        .celebration-jail-title { font-size: 0.8rem; font-weight: 800; color: var(--jail); margin-bottom: 6px; }
+        .celebration-jail-item { font-size: 0.72rem; color: var(--text-muted); padding: 2px 0; }
+        .celebration-btn { padding: 12px 36px; border-radius: 14px; border: none; background: linear-gradient(135deg, var(--accent-light), var(--accent)); color: var(--primary-dark); font-family: 'Tajawal', sans-serif; font-size: 1.05rem; font-weight: 900; cursor: pointer; box-shadow: 0 4px 25px rgba(201, 162, 39, 0.5); animation: btnPulse 2s ease-in-out infinite; }
+        .celebration-btn:active { transform: scale(0.95); }
+        @keyframes btnPulse { 0%, 100% { box-shadow: 0 4px 25px rgba(201, 162, 39, 0.5); } 50% { box-shadow: 0 4px 40px rgba(201, 162, 39, 0.8); } }
+        #confettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 2999; }
+
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--primary-dark); color: var(--accent-light); padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 0.82rem; box-shadow: 0 6px 24px rgba(0,0,0,0.5); border: 1px solid var(--accent); z-index: 1000; transition: transform 0.3s ease; pointer-events: none; white-space: nowrap; }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+        .slide-in { animation: slideIn 0.25s ease-out; }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(201, 162, 39, 0); } 50% { box-shadow: 0 0 0 8px rgba(201, 162, 39, 0.1); } }
+        .pulse-glow { animation: pulseGlow 0.4s ease-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .shake { animation: shake 0.3s ease-in-out; }
+
+        ::-webkit-scrollbar { width: 3px; height: 3px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        @media (min-width: 480px) {
+            .player-name { min-width: 70px; max-width: 100px; font-size: 0.82rem; }
+            .player-input { width: 60px; height: 40px; font-size: 0.9rem; }
+            .pqb { min-width: 38px; height: 36px; font-size: 0.78rem; }
+            .header h1 { font-size: 1.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-actions">
+                <button class="icon-btn" onclick="openSettings()" title="الإعدادات">⚙️</button>
+            </div>
+            <h1>🃏 الكونكان</h1>
+            <p>أقل سكور = الفائز</p>
+        </div>
+
+        <div id="setupSection" class="setup-card fade-in">
+            <div class="setup-title">👥 أسماء اللاعبين</div>
+            <div class="players-input" id="playersInputContainer">
+                <input type="text" class="player-name-input" placeholder="اللاعب 1" data-index="0">
+                <input type="text" class="player-name-input" placeholder="اللاعب 2" data-index="1">
+                <input type="text" class="player-name-input" placeholder="اللاعب 3" data-index="2">
+            </div>
+            <div class="setup-row">
+                <div>
+                    <div class="setup-label">🎯 نقطة النهاية</div>
+                    <div class="setup-desc">عند وصول أي لاعب لهذا الرقم تنتهي اللعبة</div>
+                </div>
+                <input type="number" class="setup-number-input" id="targetScore" value="700" min="50" max="5000" step="50">
+            </div>
+            <div class="setup-actions">
+                <button class="btn btn-outline btn-small" onclick="addPlayer()">➕ لاعب</button>
+                <button class="btn btn-outline btn-small" onclick="removePlayer()">➖ لاعب</button>
+                <button class="btn btn-primary" onclick="startGame()">🚀 ابدأ اللعبة</button>
+            </div>
+        </div>
+
+        <div id="gameBoard" class="game-board">
+            <div class="target-banner" id="targetBanner">🎯 الهدف: الوصول لـ <span id="targetDisplay">700</span> نقطة</div>
+            <div class="stats-bar" id="statsBar"></div>
+
+            <div class="round-entry fade-in">
+                <div class="round-header">
+                    <div class="round-title">🎯 تسجيل الجولة</div>
+                    <div class="round-number" id="roundNumber">ج1</div>
+                </div>
+                <div class="quick-fill-bar">
+                    <span class="quick-fill-label">⚡ للجميع:</span>
+                    <button class="quick-fill-btn negative" onclick="fillAll(-5)">-5</button>
+                    <button class="quick-fill-btn negative" onclick="fillAll(-30)">-30</button>
+                    <button class="quick-fill-btn negative" onclick="fillAll(-60)">-60</button>
+                    <button class="quick-fill-btn zero" onclick="fillAll(0)">0</button>
+                    <button class="quick-fill-btn positive" onclick="fillAll(25)">25</button>
+                    <button class="quick-fill-btn positive" onclick="fillAll(100)">100</button>
+                    <button class="quick-fill-btn positive" onclick="fillAll(125)">125</button>
+                    <button class="quick-fill-btn positive" onclick="fillAll(200)">200</button>
+                </div>
+                <div id="roundPlayersContainer"></div>
+                <div class="input-hint">💡 اضغط Enter للانتقال للاعب التالي</div>
+                <div class="round-actions">
+                    <button class="btn btn-primary" onclick="submitRound()">✅ حفظ الجولة</button>
+                    <button class="btn btn-outline btn-small" onclick="clearRoundInputs()">🔄 مسح</button>
+                </div>
+            </div>
+
+            <div class="scoreboard" id="scoreboardSection">
+                <div class="scoreboard-title">📊 النتائج</div>
+                <div style="overflow-x: auto;">
+                    <table class="score-table" id="scoreTable">
+                        <thead id="scoreTableHead"></thead>
+                        <tbody id="scoreTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <div class="icon">📋</div>
+                    <div>لم تُسجل أي جولة بعد</div>
+                </div>
+                <button class="btn btn-ghost archive-btn" onclick="openArchive()">📜 أرشيف الجولات</button>
+            </div>
+
+            <div class="bottom-actions">
+                <button class="btn btn-danger btn-small" onclick="confirmReset()">🗑️ إعادة</button>
+                <button class="btn btn-outline btn-small" onclick="goToSetup()">⚙️ تعديل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">⚙️ الإعدادات</div>
+                <button class="modal-close" onclick="closeSettings()">✕</button>
+            </div>
+            <div class="setting-item">
+                <div><div class="setting-label">🔊 الأصوات</div><div class="setting-desc">تأثيرات صوتية عند التسجيل والفوز</div></div>
+                <div class="toggle-switch on" id="soundToggle" onclick="toggleSetting('sound')"><div class="knob"></div></div>
+            </div>
+            <div class="setting-item">
+                <div><div class="setting-label">📳 الاهتزاز</div><div class="setting-desc">اهتزاز عند الضغط على الأزرار</div></div>
+                <div class="toggle-switch on" id="hapticToggle" onclick="toggleSetting('haptic')"><div class="knob"></div></div>
+            </div>
+            <div class="setting-item">
+                <div><div class="setting-label">🎉 احتفال الفوز</div><div class="setting-desc">عرض شاشة احتفال عند انتهاء اللعبة</div></div>
+                <div class="toggle-switch on" id="celebrationToggle" onclick="toggleSetting('celebration')"><div class="knob"></div></div>
+            </div>
+            <div class="setting-item">
+                <div><div class="setting-label">💾 الحفظ التلقائي</div><div class="setting-desc">حفظ اللعبة تلقائياً في المتصفح</div></div>
+                <div class="toggle-switch on" id="autosaveToggle" onclick="toggleSetting('autosave')"><div class="knob"></div></div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 8px;">
+                <button class="btn btn-danger btn-small" style="flex:1;" onclick="clearSavedGame()">🗑️ مسح الحفظ</button>
+                <button class="btn btn-accent btn-small" style="flex:1;" onclick="testSound()">🔔 اختبار الصوت</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archive Modal -->
+    <div class="modal-overlay" id="archiveModal" onclick="closeArchive(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">📜 أرشيف الجولات</div>
+                <button class="modal-close" onclick="closeArchive()">✕</button>
+            </div>
+            <div id="archiveContent"></div>
+        </div>
+    </div>
+
+    <!-- Round Detail Modal -->
+    <div class="modal-overlay" id="roundDetailModal" onclick="closeRoundDetail(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="roundDetailTitle">تفاصيل الجولة</div>
+                <button class="modal-close" onclick="closeRoundDetail()">✕</button>
+            </div>
+            <div id="roundDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- Game Over Confirm Modal -->
+    <div class="modal-overlay" id="gameOverModal" onclick="event.stopPropagation()">
+        <div class="gameover-modal" onclick="event.stopPropagation()">
+            <div class="gameover-title">🏁 انتهت اللعبة!</div>
+            <div class="gameover-status" id="gameOverStatus"></div>
+            <div class="gameover-actions">
+                <button class="btn btn-primary" onclick="confirmGameOver()">✅ تأكيد</button>
+                <button class="btn btn-outline" onclick="undoLastRound()">↩️ تراجع عن آخر جولة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Winner Celebration -->
+    <div class="celebration-overlay" id="celebrationOverlay" onclick="event.stopPropagation()">
+        <canvas id="confettiCanvas"></canvas>
+        <div class="celebration-card" onclick="event.stopPropagation()">
+            <div class="celebration-crown">👑</div>
+            <div class="celebration-title">🎉 انتهت اللعبة!</div>
+            <div class="celebration-resha-name" id="celebrationReshaName">---</div>
+            <div class="celebration-score" id="celebrationScore">---</div>
+            <div id="celebrationJailList"></div>
+            <button class="celebration-btn" onclick="closeCelebrationAndReset()">🎮 لعبة جديدة</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let players = [];
+        let rounds = [];
+        let currentRoundInputs = {};
+        let targetScore = 700;
+        let gameEnded = false;
+        let settings = { sound: true, haptic: true, celebration: true, autosave: true };
+        let audioCtx = null;
+        const AVATARS = ['🎩','🧢','👑','🎭','🎪','🎯','🎲','🎰'];
+        const QUICK_VALUES = [-5, -30, -60, 0, 25, 100, 125, 200];
+
+        function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playTone(freq, duration, type, volume) {
+            if (!settings.sound || !audioCtx) return;
+            try { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); gain.gain.setValueAtTime(volume, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); } catch(e){}
+        }
+        function playSound(type) {
+            initAudio();
+            switch(type) {
+                case 'click': playTone(800, 0.08, 'sine', 0.15); break;
+                case 'fill': playTone(600, 0.1, 'sine', 0.2); setTimeout(() => playTone(800, 0.1, 'sine', 0.2), 80); break;
+                case 'save': playTone(523, 0.12, 'sine', 0.25); setTimeout(() => playTone(659, 0.12, 'sine', 0.25), 100); setTimeout(() => playTone(784, 0.15, 'sine', 0.25), 200); break;
+                case 'delete': playTone(400, 0.15, 'sawtooth', 0.15); setTimeout(() => playTone(300, 0.15, 'sawtooth', 0.15), 100); break;
+                case 'winner': [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => playTone(f, 0.2, 'sine', 0.3), i * 120)); break;
+                case 'error': playTone(200, 0.2, 'square', 0.15); break;
+                case 'celebrate': [523, 659, 784, 1047, 784, 1047, 1319, 1047].forEach((f, i) => setTimeout(() => playTone(f, 0.22, 'sine', 0.3), i * 110)); break;
+                case 'test': playTone(440, 0.15, 'sine', 0.3); setTimeout(() => playTone(554, 0.15, 'sine', 0.3), 150); setTimeout(() => playTone(659, 0.2, 'sine', 0.3), 300); break;
+                case 'gameover': [300, 250, 200].forEach((f, i) => setTimeout(() => playTone(f, 0.3, 'sawtooth', 0.2), i * 200)); break;
+                case 'fanfare': [392, 523, 659, 784, 659, 784, 1047].forEach((f, i) => setTimeout(() => playTone(f, 0.25, 'sine', 0.35), i * 130)); break;
+            }
+        }
+
+        function haptic(type) {
+            if (!settings.haptic) return;
+            try { if (navigator.vibrate) { if (type === 'light') navigator.vibrate(8); else if (type === 'medium') navigator.vibrate(15); else if (type === 'heavy') navigator.vibrate([30, 50, 30]); else if (type === 'success') navigator.vibrate([10, 30, 10]); else if (type === 'gameover') navigator.vibrate([50, 30, 50, 30, 50]); else if (type === 'celebrate') navigator.vibrate([20, 40, 20, 40, 20, 40, 60]); } } catch(e){}
+        }
+
+        function fireConfetti() {
+            const canvas = document.getElementById('confettiCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const particles = [];
+            const colors = ['#c9a227', '#ffd700', '#2d8a5a', '#e74c3c', '#3498db', '#e8d16d', '#1a5f3c', '#ff6b6b', '#4ecdc4'];
+            for (let i = 0; i < 150; i++) {
+                particles.push({ x: canvas.width/2 + (Math.random()-0.5)*80, y: canvas.height/2 - 30, vx: (Math.random()-0.5)*14, vy: -Math.random()*18 - 4, color: colors[Math.floor(Math.random()*colors.length)], size: Math.random()*7+3, rotation: Math.random()*Math.PI*2, rotSpeed: (Math.random()-0.5)*0.25, gravity: 0.25, life: 1 });
+            }
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+                particles.forEach(p => {
+                    if (p.life <= 0) return; alive = true;
+                    p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.rotation += p.rotSpeed; p.life -= 0.006; p.vx *= 0.99;
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore();
+                });
+                if (alive) requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        function saveGame() {
+            if (!settings.autosave) return;
+            try { localStorage.setItem('konkan_players', JSON.stringify(players)); localStorage.setItem('konkan_rounds', JSON.stringify(rounds)); localStorage.setItem('konkan_target', JSON.stringify(targetScore)); localStorage.setItem('konkan_settings', JSON.stringify(settings)); localStorage.setItem('konkan_gameEnded', JSON.stringify(gameEnded)); } catch(e){}
+        }
+        function loadGame() {
+            try { const sp = localStorage.getItem('konkan_players'); const sr = localStorage.getItem('konkan_rounds'); const st = localStorage.getItem('konkan_target'); const ss = localStorage.getItem('konkan_settings'); const se = localStorage.getItem('konkan_gameEnded'); if (sp) players = JSON.parse(sp); if (sr) rounds = JSON.parse(sr); if (st) targetScore = JSON.parse(st); if (ss) settings = JSON.parse(ss); if (se) gameEnded = JSON.parse(se); updateSettingsUI(); } catch(e){}
+        }
+        function clearSavedGame() { localStorage.removeItem('konkan_players'); localStorage.removeItem('konkan_rounds'); localStorage.removeItem('konkan_target'); localStorage.removeItem('konkan_gameEnded'); showToast('🗑️ تم مسح الحفظ'); playSound('delete'); }
+
+        function openSettings() { document.getElementById('settingsModal').classList.add('active'); playSound('click'); haptic('light'); }
+        function closeSettings(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('settingsModal').classList.remove('active'); }
+        function toggleSetting(key) { settings[key] = !settings[key]; updateSettingsUI(); saveGame(); playSound('click'); haptic('light'); }
+        function updateSettingsUI() { document.getElementById('soundToggle').classList.toggle('on', settings.sound); document.getElementById('hapticToggle').classList.toggle('on', settings.haptic); document.getElementById('celebrationToggle').classList.toggle('on', settings.celebration); document.getElementById('autosaveToggle').classList.toggle('on', settings.autosave); }
+        function testSound() { playSound('test'); haptic('success'); showToast('🔔 اختبار الصوت'); }
+
+        function addPlayer() { const container = document.getElementById('playersInputContainer'); const count = container.querySelectorAll('.player-name-input').length; if (count >= 8) { showToast('الحد الأقصى 8'); playSound('error'); return; } const input = document.createElement('input'); input.type = 'text'; input.className = 'player-name-input'; input.placeholder = `اللاعب ${count + 1}`; input.dataset.index = count; container.appendChild(input); input.focus(); playSound('click'); haptic('light'); }
+        function removePlayer() { const container = document.getElementById('playersInputContainer'); const inputs = container.querySelectorAll('.player-name-input'); if (inputs.length <= 3) { showToast('الحد الأدنى 3'); playSound('error'); return; } inputs[inputs.length - 1].remove(); playSound('click'); haptic('light'); }
+        function startGame() {
+            const container = document.getElementById('playersInputContainer');
+            const inputs = container.querySelectorAll('.player-name-input');
+            players = []; inputs.forEach((input, i) => { players.push(input.value.trim() || `اللاعب ${i + 1}`); });
+            if (players.length < 3) { showToast('3 لاعبين على الأقل'); playSound('error'); return; }
+            const targetInput = document.getElementById('targetScore');
+            targetScore = parseInt(targetInput.value) || 700;
+            if (targetScore < 50) targetScore = 50;
+            rounds = []; currentRoundInputs = {}; gameEnded = false;
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('gameBoard').classList.add('active');
+            document.getElementById('targetDisplay').textContent = targetScore;
+            renderRoundEntry(); renderScoreboard(); updateStats(); saveGame();
+            playSound('save'); haptic('success'); showToast(`🎮 ${players.length} لاعبين | الهدف: ${targetScore}`);
+        }
+        function goToSetup() { document.getElementById('gameBoard').classList.remove('active'); document.getElementById('setupSection').style.display = 'block'; const container = document.getElementById('playersInputContainer'); container.innerHTML = ''; players.forEach((name, i) => { const input = document.createElement('input'); input.type = 'text'; input.className = 'player-name-input'; input.value = name; input.placeholder = `اللاعب ${i + 1}`; input.dataset.index = i; container.appendChild(input); }); if (targetScore) document.getElementById('targetScore').value = targetScore; playSound('click'); haptic('light'); }
+
+        function renderRoundEntry() {
+            const container = document.getElementById('roundPlayersContainer');
+            container.innerHTML = '';
+            document.getElementById('roundNumber').textContent = `ج${rounds.length + 1}`;
+            if (gameEnded) {
+                const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+                const minTotal = Math.min(...totals);
+                const winnerIdx = totals.indexOf(minTotal);
+                container.innerHTML = '<div style="padding:20px;text-align:center;"><div style="font-size:2.5rem;margin-bottom:8px;">🏁</div><div style="font-weight:900;font-size:1.1rem;color:var(--accent-light);">انتهت اللعبة!</div><div style="font-size:0.9rem;color:var(--text-muted);margin-top:6px;">🪶 الريشة: ' + escapeHtml(players[winnerIdx]) + '</div></div>';
+                return;
+            }
+            players.forEach((player, i) => {
+                const row = document.createElement('div'); row.className = 'player-row'; row.id = `playerRow-${i}`;
+                let btnsHTML = '';
+                QUICK_VALUES.forEach(v => { const cls = v < 0 ? 'negative' : v > 0 ? 'positive' : 'zero'; btnsHTML += `<button class="pqb ${cls}" onclick="setPlayerValue(${i}, ${v})">${v}</button>`; });
+                row.innerHTML = `<div class="player-avatar">${AVATARS[i % AVATARS.length]}</div><div class="player-name" title="${escapeHtml(player)}">${escapeHtml(player)}</div><input type="number" class="player-input" id="roundInput-${i}" placeholder="0" oninput="onRoundInput(${i}, this.value)"><div class="player-quick-btns">${btnsHTML}</div>`;
+                container.appendChild(row);
+            });
+        }
+        function setPlayerValue(playerIndex, value) { if (gameEnded) return; const input = document.getElementById(`roundInput-${playerIndex}`); input.value = value; onRoundInput(playerIndex, value); input.focus(); input.classList.add('pulse-glow'); setTimeout(() => input.classList.remove('pulse-glow'), 400); playSound('click'); haptic('light'); }
+        function fillAll(value) { if (gameEnded) return; players.forEach((_, i) => setPlayerValue(i, value)); playSound('fill'); haptic('medium'); showToast(`✨ الجميع = ${value}`); }
+        function onRoundInput(playerIndex, value) { currentRoundInputs[playerIndex] = value === '' ? null : parseFloat(value); const input = document.getElementById(`roundInput-${playerIndex}`); input.classList.remove('negative', 'positive', 'zero'); const num = parseFloat(value); if (!isNaN(num)) { if (num < 0) input.classList.add('negative'); else if (num > 0) input.classList.add('positive'); else input.classList.add('zero'); } }
+        function clearRoundInputs() { if (gameEnded) return; players.forEach((_, i) => { const input = document.getElementById(`roundInput-${i}`); input.value = ''; input.classList.remove('negative', 'positive', 'zero'); currentRoundInputs[i] = null; }); playSound('delete'); haptic('light'); }
+
+        function submitRound() {
+            if (gameEnded) return;
+            const roundValues = []; let hasValue = false;
+            for (let i = 0; i < players.length; i++) {
+                const val = currentRoundInputs[i];
+                if (val !== null && val !== undefined && !isNaN(val)) { roundValues.push(val); hasValue = true; }
+                else { roundValues.push(0); }
+            }
+            if (!hasValue) { const firstInput = document.querySelector('.player-input'); if (firstInput) { firstInput.classList.add('shake'); setTimeout(() => firstInput.classList.remove('shake'), 300); } showToast('⚠️ أدخل سكوراً'); playSound('error'); haptic('heavy'); return; }
+            rounds.push(roundValues); currentRoundInputs = {};
+            renderRoundEntry(); renderScoreboard(); updateStats(); saveGame();
+            playSound('save'); haptic('success'); showToast(`✅ ج${rounds.length} محفوظة`);
+
+            const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+            const anyReached = totals.some(t => t >= targetScore);
+            if (anyReached) {
+                showGameOverConfirm();
+            }
+        }
+
+        function showGameOverConfirm() {
+            const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+            const minTotal = Math.min(...totals);
+            const winnerIdx = totals.indexOf(minTotal);
+            const winnerName = players[winnerIdx];
+            const jailNames = players.filter((_, i) => totals[i] >= targetScore && i !== winnerIdx);
+
+            let html = '';
+            // Jail players first
+            jailNames.forEach(name => {
+                const score = totals[players.indexOf(name)];
+                html += `<div class="gameover-jail">🔒 ${escapeHtml(name)} مسجون — ${score} نقطة</div>`;
+            });
+            // Winner
+            html += `<div class="gameover-resha">🪶 ${escapeHtml(winnerName)} الريشة — ${minTotal} نقطة</div>`;
+
+            document.getElementById('gameOverStatus').innerHTML = html;
+            document.getElementById('gameOverModal').classList.add('active');
+            playSound('gameover');
+            haptic('gameover');
+        }
+
+        function confirmGameOver() {
+            document.getElementById('gameOverModal').classList.remove('active');
+            gameEnded = true;
+            saveGame();
+            renderRoundEntry();
+            renderScoreboard();
+            updateStats();
+            setTimeout(() => { showCelebration(); }, 200);
+        }
+
+        function undoLastRound() {
+            document.getElementById('gameOverModal').classList.remove('active');
+            rounds.pop();
+            currentRoundInputs = {};
+            renderRoundEntry();
+            renderScoreboard();
+            updateStats();
+            saveGame();
+            playSound('delete');
+            haptic('medium');
+            showToast('↩️ تم التراجع عن آخر جولة');
+        }
+
+        function renderScoreboard() {
+            const thead = document.getElementById('scoreTableHead');
+            const tbody = document.getElementById('scoreTableBody');
+            const emptyState = document.getElementById('emptyState');
+            if (rounds.length === 0) { emptyState.style.display = 'block'; thead.innerHTML = ''; tbody.innerHTML = ''; return; }
+            emptyState.style.display = 'none';
+
+            const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+            const minTotal = Math.min(...totals);
+            const winnerIdx = totals.indexOf(minTotal);
+            const jailIndices = totals.map((t, i) => t >= targetScore && i !== winnerIdx ? i : -1).filter(i => i !== -1);
+
+            players.forEach((_, i) => {
+                const row = document.getElementById(`playerRow-${i}`);
+                if (row) {
+                    row.classList.remove('winner-highlight', 'jail-highlight', 'resha-highlight');
+                    if (gameEnded) { if (i === winnerIdx) row.classList.add('resha-highlight'); else if (jailIndices.includes(i)) row.classList.add('jail-highlight'); }
+                }
+            });
+
+            let headHTML = '<tr>'; headHTML += '<th>👤</th>';
+            rounds.forEach((_, r) => { headHTML += `<th><button class="delete-round-btn" onclick="deleteRound(${r})">🗑️</button>ج${r + 1}</th>`; });
+            headHTML += '<th>المجموع</th>'; headHTML += '</tr>'; thead.innerHTML = headHTML;
+
+            let bodyHTML = '';
+            players.forEach((player, i) => {
+                const isWinner = i === winnerIdx;
+                const isJail = totals[i] >= targetScore && !isWinner;
+                let rowClass = 'slide-in';
+                if (isWinner) rowClass = 'winner-row slide-in';
+                else if (isJail) rowClass = 'jail-row slide-in';
+                bodyHTML += `<tr class="${rowClass}">`;
+                let badge = '';
+                if (gameEnded) { if (isWinner) badge = '<span class="winner-badge">🪶 الريشة</span>'; else if (isJail) badge = '<span class="jail-badge">🔒 مسجون</span>'; }
+                else { if (isWinner) badge = '<span class="winner-badge">👑</span>'; }
+                bodyHTML += `<td class="player-name-cell">${badge}${escapeHtml(player)}</td>`;
+                rounds.forEach(round => { const val = round[i] || 0; const valClass = val < 0 ? 'negative' : val > 0 ? 'positive' : 'zero'; bodyHTML += `<td class="score-value ${valClass}">${val}</td>`; });
+                bodyHTML += `<td class="total-cell">${totals[i]}</td>`; bodyHTML += '</tr>';
+            });
+            tbody.innerHTML = bodyHTML;
+        }
+
+        function deleteRound(roundIndex) { if (gameEnded) { showToast('🏁 اللعبة منتهية'); playSound('error'); return; } if (!confirm(`حذف الجولة ${roundIndex + 1}؟`)) return; rounds.splice(roundIndex, 1); renderRoundEntry(); renderScoreboard(); updateStats(); saveGame(); playSound('delete'); haptic('medium'); showToast('🗑️ تم الحذف'); }
+
+        function updateStats() {
+            const statsBar = document.getElementById('statsBar');
+            if (rounds.length === 0) { statsBar.innerHTML = ''; return; }
+            const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+            const minTotal = Math.min(...totals);
+            const winnerIdx = totals.indexOf(minTotal);
+            const winnerName = players[winnerIdx];
+            const jailCount = totals.filter((t, i) => t >= targetScore && i !== winnerIdx).length;
+            let html = '';
+            if (gameEnded) { html += `<div class="stat-pill resha-pill">🪶 الريشة: <span>${escapeHtml(winnerName)}</span></div>`; if (jailCount > 0) html += `<div class="stat-pill danger-pill">🔒 مسجونين: <span>${jailCount}</span></div>`; }
+            else { html += `<div class="stat-pill winner-pill">🏆 <span>${escapeHtml(winnerName)}</span></div>`; }
+            html += `<div class="stat-pill">🎯 <span>${minTotal}</span></div>`;
+            html += `<div class="stat-pill">🔄 <span>${rounds.length}</span></div>`;
+            statsBar.innerHTML = html;
+        }
+
+        function openArchive() { const content = document.getElementById('archiveContent'); if (rounds.length === 0) { content.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="icon">📜</div><div>لا توجد جولات مسجلة</div></div>'; } else { let html = '<div class="archive-grid">'; rounds.forEach((_, i) => { html += `<div class="archive-item" onclick="showRoundDetail(${i})"><div class="archive-item-num">ج${i+1}</div><div class="archive-item-label">اضغط للتفاصيل</div></div>`; }); html += '</div>'; content.innerHTML = html; } document.getElementById('archiveModal').classList.add('active'); playSound('click'); haptic('light'); }
+        function closeArchive(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('archiveModal').classList.remove('active'); }
+
+        function showRoundDetail(roundIndex) {
+            const round = rounds[roundIndex];
+            const totalsUpToRound = players.map((_, i) => { let sum = 0; for (let r = 0; r <= roundIndex; r++) sum += (rounds[r][i] || 0); return sum; });
+            const minTotal = Math.min(...totalsUpToRound);
+            const winnerIdx = totalsUpToRound.indexOf(minTotal);
+            const jailAtRound = totalsUpToRound.map((t, i) => t >= targetScore && i !== winnerIdx ? i : -1).filter(i => i !== -1);
+            document.getElementById('roundDetailTitle').textContent = `🎯 تفاصيل الجولة ${roundIndex + 1}`;
+            let html = '<div class="round-detail-players">';
+            players.forEach((player, i) => { const val = round[i] || 0; const isWinner = i === winnerIdx; const isJail = jailAtRound.includes(i); const valClass = val < 0 ? 'negative' : val > 0 ? 'positive' : 'zero'; let status = ''; if (isWinner) status = ' 🪶 الريشة'; else if (isJail) status = ' 🔒 مسجون'; html += `<div class="round-detail-item ${isWinner ? 'winner' : isJail ? 'jail' : ''}"><div><div class="round-detail-name">${escapeHtml(player)}${status}</div></div><div class="round-detail-score ${valClass}">${val > 0 ? '+' : ''}${val}</div></div>`; });
+            html += '</div>';
+            html += `<div class="round-detail-total">📊 المجموع التراكمي بعد هذه الجولة: ${minTotal} (أقل سكور)</div>`;
+            document.getElementById('roundDetailContent').innerHTML = html;
+            document.getElementById('roundDetailModal').classList.add('active');
+            playSound('click'); haptic('light');
+        }
+        function closeRoundDetail(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('roundDetailModal').classList.remove('active'); }
+
+        function showCelebration() {
+            if (!settings.celebration) { showToast('🏁 انتهت اللعبة!'); return; }
+            const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0));
+            const minTotal = Math.min(...totals);
+            const winnerIdx = totals.indexOf(minTotal);
+            const winnerName = players[winnerIdx];
+            const jailNames = players.filter((_, i) => totals[i] >= targetScore && i !== winnerIdx);
+            document.getElementById('celebrationReshaName').textContent = winnerName;
+            document.getElementById('celebrationScore').innerHTML = `🪶 <span style="color:var(--winner);font-weight:900;">الريشة</span> | سكور: ${minTotal} | الهدف: ${targetScore}`;
+            let jailHTML = '';
+            if (jailNames.length > 0) { jailHTML = '<div class="celebration-jail-list"><div class="celebration-jail-title">🔒 المسجونين:</div>'; jailNames.forEach(name => { const score = totals[players.indexOf(name)]; jailHTML += `<div class="celebration-jail-item">${escapeHtml(name)} — ${score} نقطة</div>`; }); jailHTML += '</div>'; }
+            document.getElementById('celebrationJailList').innerHTML = jailHTML;
+            document.getElementById('celebrationOverlay').classList.add('active');
+            playSound('fanfare');
+            haptic('celebrate');
+            fireConfetti();
+        }
+        function closeCelebration() { document.getElementById('celebrationOverlay').classList.remove('active'); }
+        function closeCelebrationAndReset() { closeCelebration(); confirmReset(); }
+
+        function confirmReset() { if (confirm('إعادة اللعبة؟ سيتم حذف الجولات!')) { rounds = []; currentRoundInputs = {}; gameEnded = false; renderRoundEntry(); renderScoreboard(); updateStats(); saveGame(); playSound('delete'); haptic('heavy'); showToast('🔄 تمت الإعادة'); } }
+
+        function showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2200); }
+        function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.getElementById('gameBoard').classList.contains('active')) { if (e.target.classList.contains('player-input')) { const inputs = Array.from(document.querySelectorAll('.player-input')); const idx = inputs.indexOf(e.target); if (idx < inputs.length - 1) inputs[idx + 1].focus(); else submitRound(); } } });
+
+        loadGame(); updateSettingsUI();
+        if (players.length >= 3 && (rounds.length > 0 || gameEnded)) {
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('gameBoard').classList.add('active');
+            document.getElementById('targetDisplay').textContent = targetScore;
+            renderRoundEntry(); renderScoreboard(); updateStats();
+            if (gameEnded) { const totals = players.map((_, i) => rounds.reduce((sum, r) => sum + (r[i] || 0), 0)); const minTotal = Math.min(...totals); const winnerIdx = totals.indexOf(minTotal); showToast('🏁 اللعبة منتهية — الريشة: ' + players[winnerIdx]); }
+            else showToast('📂 تم استعادة اللعبة المحفوظة');
+        }
+    </script>
+</body>
+</html>
