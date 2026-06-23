@@ -416,3 +416,31 @@ function copyAdminCode() {
  const code = userProfile.adminCode || '';
  navigator.clipboard?.writeText(code).then(() => toast('📋 تم نسخ الكود: ' + code));
 }
+
+// ════ حذف الحساب ════
+function confirmDeleteAccount() {
+  closeModal('profileModal');
+  const confirmed = confirm('⚠️ هل أنت متأكد من حذف حسابك؟\n\nسيتم حذف جميع بياناتك (الملف الشخصي، الرسائل الخاصة) بشكل نهائي ولا يمكن التراجع.');
+  if (!confirmed) return;
+  deleteUserData();
+}
+
+async function deleteUserData() {
+  if (!currentUser) return;
+  const uid = currentUser.uid;
+  try {
+    toast('⏳ جاري حذف الحساب...');
+    await db.ref('users/' + uid).remove();
+    const dmSnap = await db.ref('dm_messages').once('value');
+    const dms = dmSnap.val() || {};
+    const dmDeletes = [];
+    Object.keys(dms).forEach(dmId => {
+      if (dmId.includes(uid)) dmDeletes.push(db.ref('dm_messages/' + dmId).remove());
+    });
+    await Promise.all(dmDeletes);
+    toast('✅ تم حذف بياناتك بنجاح');
+    setTimeout(() => { auth.signOut(); }, 1500);
+  } catch(e) {
+    toast('❌ فشل حذف الحساب: ' + (e.message || ''));
+  }
+}
