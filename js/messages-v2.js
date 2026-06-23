@@ -1030,7 +1030,7 @@ function _attachContextBar(div, body, actions, isMine) {
  const b = document.createElement('button');
  b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
  b.title = ac.label;
- b.innerHTML = `${ac.icon}${ac.label}`;
+ b.innerHTML = `<span class="mc-icon">${ac.icon}</span><span class="mc-label">${ac.label}</span>`;
  b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
  ctxBar.appendChild(b);
  });
