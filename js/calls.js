@@ -495,38 +495,39 @@ function _showMediaBlockedHelp(type) {
 let _ringtoneCtx = null;
 let _ringtoneInterval = null;
 let _ringing = false;
+let _ringtoneAudio = null;
 
 function _playRingtone() {
-  _ringing = true;
   _stopRingtone();
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    _ringtoneCtx = ctx;
-    let beat = 0;
-    const playBeat = () => {
-      if (!_ringing || ctx.state === 'closed') { clearInterval(_ringtoneInterval); _ringtoneInterval = null; return; }
-      try {
+  _ringing = true;
+
+  // نولّد نغمة رنين بسيطة بدون setInterval
+  function _beep() {
+    if (!_ringing) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      _ringtoneCtx = ctx;
+      [0, 0.5].forEach(offset => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = beat % 2 === 0 ? 880 : 660;
-        gain.gain.setValueAtTime(0.15, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-        beat++;
-      } catch(e) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
-    };
-    playBeat();
-    _ringtoneInterval = setInterval(playBeat, 800);
-  } catch(e) {}
+        osc.frequency.value = offset === 0 ? 880 : 660;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.4);
+        osc.start(ctx.currentTime + offset);
+        osc.stop(ctx.currentTime + offset + 0.4);
+      });
+      setTimeout(() => { try { ctx.close(); } catch(e) {} _ringtoneCtx = null; }, 1200);
+    } catch(e) {}
+    if (_ringing) _ringtoneInterval = setTimeout(_beep, 1500);
+  }
+  _beep();
 }
 
 function _stopRingtone() {
   _ringing = false;
-  if (_ringtoneInterval) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
+  if (_ringtoneInterval) { clearTimeout(_ringtoneInterval); _ringtoneInterval = null; }
   if (_ringtoneCtx) {
-    try { _ringtoneCtx.suspend(); } catch(e) {}
     try { _ringtoneCtx.close(); } catch(e) {}
     _ringtoneCtx = null;
   }
