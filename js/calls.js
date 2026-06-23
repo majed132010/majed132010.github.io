@@ -136,6 +136,8 @@ function listenIncomingCalls() {
 async function acceptCall() {
   if (!_call || _call.role !== 'callee') return;
   _stopRingtone();
+  setTimeout(_stopRingtone, 200);
+  setTimeout(_stopRingtone, 600);
   clearTimeout(_ringTimer);
   _detachListeners();
   const { callId, channelName, type, fromUid, fromName } = _call;
@@ -517,7 +519,11 @@ function _playRingtone() {
 
 function _stopRingtone() {
   if (_ringtoneInterval) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
-  if (_ringtoneCtx) { try { _ringtoneCtx.close(); } catch(e) {} _ringtoneCtx = null; }
+  if (_ringtoneCtx) {
+    try { _ringtoneCtx.suspend(); } catch(e) {}
+    try { _ringtoneCtx.close(); } catch(e) {}
+    _ringtoneCtx = null;
+  }
 }
 
 function acceptCallFromNotification(callId) {
