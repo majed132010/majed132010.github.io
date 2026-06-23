@@ -447,21 +447,28 @@
 
 
 <!-- Image Lightbox -->
-<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,0.95);flex-direction:column" onclick="closeLightbox()">
-  <!-- شريط أعلى مثل واتساب -->
-  <div onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);flex-shrink:0">
-    <button onclick="closeLightbox()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;opacity:0.85">✕</button>
-    <div id="lightboxName" style="color:#fff;font-family:Tajawal,sans-serif;font-size:15px;font-weight:600;opacity:0.9;flex:1;text-align:center;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-    <div style="display:flex;gap:4px">
-      <button onclick="event.stopPropagation();lightboxShare()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:6px 10px;opacity:0.85" title="مشاركة">↗️</button>
-      <button onclick="event.stopPropagation();lightboxDownload()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:6px 10px;opacity:0.85" title="تحميل">⬇️</button>
-      <button onclick="event.stopPropagation();lightboxDelete()" id="lightboxDelBtn" style="background:none;border:none;color:#ff4d4d;font-size:20px;cursor:pointer;padding:6px 10px;opacity:0.85;display:none" title="حذف">🗑️</button>
-    </div>
+<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:#000;flex-direction:column" onclick="closeLightbox()">
+  <!-- شريط أعلى مطابق للواتساب -->
+  <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px;padding:10px 8px;background:#1a1a1a;flex-shrink:0;direction:ltr">
+    <!-- زر الرجوع (يسار) -->
+    <button onclick="closeLightbox()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;display:flex;align-items:center">‹</button>
+    <!-- اسم الملف -->
+    <div id="lightboxName" style="color:#fff;font-family:Tajawal,sans-serif;font-size:16px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right"></div>
+    <!-- أزرار اليمين -->
+    <button id="lightboxDelBtn" onclick="event.stopPropagation();lightboxDelete()" style="background:none;border:none;color:#fff;cursor:pointer;padding:6px;display:none;align-items:center;justify-content:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    </button>
+    <button onclick="event.stopPropagation();lightboxShare()" style="background:none;border:none;color:#fff;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+    <button onclick="event.stopPropagation();lightboxDownload()" style="background:none;border:none;color:#fff;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
   </div>
   <!-- المحتوى -->
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
-    <img id="lightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;display:none">
-    <video id="lightboxVid" controls style="max-width:100%;max-height:100%;display:none"></video>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px">
+    <img id="lightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:4px">
+    <video id="lightboxVid" controls style="max-width:100%;max-height:100%;display:none;border-radius:4px"></video>
   </div>
 </div>
 
