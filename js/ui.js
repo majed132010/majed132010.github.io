@@ -30,61 +30,101 @@ function goBack() {
   else showHome();
 }
 
-// ════ Drawer ════
-function toggleDrawer() {
-  const sidebar=document.getElementById('channelSidebar');
-  if (!sidebar) return;
-  if (sidebar.classList.contains('drawer-open')) closeDrawer();
-  else openDrawer();
+// ════ Drawer — نظام 3 حالات ════
+// حالة 0: شاشة كاملة (لا قوائم)
+// حالة 1: قائمة السيرفرات فقط
+// حالة 2: قائمة السيرفرات + القنوات
+
+let _mobState = 0;
+
+function _setMobState(s) {
+  if (!isMobile()) return;
+  _mobState = Math.max(0, Math.min(2, s));
+  document.body.classList.remove('mob-state-0', 'mob-state-1', 'mob-state-2');
+  document.body.classList.add('mob-state-' + _mobState);
 }
+
 function openDrawer() {
-  document.getElementById('channelSidebar')?.classList.add('drawer-open');
-  document.getElementById('drawerOverlay')?.classList.add('show');
-}
-function closeDrawer() {
-  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
-  document.getElementById('drawerOverlay')?.classList.remove('show');
-  if (currentServer && !currentChannel) {
-    const sv=servers[currentServer];
-    if (sv?.channels) {
-      const chs=Object.entries(sv.channels).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
-      const firstText=chs.find(([,ch])=>ch.type!=='voice');
-      if (firstText){selectChannel(currentServer,firstText[0],firstText[1]);return;}
-    }
+  if (isMobile()) _setMobState(2);
+  else {
+    document.getElementById('channelSidebar')?.classList.add('drawer-open');
+    document.getElementById('drawerOverlay')?.classList.add('show');
   }
-  if (!currentServer) {
-    const svKeys=Object.keys(servers);
-    if (svKeys.length>0) {
-      const sid=svKeys[0]; selectServer(sid);
-      const sv=servers[sid];
+}
+
+function closeDrawer() {
+  if (isMobile()) {
+    _setMobState(0);
+    if (currentServer && !currentChannel) {
+      const sv=servers[currentServer];
       if (sv?.channels) {
         const chs=Object.entries(sv.channels).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
         const firstText=chs.find(([,ch])=>ch.type!=='voice');
-        if (firstText) setTimeout(()=>selectChannel(sid,firstText[0],firstText[1]),100);
+        if (firstText){selectChannel(currentServer,firstText[0],firstText[1]);return;}
       }
-    } else showHome();
+    }
+    if (!currentServer) {
+      const svKeys=Object.keys(servers);
+      if (svKeys.length>0) {
+        const sid=svKeys[0]; selectServer(sid);
+        const sv=servers[sid];
+        if (sv?.channels) {
+          const chs=Object.entries(sv.channels).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
+          const firstText=chs.find(([,ch])=>ch.type!=='voice');
+          if (firstText) setTimeout(()=>selectChannel(sid,firstText[0],firstText[1]),100);
+        }
+      } else showHome();
+    }
+  } else {
+    document.getElementById('channelSidebar')?.classList.remove('drawer-open');
+    document.getElementById('drawerOverlay')?.classList.remove('show');
   }
 }
-function closeSidebar() {
-  document.getElementById('channelSidebar')?.classList.remove('drawer-open');
-  document.getElementById('drawerOverlay')?.classList.remove('show');
+
+function toggleDrawer() {
+  if (isMobile()) _setMobState(_mobState === 2 ? 0 : _mobState + 1);
+  else {
+    const sidebar=document.getElementById('channelSidebar');
+    if (sidebar?.classList.contains('drawer-open')) closeDrawer();
+    else openDrawer();
+  }
 }
 
-// Swipe gesture
+function closeSidebar() {
+  if (isMobile()) _setMobState(0);
+  else {
+    document.getElementById('channelSidebar')?.classList.remove('drawer-open');
+    document.getElementById('drawerOverlay')?.classList.remove('show');
+  }
+}
+
+// عند الضغط على overlay → إغلاق
+document.getElementById('drawerOverlay')?.addEventListener('click', () => {
+  if (isMobile()) _setMobState(Math.max(0, _mobState - 1));
+  else closeDrawer();
+});
+
+// Swipe gesture — 3 حالات
 (function initTouchGestures() {
   let touchStartX=0, touchStartY=0;
-  const EDGE_THRESHOLD=30, SWIPE_THRESHOLD=50;
-  document.addEventListener('touchstart', e => { touchStartX=e.changedTouches[0].clientX; touchStartY=e.changedTouches[0].clientY; }, {passive:true});
+  const SWIPE_THRESHOLD=50;
+  document.addEventListener('touchstart', e => {
+    touchStartX=e.changedTouches[0].clientX;
+    touchStartY=e.changedTouches[0].clientY;
+  }, {passive:true});
   document.addEventListener('touchend', e => {
     if (!isMobile()) return;
     const dx=e.changedTouches[0].clientX-touchStartX;
     const dy=e.changedTouches[0].clientY-touchStartY;
-    if (Math.abs(dy)>Math.abs(dx)) return;
-    const sidebar=document.getElementById('channelSidebar');
-    const isOpen=sidebar?.classList.contains('drawer-open');
-    const screenW=window.innerWidth;
-    if (!isOpen && dx<-SWIPE_THRESHOLD && touchStartX>screenW-65-EDGE_THRESHOLD) openDrawer();
-    if (isOpen && dx>SWIPE_THRESHOLD) closeDrawer();
+    if (Math.abs(dy)>Math.abs(dx)*0.8) return; // حركة عمودية — تجاهل
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+    if (dx < 0) {
+      // سحب يسار → زيادة الحالة (إظهار المزيد)
+      _setMobState(_mobState + 1);
+    } else {
+      // سحب يمين → تقليل الحالة (إخفاء)
+      _setMobState(_mobState - 1);
+    }
   }, {passive:true});
 })();
 
