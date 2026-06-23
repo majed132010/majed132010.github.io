@@ -1,4 +1,10 @@
-// Firebase Messaging Service Worker — عوالم (مُصلح)
+// Firebase Messaging Service Worker — عوالم
+// ✅ استجب لطلب skipWaiting من ui.js
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
