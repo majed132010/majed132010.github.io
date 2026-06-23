@@ -968,11 +968,10 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     overflow-y: auto;
     overflow-x: hidden;
     background: var(--bg) !important;
-    border-left: 1px solid var(--border) !important;
+    border-left: 4px solid rgba(212,175,55,0.9) !important;
     transform: translateX(100%);
-    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
   }
-  /* حالة 2: السيرفرات ظاهرة */
   body.mob-state-1 #serverList,
   body.mob-state-2 #serverList {
     transform: translateX(0);
@@ -984,31 +983,28 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     position: fixed !important;
     top: 0; bottom: 0;
     right: 0;
-    width: 260px !important;
-    min-width: 260px !important;
+    width: calc(100% - 65px) !important;
+    min-width: unset !important;
     transform: translateX(100%);
-    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1), border-left-color 0.3s;
-    z-index: 290;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 295;
     box-shadow: -4px 0 20px rgba(0,0,0,0.4);
-    border-left: 3px solid transparent;
+    border-right: 5px solid rgba(212,175,55,0.95) !important;
+    border-left: none !important;
   }
-  /* حالة 3: القنوات + السيرفرات ظاهرة */
   body.mob-state-2 #channelSidebar {
-    transform: translateX(65px);
-    border-left-color: rgba(212,175,90,0.8);
+    transform: translateX(0);
   }
   #channelSidebar::before { display: none; }
   #channelSidebar::after { display: none; }
 
-  /* Drawer overlay */
+  /* Drawer overlay — يغطي المحتوى فقط وليس القوائم */
   #drawerOverlay {
     display: none;
     position: fixed;
     top: 0; left: 0; bottom: 0; right: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 188;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    background: rgba(0,0,0,0.35);
+    z-index: 180;
   }
   body.mob-state-1 #drawerOverlay,
   body.mob-state-2 #drawerOverlay { display: block; }
