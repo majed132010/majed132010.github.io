@@ -957,6 +957,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   }
 
   /* ─── Server list ─── */
+  /* ─── Server list ─── */
   #serverList {
     display: flex !important;
     width: 65px !important;
@@ -968,7 +969,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     overflow-y: auto;
     overflow-x: hidden;
     background: var(--bg) !important;
-    border-left: none !important;
+    border-left: 1px solid var(--border) !important;
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
   }
@@ -977,19 +978,19 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
     transform: translateX(0);
   }
 
-  /* ─── Channel Drawer: يجلس بجوار السيرفرات ─── */
+  /* ─── Channel Drawer: مثل النموذج القديم ─── */
   #channelSidebar {
     display: flex !important;
     position: fixed !important;
     top: 0; bottom: 0;
     right: 65px;
-    width: calc(100% - 65px) !important;
-    min-width: unset !important;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    width: 260px !important;
+    min-width: 260px !important;
+    transform: translateX(calc(100% + 65px));
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
     z-index: 295;
     box-shadow: -4px 0 20px rgba(0,0,0,0.4);
-    border-left: 6px solid rgba(212,175,55,0.95) !important;
+    border-left: none !important;
     border-right: none !important;
   }
   body.mob-state-2 #channelSidebar {
@@ -1002,7 +1003,8 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   #drawerOverlay {
     display: none;
     position: fixed;
-    top: 0; left: 0; bottom: 0; right: 0;
+    top: 0; left: 0; bottom: 0;
+    right: 65px;
     background: rgba(0,0,0,0.35);
     z-index: 180;
   }
@@ -1036,12 +1038,18 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   }
   #mobSwipeTab:active { width: 22px; }
 
-  /* ─── Main content: fullscreen ─── */
+  /* ─── Main content ─── */
   #mainContent {
     display: flex !important;
     margin-right: 0;
     width: 100%;
     flex-direction: column;
+    transition: margin-right 0.3s, width 0.3s;
+  }
+  body.mob-state-1 #mainContent,
+  body.mob-state-2 #mainContent {
+    margin-right: 65px;
+    width: calc(100% - 65px);
   }
 
   /* ─── Header hamburger button ─── */
