@@ -447,28 +447,33 @@
 
 
 <!-- Image Lightbox -->
-<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:#000;flex-direction:column" onclick="closeLightbox()">
-  <!-- شريط أعلى مطابق للواتساب — RTL -->
-  <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;padding:8px 4px;background:#1f2c34;flex-shrink:0;direction:rtl;min-height:52px">
-    <!-- زر الرجوع (يمين في RTL) -->
-    <button onclick="closeLightbox()" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px 10px;line-height:1;display:flex;align-items:center;opacity:0.9">‹</button>
-    <!-- اسم الملف -->
-    <div id="lightboxName" style="color:#fff;font-family:Tajawal,sans-serif;font-size:16px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-    <!-- أزرار (يسار في RTL) -->
-    <button id="lightboxDelBtn" onclick="event.stopPropagation();lightboxDelete()" style="background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:none;align-items:center;justify-content:center;opacity:0.9">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+<div id="lightboxBg" style="display:none;position:fixed;inset:0;z-index:9995;background:#111;flex-direction:column;font-family:Tajawal,sans-serif">
+  <!-- شريط واتساب العلوي -->
+  <div id="lightboxBar" onclick="event.stopPropagation()" style="display:flex;align-items:center;padding:0 4px;background:#202c33;height:56px;flex-shrink:0;gap:2px">
+    <!-- رجوع -->
+    <button onclick="closeLightbox()" style="background:none;border:none;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;flex-shrink:0">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <button onclick="event.stopPropagation();lightboxShare()" style="background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center;opacity:0.9">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    <!-- معلومات المرسل والوقت -->
+    <div style="flex:1;overflow:hidden;padding:0 4px">
+      <div id="lightboxName" style="color:#fff;font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <div id="lightboxTime" style="color:rgba(255,255,255,0.6);font-size:12px"></div>
+    </div>
+    <!-- أزرار يمين -->
+    <button id="lightboxDelBtn" onclick="event.stopPropagation();lightboxDelete()" style="background:none;border:none;color:#fff;width:44px;height:44px;display:none;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;flex-shrink:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
     </button>
-    <button onclick="event.stopPropagation();lightboxDownload()" style="background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center;opacity:0.9">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <button onclick="event.stopPropagation();lightboxShare()" style="background:none;border:none;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;flex-shrink:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+    <button onclick="event.stopPropagation();lightboxDownload()" style="background:none;border:none;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;flex-shrink:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     </button>
   </div>
-  <!-- المحتوى -->
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px">
-    <img id="lightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:4px">
-    <video id="lightboxVid" controls style="max-width:100%;max-height:100%;display:none;border-radius:4px"></video>
+  <!-- الصورة/الفيديو -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#111" onclick="closeLightbox()">
+    <img id="lightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;display:none">
+    <video id="lightboxVid" controls style="max-width:100%;max-height:100%;display:none" onclick="event.stopPropagation()"></video>
   </div>
 </div>
 
