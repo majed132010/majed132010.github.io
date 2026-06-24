@@ -125,7 +125,7 @@ function showMessages(sid, cid) {
  else {
  const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
  const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
+ img.addEventListener('click', () => { const sv=servers[currentServer]; const myRole=sv?.members?.[currentUser?.uid]?.role; const _isAdmin=myRole==='owner'||myRole==='admin'; openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid===(currentUser&&currentUser.uid)||_isAdmin, msg.name, msg.ts); });
  loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
  mediaWrap.appendChild(img); body.appendChild(mediaWrap);
  }
