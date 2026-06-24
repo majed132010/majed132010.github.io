@@ -999,13 +999,21 @@ function lightboxDelete() {
 }
 function downloadMedia(url, name, type) {
  const ext = type==='video'?'.mp4':'.jpg';
- const filename = name.includes('.')?name:name+ext;
+ const filename = (name||'media').includes('.')?name:name+ext;
  fetch(url).then(r=>r.blob()).then(blob=>{
- const a=document.createElement('a');
- a.href=URL.createObjectURL(blob); a.download=filename;
- document.body.appendChild(a); a.click(); document.body.removeChild(a);
- toast('✅ تم الحفظ!');
- }).catch(()=>window.open(url,'_blank'));
+   const a=document.createElement('a');
+   a.href=URL.createObjectURL(blob); a.download=filename;
+   document.body.appendChild(a); a.click();
+   setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1000);
+   toast('✅ تم الحفظ!');
+ }).catch(()=>{
+   // fallback: فتح في نافذة جديدة مع إشعار
+   const a=document.createElement('a');
+   a.href=url; a.download=filename; a.target='_blank';
+   document.body.appendChild(a); a.click();
+   document.body.removeChild(a);
+   toast('💾 اضغط مطولاً للحفظ');
+ });
 }
 
 // ESC key
