@@ -1002,29 +1002,20 @@ function lightboxDelete() {
 function downloadMedia(url, name, type) {
  const ext = type==='video'?'.mp4':'.jpg';
  const filename = (name||'media').includes('.')?name:(name||'media')+ext;
- toast('⏳ جاري التحميل...');
- const xhr = new XMLHttpRequest();
- xhr.open('GET', url, true);
- xhr.responseType = 'blob';
- xhr.onload = function() {
-   if (xhr.status === 200) {
-     const a = document.createElement('a');
-     a.href = URL.createObjectURL(xhr.response);
-     a.download = filename;
-     document.body.appendChild(a);
-     a.click();
-     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1000);
-     toast('✅ تم الحفظ!');
-   } else {
-     window.open(url, '_blank');
-     toast('💾 اضغط مطولاً للحفظ');
-   }
- };
- xhr.onerror = function() {
+ // محاولة التحميل المباشر
+ try {
+   const a = document.createElement('a');
+   a.href = url;
+   a.download = filename;
+   a.target = '_blank';
+   a.rel = 'noopener';
+   document.body.appendChild(a);
+   a.click();
+   document.body.removeChild(a);
+   toast('✅ جاري الحفظ...');
+ } catch(e) {
    window.open(url, '_blank');
-   toast('💾 اضغط مطولاً للحفظ');
- };
- xhr.send();
+ }
 }
 
 // ESC key
