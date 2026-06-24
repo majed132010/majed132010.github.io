@@ -295,7 +295,8 @@ function buildMsgDiv(msg, key) {
  const img = document.createElement('img');
  img.decoding = 'async';
  img.className = 'msg-media-img';
- img.src = '';
+img.style.background = '#2a2a2a';
+img.style.minHeight = '80px';
  img.dataset.msgKey = key;
  img.alt = msg.mediaName || '';
  img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
