@@ -97,21 +97,21 @@
         .quick-fill-btn.zero { color: #999; }
         .quick-fill-btn.positive { color: var(--accent-light); border-color: rgba(201, 162, 39, 0.3); }
 
-        .player-row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; margin-bottom: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; position: relative; }
+        .player-row { display: flex; align-items: center; gap: 4px; padding: 6px 6px; margin-bottom: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; position: relative; }
         .player-row:active { border-color: var(--primary-light); }
         .player-row.winner-highlight { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.15); }
         .player-row.jail-highlight { border-color: var(--danger); box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.15); }
         .player-row.resha-highlight { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2); background: var(--winner-bg); }
-        .player-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-light), var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; border: 2px solid var(--border); }
-        .player-name { min-width: 55px; max-width: 80px; font-weight: 700; font-size: 0.75rem; color: var(--accent-light); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
-        .player-input { width: 52px; height: 36px; padding: 0 4px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.85rem; font-weight: 700; text-align: center; transition: all 0.15s; flex-shrink: 0; }
+        .player-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-light), var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; border: 2px solid var(--border); }
+        .player-name { min-width: 45px; max-width: 70px; font-weight: 700; font-size: 0.75rem; color: var(--accent-light); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+        .player-input { width: 45px; height: 32px; padding: 0 2px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.78rem; font-weight: 700; text-align: center; transition: all 0.15s; flex-shrink: 0; }
         .player-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15); }
         .player-input.negative { color: #ff7b7b; }
         .player-input.positive { color: var(--accent-light); }
         .player-input.zero { color: #888; }
-        .player-quick-btns { display: flex; gap: 3px; flex: 1; justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
+        .player-quick-btns { display: flex; gap: 2px; flex: 1; justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
         .player-quick-btns::-webkit-scrollbar { display: none; }
-        .pqb { min-width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg-light); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; overflow: hidden; }
+        .pqb { min-width: 28px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg-light); color: var(--text); font-family: 'Tajawal', sans-serif; font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; overflow: hidden; }
         .pqb::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background 0.1s; }
         .pqb:active::after { background: rgba(255,255,255,0.12); }
         .pqb:active { transform: scale(0.9); }
@@ -245,9 +245,9 @@
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
         @media (min-width: 480px) {
-            .player-name { min-width: 70px; max-width: 100px; font-size: 0.82rem; }
-            .player-input { width: 60px; height: 40px; font-size: 0.9rem; }
-            .pqb { min-width: 38px; height: 36px; font-size: 0.78rem; }
+            .player-name { min-width: 60px; max-width: 90px; font-size: 0.82rem; }
+            .player-input { width: 52px; height: 36px; font-size: 0.85rem; }
+            .pqb { min-width: 32px; height: 34px; font-size: 0.72rem; }
             .header h1 { font-size: 1.7rem; }
         }
     </style>
@@ -292,17 +292,7 @@
                     <div class="round-title">🎯 تسجيل الجولة</div>
                     <div class="round-number" id="roundNumber">ج1</div>
                 </div>
-                <div class="quick-fill-bar">
-                    <span class="quick-fill-label">⚡ للجميع:</span>
-                    <button class="quick-fill-btn negative" onclick="fillAll(-5)">-5</button>
-                    <button class="quick-fill-btn negative" onclick="fillAll(-30)">-30</button>
-                    <button class="quick-fill-btn negative" onclick="fillAll(-60)">-60</button>
-                    <button class="quick-fill-btn zero" onclick="fillAll(0)">0</button>
-                    <button class="quick-fill-btn positive" onclick="fillAll(25)">25</button>
-                    <button class="quick-fill-btn positive" onclick="fillAll(100)">100</button>
-                    <button class="quick-fill-btn positive" onclick="fillAll(125)">125</button>
-                    <button class="quick-fill-btn positive" onclick="fillAll(200)">200</button>
-                </div>
+
                 <div id="roundPlayersContainer"></div>
                 <div class="input-hint">💡 اضغط Enter للانتقال للاعب التالي</div>
                 <div class="round-actions">
