@@ -205,6 +205,7 @@ const _imgCacheDB = (() => {
 setTimeout(() => _imgCacheDB.cleanup(), 3000);
 
 async function loadCachedImage(url, expiresAt, saved) {
+  if (url && url.includes('cloudinary.com')) return url;
   const cached = await _imgCacheDB.get(url);
   if (cached) {
     // if (cached.expiresAt && !cached.saved && Date.now() > cached.expiresAt) return null; // مؤقتاً معطل
@@ -213,7 +214,8 @@ async function loadCachedImage(url, expiresAt, saved) {
   try {
     const resp = await fetch(url);
     if (!resp.ok) return url;
-    const blob = await resp.blob();
+  const blob = await resp.blob();
+    if (!blob || blob.size === 0) return url;
     await _imgCacheDB.set(url, blob, expiresAt, saved);
     return URL.createObjectURL(blob);
   } catch { return url; }
