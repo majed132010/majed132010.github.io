@@ -327,7 +327,7 @@ function buildMsgDiv(msg, key) {
  { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
  { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
  ...((isMine || isAdminUser) ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteMessage(key) }] : []),
- ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
+ ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => downloadMedia(msg.mediaUrl || msg.voiceUrl, msg.mediaName || 'media', msg.mediaType || 'image') }] : []),
  ], isMine);
 
  return div;
