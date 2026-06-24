@@ -196,7 +196,7 @@ async function loadMoreMessages() {
 // ════ بناء رسالة ════
 function buildMsgDiv(msg, key) {
  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
- if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null;
+ // if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null; // مؤقتاً معطل
  if (!msg.text && !msg.mediaUrl && !msg.voiceUrl && !msg.replyTo && !msg.uploading) return null;
 
  const isAdmin = msg.role === 'owner' || msg.role === 'admin';
