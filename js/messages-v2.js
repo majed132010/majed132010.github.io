@@ -157,6 +157,8 @@ function showMessages(sid, cid) {
  area.scrollTop = area.scrollHeight;
  setTimeout(() => { area.scrollTop = area.scrollHeight; }, 150);
  setTimeout(() => { area.scrollTop = area.scrollHeight; }, 500);
+ setTimeout(() => { area.scrollTop = area.scrollHeight; }, 1000);
+ setTimeout(() => { area.scrollTop = area.scrollHeight; }, 2000);
  });
 }
 
