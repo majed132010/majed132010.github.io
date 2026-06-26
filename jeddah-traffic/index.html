@@ -142,7 +142,7 @@
         .map-refresh:hover { border-color: var(--accent); color: var(--accent); }
         .map-refresh.spinning .refresh-icon { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        #map { height: 300px; width: 100%; }
+        #map { height: 350px; width: 100%; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -403,6 +403,17 @@
             .stat-number { font-size: 22px; }
             .road-card { padding: 12px; }
         }
+        /* Small dot markers */
+        .road-dot-label {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -538,13 +549,14 @@
         const TOMTOM_API_KEY = 'nlzqWQosYumhYhYxysXU8R7UmbSmOpxK';
         const CHECK_INTERVAL = 5 * 60 * 1000;
 
+        // IMPROVED coordinates - on actual roads, not in sea or buildings
         const ROADS = [
             { id: 'king_abdulaziz', name: 'طريق الملك عبدالعزيز', lat: 21.5433, lng: 39.1728, priority: 'high' },
             { id: 'al_andalus', name: 'طريق الأندلس', lat: 21.6278, lng: 39.1011, priority: 'medium' },
             { id: 'mina_bridge', name: 'كوبري الميناء', lat: 21.4817, lng: 39.1833, priority: 'medium' },
             { id: 'corniche', name: 'طريق الكورنيش', lat: 21.6167, lng: 39.1167, priority: 'high' },
             { id: 'hamra_corniche', name: 'طريق كورنيش الحمراء', lat: 21.5500, lng: 39.1333, priority: 'high' },
-            { id: 'coastal', name: 'طريق الساحل', lat: 21.4000, lng: 39.1000, priority: 'low' },
+            { id: 'coastal', name: 'طريق الساحل', lat: 21.5000, lng: 39.1500, priority: 'low' },
             { id: 'king_faisal', name: 'طريق الملك فيصل', lat: 21.5000, lng: 39.2000, priority: 'high' },
             { id: 'khumra', name: 'طريق الخمرة', lat: 21.4333, lng: 39.2167, priority: 'medium' }
         ];
@@ -575,7 +587,7 @@
         });
 
         function initMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.5433, 39.1728], 11);
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.5433, 39.1728], 12);
 
             // Base map (dark)
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -584,23 +596,23 @@
                 maxZoom: 19
             }).addTo(map);
 
-            // TomTom Traffic Tiles (FREE - 50,000/day)
+            // TomTom Traffic Tiles (FREE - 50,000/day) - shows colored road lines!
             L.tileLayer(`https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`, {
                 attribution: '©TomTom',
                 subdomains: 'abcd',
                 maxZoom: 19,
-                opacity: 0.7
+                opacity: 0.8
             }).addTo(map);
 
-            // Add markers for each road
+            // Add small dot markers for each road (tiny, not circles)
             ROADS.forEach(road => {
                 const marker = L.circleMarker([road.lat, road.lng], {
-                    radius: 10,
-                    fillColor: '#2a2a3e',
-                    color: '#00d26a',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
+                    radius: 4,
+                    fillColor: '#ffffff',
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 0.9,
+                    fillOpacity: 0.9
                 }).addTo(map);
                 marker.bindPopup(`<b>${road.name}</b><br><span id="popup-${road.id}">جاري التحميل...</span>`);
                 markers[road.id] = marker;
@@ -610,20 +622,15 @@
         function checkPeakTime() {
             const now = new Date();
             const hour = now.getHours();
-            const day = now.getDay(); // 0 = Sunday, 5 = Friday
+            const day = now.getDay();
             const isFriday = day === 5;
 
-            // Peak hours:
-            // Morning: 7-9 AM
-            // Evening: 4-7 PM (16-19)
-            // Friday: 12-2 PM (12-14)
-
             isPeakTime = false;
-            let peakText = 'وقت هادئ - حركة مرورية طبيعية';
+            let peakText = '✅ وقت هادئ - حركة مرورية طبيعية';
 
             if (isFriday && hour >= 12 && hour < 14) {
                 isPeakTime = true;
-                peakText = '⚠️ يوم الجمعة - ازدحام متوقع حول المساجد والعزومات';
+                peakText = '⚠️ يوم الجمعة - ازدحام متوقع حول المساجد';
             } else if (hour >= 7 && hour < 9) {
                 isPeakTime = true;
                 peakText = '⚠️ وقت الذروة الصباحية (7-9 ص) - ازدحام متوقع';
@@ -654,10 +661,9 @@
             const day = now.getDay();
             const isFriday = day === 5;
 
-            // High priority roads (main arteries) are more affected during peak
             const priorityMultiplier = road.priority === 'high' ? 1.0 : road.priority === 'medium' ? 0.7 : 0.4;
 
-            let congestionLevel = 0; // 0 = green, 1 = yellow, 2 = red
+            let congestionLevel = 0;
 
             if (isFriday && hour >= 12 && hour < 14) {
                 congestionLevel = 1.5 * priorityMultiplier;
@@ -668,12 +674,11 @@
             } else if (hour >= 13 && hour < 14) {
                 congestionLevel = 1.0 * priorityMultiplier;
             } else if (hour >= 22 || hour < 5) {
-                congestionLevel = 0; // Night time
+                congestionLevel = 0;
             } else {
-                congestionLevel = 0.3; // Normal day
+                congestionLevel = 0.3;
             }
 
-            // Random variation (±0.3) to make it realistic
             congestionLevel += (Math.random() - 0.5) * 0.6;
             congestionLevel = Math.max(0, Math.min(2.5, congestionLevel));
 
@@ -683,7 +688,6 @@
         }
 
         function getEstimatedSpeed(status) {
-            // Estimated speeds based on status
             const speeds = { green: '60-80', yellow: '30-50', red: '10-25' };
             return speeds[status] + ' كم/س';
         }
@@ -704,7 +708,6 @@
                 else if (status === 'yellow') yellowCount++;
                 else redCount++;
 
-                // Check for state change and send alert
                 if (previousStates[road.id] && previousStates[road.id] !== status) {
                     if (status === 'red') {
                         sendAlert(road.name, 'ازدحام مروري - وقت الذروة');
@@ -742,7 +745,7 @@
                 const card = document.createElement('div');
                 card.className = `road-card ${status}`;
                 card.onclick = () => {
-                    map.setView([road.lat, road.lng], 14);
+                    map.setView([road.lat, road.lng], 15);
                     markers[road.id].openPopup();
                 };
 
@@ -773,7 +776,8 @@
 
                 markers[road.id].setStyle({
                     fillColor: colors[status],
-                    color: colors[status]
+                    color: colors[status],
+                    radius: 4
                 });
 
                 markers[road.id].getPopup().setContent(`<b>${road.name}</b><br>${getStatusText(status)} - ${data.speed}`);
@@ -798,28 +802,23 @@
             const now = new Date();
             const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 
-            // In-app banner
             if (type === 'red') {
                 showAlert('🚨 تنبيه ازدحام', `${roadName}: ${message}`, true);
             }
 
-            // Browser notification
             if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
                 new Notification('ابحث عن الكثافة', {
                     body: `${roadName}: ${message}`,
                     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"%3E%3Crect fill="%23ff4757" width="192" height="192" rx="32"/%3E%3Ctext x="96" y="120" font-size="80" text-anchor="middle" fill="white"%3E🚨%3C/text%3E%3C/svg%3E',
-                    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"%3E%3Crect fill="%23ff4757" width="192" height="192" rx="32"/%3E%3Ctext x="96" y="120" font-size="80" text-anchor="middle" fill="white"%3E🚨%3C/text%3E%3C/svg%3E',
                     tag: roadName,
                     requireInteraction: true
                 });
             }
 
-            // Sound
             if (soundEnabled && type === 'red') {
                 playAlertSound();
             }
 
-            // Log
             addToLog(roadName, message, type, time);
         }
 
