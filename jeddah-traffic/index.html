@@ -403,17 +403,6 @@
             .stat-number { font-size: 22px; }
             .road-card { padding: 12px; }
         }
-        /* Small dot markers */
-        .road-dot-label {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-size: 10px;
-            color: var(--text-primary);
-            white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
     </style>
 </head>
 <body>
@@ -549,7 +538,6 @@
         const TOMTOM_API_KEY = 'nlzqWQosYumhYhYxysXU8R7UmbSmOpxK';
         const CHECK_INTERVAL = 5 * 60 * 1000;
 
-        // IMPROVED coordinates - on actual roads, not in sea or buildings
         const ROADS = [
             { id: 'king_abdulaziz', name: 'طريق الملك عبدالعزيز', lat: 21.5433, lng: 39.1728, priority: 'high' },
             { id: 'al_andalus', name: 'طريق الأندلس', lat: 21.6278, lng: 39.1011, priority: 'medium' },
@@ -568,7 +556,6 @@
         let autoCheckEnabled = true;
         let checkTimer = null;
         let map = null;
-        let markers = {};
         let alertLog = JSON.parse(localStorage.getItem('trafficAlertLog') || '[]');
         let isPeakTime = false;
 
@@ -604,19 +591,7 @@
                 opacity: 0.8
             }).addTo(map);
 
-            // Add small dot markers for each road (tiny, not circles)
-            ROADS.forEach(road => {
-                const marker = L.circleMarker([road.lat, road.lng], {
-                    radius: 4,
-                    fillColor: '#ffffff',
-                    color: '#ffffff',
-                    weight: 1,
-                    opacity: 0.9,
-                    fillOpacity: 0.9
-                }).addTo(map);
-                marker.bindPopup(`<b>${road.name}</b><br><span id="popup-${road.id}">جاري التحميل...</span>`);
-                markers[road.id] = marker;
-            });
+            // NO markers - traffic tiles show the roads as colored lines
         }
 
         function checkPeakTime() {
@@ -720,7 +695,6 @@
 
             updateStats(greenCount, yellowCount, redCount);
             renderRoads();
-            updateMapMarkers();
             updateLastUpdate();
         }
 
@@ -745,8 +719,8 @@
                 const card = document.createElement('div');
                 card.className = `road-card ${status}`;
                 card.onclick = () => {
-                    map.setView([road.lat, road.lng], 15);
-                    markers[road.id].openPopup();
+                    // Center map on road area without markers
+                    map.setView([road.lat, road.lng], 14);
                 };
 
                 card.innerHTML = `
@@ -762,25 +736,6 @@
                 `;
 
                 container.appendChild(card);
-            });
-        }
-
-        function updateMapMarkers() {
-            ROADS.forEach(road => {
-                const data = roadData[road.id];
-                if (!data || !markers[road.id]) return;
-
-                const status = data.status;
-                const colors = { green: '#00d26a', yellow: '#ffc107', red: '#ff4757' };
-                const popupText = `${data.name}<br>${getStatusText(status)} - ${data.speed}`;
-
-                markers[road.id].setStyle({
-                    fillColor: colors[status],
-                    color: colors[status],
-                    radius: 4
-                });
-
-                markers[road.id].getPopup().setContent(`<b>${road.name}</b><br>${getStatusText(status)} - ${data.speed}`);
             });
         }
 
