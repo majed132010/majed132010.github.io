@@ -205,15 +205,17 @@ const _imgCacheDB = (() => {
 setTimeout(() => _imgCacheDB.cleanup(), 3000);
 
 async function loadCachedImage(url, expiresAt, saved) {
+  if (url && url.includes('cloudinary.com')) return url;
   const cached = await _imgCacheDB.get(url);
   if (cached) {
-    if (cached.expiresAt && !cached.saved && Date.now() > cached.expiresAt) return null;
+    // if (cached.expiresAt && !cached.saved && Date.now() > cached.expiresAt) return null; // مؤقتاً معطل
     return URL.createObjectURL(cached.blob);
   }
   try {
     const resp = await fetch(url);
     if (!resp.ok) return url;
-    const blob = await resp.blob();
+  const blob = await resp.blob();
+    if (!blob || blob.size === 0) return url;
     await _imgCacheDB.set(url, blob, expiresAt, saved);
     return URL.createObjectURL(blob);
   } catch { return url; }
@@ -365,7 +367,9 @@ async function _retryMediaUpload(msgKey) {
   await db.ref(info.msgPath + '/' + msgKey).update({ uploading: true, uploadFailed: false, uploadProgress: 1 });
   const updatePct = pct => db.ref(info.msgPath + '/' + msgKey).update({ uploadProgress: pct }).catch(() => {});
   try {
-    const url = await uploadToCloudinary(new File([info.blob], info.name, { type: info.mimeType }), 3, updatePct);
+    const ext = info.mimeType?.startsWith('video') ? (info.name?.split('.').pop() || 'mp4') : (info.name?.split('.').pop() || 'jpg');
+    const path = `messages/${currentServer}/${currentChannel}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const url = await uploadToStorage(new File([info.blob], info.name, { type: info.mimeType }), path, { retries: 3, onProgress: updatePct });
     await db.ref(info.msgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
     delete (window._uploadBlobs || {})[msgKey];
   } catch(e) {

@@ -1379,7 +1379,7 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
 /* ════ Message context bar (right-click / long-press) ════ */
 .msg-ctx-bar {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
   left: 0;
   display: none;
   flex-direction: row;

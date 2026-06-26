@@ -426,7 +426,9 @@ window.sendDM = async function() {
       saved: false
     });
     try {
-      const url = await uploadToCloudinary(new File([m.blob], m.name, { type: m.mimeType }), 3, () => {});
+      const ext1 = m.name?.split('.').pop() || 'jpg';
+      const path1 = `dm_messages/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext1}`;
+      const url = await uploadToStorage(new File([m.blob], m.name, { type: m.mimeType }), path1, { retries: 3 });
       await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
       try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
     } catch(e) {
@@ -677,7 +679,8 @@ async function sendDmVoiceMessage(blob, duration, mimeType) {
   const ct = (mimeType || 'audio/webm').split(';')[0];
   const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
   try {
-    const url = await uploadToCloudinary(new File([blob], `voice.${ext}`, { type: ct }));
+    const voicePath = `dm_messages/voice_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const url = await uploadToStorage(new File([blob], `voice.${ext}`, { type: ct }), voicePath, { retries: 3 });
     const dmId = getDmId(currentUser.uid, _currentDmUid);
     await db.ref('dm_messages/' + dmId).push({
       uid: currentUser.uid,

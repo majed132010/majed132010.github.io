@@ -125,7 +125,7 @@ function showMessages(sid, cid) {
  else {
  const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
  const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
- img.addEventListener('click', () => openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
+ img.addEventListener('click', () => { const sv=servers[currentServer]; const myRole=sv?.members?.[currentUser?.uid]?.role; const _isAdmin=myRole==='owner'||myRole==='admin'; openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid===(currentUser&&currentUser.uid)||_isAdmin, msg.name, msg.ts); });
  loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
  mediaWrap.appendChild(img); body.appendChild(mediaWrap);
  }
@@ -157,6 +157,8 @@ function showMessages(sid, cid) {
  area.scrollTop = area.scrollHeight;
  setTimeout(() => { area.scrollTop = area.scrollHeight; }, 150);
  setTimeout(() => { area.scrollTop = area.scrollHeight; }, 500);
+ setTimeout(() => { area.scrollTop = area.scrollHeight; }, 1000);
+ setTimeout(() => { area.scrollTop = area.scrollHeight; }, 2000);
  });
 }
 
@@ -196,7 +198,7 @@ async function loadMoreMessages() {
 // ════ بناء رسالة ════
 function buildMsgDiv(msg, key) {
  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
- if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null;
+ // if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null; // مؤقتاً معطل
  if (!msg.text && !msg.mediaUrl && !msg.voiceUrl && !msg.replyTo && !msg.uploading) return null;
 
  const isAdmin = msg.role === 'owner' || msg.role === 'admin';
@@ -293,7 +295,8 @@ function buildMsgDiv(msg, key) {
  const img = document.createElement('img');
  img.decoding = 'async';
  img.className = 'msg-media-img';
- img.src = '';
+img.style.background = '#2a2a2a';
+img.style.minHeight = '80px';
  img.dataset.msgKey = key;
  img.alt = msg.mediaName || '';
  img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
@@ -325,7 +328,7 @@ function buildMsgDiv(msg, key) {
  { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
  { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
  ...((isMine || isAdminUser) ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteMessage(key) }] : []),
- ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
+ ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => downloadMedia(msg.mediaUrl || msg.voiceUrl, msg.mediaName || 'media', msg.mediaType || 'image') }] : []),
  ], isMine);
 
  return div;
@@ -999,13 +1002,20 @@ function lightboxDelete() {
 }
 function downloadMedia(url, name, type) {
  const ext = type==='video'?'.mp4':'.jpg';
- const filename = name.includes('.')?name:name+ext;
+ const filename = (name||'media').includes('.')?name:(name||'media')+ext;
+ toast('⏳ جاري التحميل...');
  fetch(url).then(r=>r.blob()).then(blob=>{
- const a=document.createElement('a');
- a.href=URL.createObjectURL(blob); a.download=filename;
- document.body.appendChild(a); a.click(); document.body.removeChild(a);
- toast('✅ تم الحفظ!');
- }).catch(()=>window.open(url,'_blank'));
+   const a = document.createElement('a');
+   a.href = URL.createObjectURL(blob);
+   a.download = filename;
+   document.body.appendChild(a);
+   a.click();
+   setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1000);
+   toast('✅ تم الحفظ!');
+ }).catch(()=>{
+   window.open(url, '_blank');
+   toast('💾 اضغط مطولاً للحفظ');
+ });
 }
 
 // ESC key
