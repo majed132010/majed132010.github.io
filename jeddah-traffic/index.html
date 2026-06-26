@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ابحث عن الكثافة</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%2300d26a' width='192' height='192' rx='32'/%3E%3Ctext x='96' y='120' font-size='80' text-anchor='middle' fill='white'%3E🚦%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --bg-card-hover: #22223e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #8892b0;
+            --accent: #00d26a;
+            --accent-glow: rgba(0, 210, 106, 0.3);
+            --green: #00d26a;
+            --yellow: #ffc107;
+            --red: #ff4757;
+            --border: #2a2a3e;
+        }
+        body {
+            font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+        }
+        .header-content {
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo-icon {
+            font-size: 28px;
+            filter: drop-shadow(0 0 8px var(--accent-glow));
+        }
+        .logo-text {
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+        .status-dot.alert { background: var(--red); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(255, 71, 87, 0.15), rgba(255, 71, 87, 0.05));
+            border: 1px solid var(--red);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            animation: slideDown 0.4s ease;
+        }
+        .alert-banner.show { display: flex; }
+        .alert-banner-icon { font-size: 24px; flex-shrink: 0; }
+        .alert-banner-text { flex: 1; }
+        .alert-banner-title { font-weight: 700; color: var(--red); margin-bottom: 4px; }
+        .alert-banner-desc { font-size: 13px; color: var(--text-secondary); }
+        .alert-banner-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .map-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        .map-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .map-title {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .map-refresh {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s;
+        }
+        .map-refresh:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .map-refresh.spinning .refresh-icon {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        #map {
+            height: 280px;
+            width: 100%;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card.green { border-color: rgba(0, 210, 106, 0.3); }
+        .stat-card.yellow { border-color: rgba(255, 193, 7, 0.3); }
+        .stat-card.red { border-color: rgba(255, 71, 87, 0.3); }
+        .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .stat-number.green { color: var(--green); }
+        .stat-number.yellow { color: var(--yellow); }
+        .stat-number.red { color: var(--red); }
+        .stat-label { font-size: 12px; color: var(--text-secondary); }
+        .roads-section { margin-bottom: 16px; }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 4px;
+        }
+        .road-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .road-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateX(-4px);
+        }
+        .road-card.green { border-right: 4px solid var(--green); }
+        .road-card.yellow { border-right: 4px solid var(--yellow); }
+        .road-card.red { border-right: 4px solid var(--red); }
+        .road-status-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .road-status-icon.green { background: rgba(0, 210, 106, 0.15); }
+        .road-status-icon.yellow { background: rgba(255, 193, 7, 0.15); }
+        .road-status-icon.red {
+            background: rgba(255, 71, 87, 0.15);
+            animation: alertPulse 1.5s infinite;
+        }
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
+        }
+        .road-info { flex: 1; }
+        .road-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .road-status-text { font-size: 13px; color: var(--text-secondary); }
+        .road-status-text.green { color: var(--green); }
+        .road-status-text.yellow { color: var(--yellow); }
+        .road-status-text.red { color: var(--red); font-weight: 600; }
+        .road-speed {
+            text-align: left;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .road-speed-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+        .log-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .log-clear {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .log-clear:hover { color: var(--red); background: rgba(255,71,87,0.1); }
+        .log-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .log-item:last-child { border-bottom: none; }
+        .log-time { color: var(--text-secondary); font-size: 11px; flex-shrink: 0; width: 50px; }
+        .log-icon { font-size: 16px; flex-shrink: 0; }
+        .log-text { flex: 1; }
+        .log-empty { text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px; }
+        .settings-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .setting-item:last-child { border-bottom: none; }
+        .setting-label {
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toggle.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .toggle-knob {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle.active .toggle-knob { right: 24px; }
+        .test-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), #00b894);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--accent-glow);
+        }
+        .test-btn:active { transform: translateY(0); }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        .last-update {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .update-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s infinite;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .loading-text { color: var(--text-secondary); font-size: 14px; }
+        .leaflet-container { background: var(--bg-primary) !important; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+        @media (max-width: 400px) {
+            .stats-grid { gap: 8px; }
+            .stat-card { padding: 12px; }
+            .stat-number { font-size: 22px; }
+            .road-card { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">جاري تحميل البيانات...</div>
+    </div>
+
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">🚦</span>
+                <span class="logo-text">ابحث عن الكثافة</span>
+            </div>
+            <div class="status-badge" id="systemStatus">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">متصل</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="alert-banner" id="alertBanner">
+            <span class="alert-banner-icon">🚨</span>
+            <div class="alert-banner-text">
+                <div class="alert-banner-title" id="alertTitle">تنبيه ازدحام</div>
+                <div class="alert-banner-desc" id="alertDesc">تم رصد ازدحام مروري</div>
+            </div>
+            <button class="alert-banner-close" onclick="dismissAlert()">×</button>
+        </div>
+
+        <div class="map-section">
+            <div class="map-header">
+                <div class="map-title">
+                    <span>🗺️</span>
+                    <span>خريطة جدة</span>
+                </div>
+                <button class="map-refresh" id="refreshBtn" onclick="manualRefresh()">
+                    <span class="refresh-icon">🔄</span>
+                    <span>تحديث</span>
+                </button>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card green" id="statGreen">
+                <div class="stat-number green" id="countGreen">0</div>
+                <div class="stat-label">طبيعي</div>
+            </div>
+            <div class="stat-card yellow" id="statYellow">
+                <div class="stat-number yellow" id="countYellow">0</div>
+                <div class="stat-label">متوسط</div>
+            </div>
+            <div class="stat-card red" id="statRed">
+                <div class="stat-number red" id="countRed">0</div>
+                <div class="stat-label">مزدحم</div>
+            </div>
+        </div>
+
+        <div class="roads-section">
+            <div class="section-title">
+                <span>🛣️</span>
+                <span>حالة الطرق</span>
+            </div>
+            <div id="roadsList"></div>
+        </div>
+
+        <div class="log-section">
+            <div class="log-header">
+                <div class="section-title" style="margin:0">
+                    <span>📋</span>
+                    <span>سجل التنبيهات</span>
+                </div>
+                <button class="log-clear" onclick="clearLog()">مسح</button>
+            </div>
+            <div id="logList">
+                <div class="log-empty">لا توجد تنبيهات بعد</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="section-title" style="margin-bottom:8px">
+                <span>⚙️</span>
+                <span>الإعدادات</span>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">
+                    <span>🔔</span>
+                    <span>إشعارات الازدحام</span>
+                </div>
+                <div class="toggle" id="notifToggle" onclick="toggleNotifications()">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">
+                    <span>🔊</span>
+                    <span>صوت التنبيه</span>
+                </div>
+                <div class="toggle" id="soundToggle" onclick="toggleSound()">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">
+                    <span>⏱️</span>
+                    <span>فحص كل 5 دقائق</span>
+                </div>
+                <div class="toggle active" id="autoToggle" onclick="toggleAuto()">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+            <button class="test-btn" onclick="testNotification()">🧪 اختبار الإشعار</button>
+        </div>
+
+        <div class="footer">
+            <div class="last-update">
+                <span class="update-dot"></span>
+                <span id="lastUpdate">جاري التحميل...</span>
+            </div>
+            <div>ابحث عن الكثافة - مراقب مرور جدة</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const TOMTOM_API_KEY = 'nlzqWQosYumhYhYxysXU8R7UmbSmOpxK';
+        const CHECK_INTERVAL = 5 * 60 * 1000;
+        
+        const ROADS = [
+            { id: 'king_abdulaziz', name: 'طريق الملك عبدالعزيز', lat: 21.5433, lng: 39.1728 },
+            { id: 'al_andalus', name: 'طريق الأندلس', lat: 21.6278, lng: 39.1011 },
+            { id: 'mina_bridge', name: 'كوبري الميناء', lat: 21.4817, lng: 39.1833 },
+            { id: 'corniche', name: 'طريق الكورنيش', lat: 21.6167, lng: 39.1167 },
+            { id: 'hamra_corniche', name: 'طريق كورنيش الحمراء', lat: 21.5500, lng: 39.1333 },
+            { id: 'coastal', name: 'طريق الساحل', lat: 21.4000, lng: 39.1000 },
+            { id: 'king_faisal', name: 'طريق الملك فيصل', lat: 21.5000, lng: 39.2000 },
+            { id: 'khumra', name: 'طريق الخمرة', lat: 21.4333, lng: 39.2167 }
+        ];
+        
+        let roadData = {};
+        let previousStates = {};
+        let notificationsEnabled = false;
+        let soundEnabled = false;
+        let autoCheckEnabled = true;
+        let checkTimer = null;
+        let map = null;
+        let markers = {};
+        let alertLog = JSON.parse(localStorage.getItem('trafficAlertLog') || '[]');
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            initMap();
+            loadSettings();
+            renderRoads();
+            renderLog();
+            await checkAllRoads();
+            document.getElementById('loading').classList.add('hidden');
+            if (autoCheckEnabled) startAutoCheck();
+            if ('serviceWorker' in navigator) {
+                try { await navigator.serviceWorker.register('sw.js'); } catch(e) { console.log('SW:', e); }
+            }
+        });
+        
+        function initMap() {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.5433, 39.1728], 11);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '©OpenStreetMap, ©CartoDB', subdomains: 'abcd', maxZoom: 19
+            }).addTo(map);
+            ROADS.forEach(road => {
+                const marker = L.circleMarker([road.lat, road.lng], {
+                    radius: 10, fillColor: '#2a2a3e', color: '#00d26a', weight: 2, opacity: 1, fillOpacity: 0.8
+                }).addTo(map);
+                marker.bindPopup(`<b>${road.name}</b><br><span id="popup-${road.id}">جاري التحميل...</span>`);
+                markers[road.id] = marker;
+            });
+        }
+        
+        async function checkAllRoads() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('spinning');
+            let greenCount = 0, yellowCount = 0, redCount = 0;
+            
+            for (const road of ROADS) {
+                try {
+                    const data = await fetchTrafficData(road.lat, road.lng);
+                    roadData[road.id] = { ...data, name: road.name };
+                    const status = getStatus(data);
+                    if (status === 'green') greenCount++;
+                    else if (status === 'yellow') yellowCount++;
+                    else redCount++;
+                    
+                    if (previousStates[road.id] && previousStates[road.id] !== status) {
+                        if (status === 'red') sendAlert(road.name, 'ازدحام مروري');
+                        else if (previousStates[road.id] === 'red') sendAlert(road.name, 'انفراج مروري', 'green');
+                    }
+                    previousStates[road.id] = status;
+                } catch (err) {
+                    console.error(`Error ${road.name}:`, err);
+                    roadData[road.id] = { error: true, name: road.name };
+                }
+                await new Promise(r => setTimeout(r, 200));
+            }
+            
+            updateStats(greenCount, yellowCount, redCount);
+            renderRoads();
+            updateMapMarkers();
+            updateLastUpdate();
+            btn.classList.remove('spinning');
+        }
+        
+        async function fetchTrafficData(lat, lng) {
+            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key=${TOMTOM_API_KEY}&point=${lat},${lng}&unit=KMPH`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (!data.flowSegmentData) throw new Error('No flow data');
+            const flow = data.flowSegmentData;
+            return {
+                currentSpeed: flow.currentSpeed || 0,
+                freeFlowSpeed: flow.freeFlowSpeed || 1,
+                confidence: flow.confidence || 0,
+                roadClosure: flow.roadClosure || false,
+                ratio: (flow.currentSpeed || 0) / (flow.freeFlowSpeed || 1)
+            };
+        }
+        
+        function getStatus(data) {
+            if (data.error || data.roadClosure) return 'red';
+            if (data.ratio < 0.4) return 'red';
+            if (data.ratio < 0.7) return 'yellow';
+            return 'green';
+        }
+        
+        function getStatusText(status) { return { green: 'طبيعي', yellow: 'متوسط', red: 'مزدحم' }[status]; }
+        function getStatusIcon(status) { return { green: '🟢', yellow: '🟡', red: '🔴' }[status]; }
+        
+        function updateStats(g, y, r) {
+            document.getElementById('countGreen').textContent = g;
+            document.getElementById('countYellow').textContent = y;
+            document.getElementById('countRed').textContent = r;
+        }
+        
+        function renderRoads() {
+            const container = document.getElementById('roadsList');
+            container.innerHTML = '';
+            ROADS.forEach(road => {
+                const data = roadData[road.id];
+                if (!data) return;
+                const status = data.error ? 'red' : getStatus(data);
+                const statusText = data.error ? 'خطأ في البيانات' : getStatusText(status);
+                const speedText = data.error ? '-' : `${Math.round(data.currentSpeed)} كم/س`;
+                
+                const card = document.createElement('div');
+                card.className = `road-card ${status}`;
+                card.onclick = () => { map.setView([road.lat, road.lng], 14); markers[road.id].openPopup(); };
+                card.innerHTML = `
+                    <div class="road-status-icon ${status}">${getStatusIcon(status)}</div>
+                    <div class="road-info">
+                        <div class="road-name">${road.name}</div>
+                        <div class="road-status-text ${status}">${statusText}</div>
+                    </div>
+                    <div class="road-speed">
+                        <div class="road-speed-value">${speedText}</div>
+                        <div>السرعة</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function updateMapMarkers() {
+            ROADS.forEach(road => {
+                const data = roadData[road.id];
+                if (!data || !markers[road.id]) return;
+                const status = data.error ? 'red' : getStatus(data);
+                const colors = { green: '#00d26a', yellow: '#ffc107', red: '#ff4757' };
+                const popupText = data.error ? 'خطأ في البيانات' : `${getStatusText(status)} - ${Math.round(data.currentSpeed)} كم/س`;
+                markers[road.id].setStyle({ fillColor: colors[status], color: colors[status] });
+                markers[road.id].getPopup().setContent(`<b>${road.name}</b><br>${popupText}`);
+            });
+        }
+        
+        function updateLastUpdate() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdate').textContent = `آخر تحديث: ${time}`;
+        }
+        
+        function sendAlert(roadName, message, type = 'red') {
+            const now = new Date();
+            const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+            if (type === 'red') showAlert('🚨 تنبيه ازدحام', `${roadName}: ${message}`, true);
+            
+            if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+                new Notification('ابحث عن الكثافة', {
+                    body: `${roadName}: ${message}`,
+                    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"%3E%3Crect fill="%23ff4757" width="192" height="192" rx="32"/%3E%3Ctext x="96" y="120" font-size="80" text-anchor="middle" fill="white"%3E🚨%3C/text%3E%3C/svg%3E',
+                    tag: roadName, requireInteraction: true
+                });
+            }
+            if (soundEnabled && type === 'red') playAlertSound();
+            addToLog(roadName, message, type, time);
+        }
+        
+        function showAlert(title, desc, autoHide = true) {
+            const banner = document.getElementById('alertBanner');
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertDesc').textContent = desc;
+            banner.classList.add('show');
+            if (autoHide) setTimeout(() => dismissAlert(), 8000);
+        }
+        
+        function dismissAlert() { document.getElementById('alertBanner').classList.remove('show'); }
+        
+        function addToLog(road, message, type, time) {
+            alertLog.unshift({ road, message, type, time, date: new Date().toISOString() });
+            if (alertLog.length > 50) alertLog.pop();
+            localStorage.setItem('trafficAlertLog', JSON.stringify(alertLog));
+            renderLog();
+        }
+        
+        function renderLog() {
+            const container = document.getElementById('logList');
+            if (alertLog.length === 0) { container.innerHTML = '<div class="log-empty">لا توجد تنبيهات بعد</div>'; return; }
+            container.innerHTML = alertLog.slice(0, 20).map(entry => {
+                const icon = entry.type === 'green' ? '✅' : '🚨';
+                return `<div class="log-item"><span class="log-time">${entry.time}</span><span class="log-icon">${icon}</span><span class="log-text">${entry.road}: ${entry.message}</span></div>`;
+            }).join('');
+        }
+        
+        function clearLog() { alertLog = []; localStorage.removeItem('trafficAlertLog'); renderLog(); }
+        
+        function playAlertSound() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 800; gain.gain.value = 0.3; osc.start(); setTimeout(() => osc.stop(), 300);
+            setTimeout(() => {
+                const osc2 = ctx.createOscillator(); const gain2 = ctx.createGain();
+                osc2.connect(gain2); gain2.connect(ctx.destination);
+                osc2.frequency.value = 600; gain2.gain.value = 0.3; osc2.start(); setTimeout(() => osc2.stop(), 300);
+            }, 400);
+        }
+        
+        function toggleNotifications() {
+            const toggle = document.getElementById('notifToggle');
+            if (!notificationsEnabled) {
+                if ('Notification' in window) {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            notificationsEnabled = true; toggle.classList.add('active');
+                            localStorage.setItem('trafficNotif', 'true');
+                            showAlert('✅ الإشعارات مفعلة', 'سيتم إرسال إشعارات عند الازدحام', false);
+                            setTimeout(dismissAlert, 3000);
+                        } else {
+                            showAlert('⚠️ تم رفض الإذن', 'يرجى السماح بالإشعارات من إعدادات المتصفح', false);
+                            setTimeout(dismissAlert, 4000);
+                        }
+                    });
+                }
+            } else {
+                notificationsEnabled = false; toggle.classList.remove('active');
+                localStorage.setItem('trafficNotif', 'false');
+            }
+        }
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').classList.toggle('active', soundEnabled);
+            localStorage.setItem('trafficSound', soundEnabled ? 'true' : 'false');
+        }
+        
+        function toggleAuto() {
+            autoCheckEnabled = !autoCheckEnabled;
+            const toggle = document.getElementById('autoToggle');
+            toggle.classList.toggle('active', autoCheckEnabled);
+            localStorage.setItem('trafficAuto', autoCheckEnabled ? 'true' : 'false');
+            if (autoCheckEnabled) startAutoCheck(); else stopAutoCheck();
+        }
+        
+        function loadSettings() {
+            notificationsEnabled = localStorage.getItem('trafficNotif') === 'true';
+            soundEnabled = localStorage.getItem('trafficSound') === 'true';
+            autoCheckEnabled = localStorage.getItem('trafficAuto') !== 'false';
+            document.getElementById('notifToggle').classList.toggle('active', notificationsEnabled);
+            document.getElementById('soundToggle').classList.toggle('active', soundEnabled);
+            document.getElementById('autoToggle').classList.toggle('active', autoCheckEnabled);
+        }
+        
+        function startAutoCheck() {
+            stopAutoCheck();
+            checkTimer = setInterval(() => { if (document.visibilityState !== 'hidden') checkAllRoads(); }, CHECK_INTERVAL);
+        }
+        
+        function stopAutoCheck() { if (checkTimer) { clearInterval(checkTimer); checkTimer = null; } }
+        function manualRefresh() { checkAllRoads(); }
+        
+        function testNotification() {
+            sendAlert('طريق الملك عبدالعزيز', 'اختبار - ازدحام مروري تجريبي', 'red');
+            showAlert('✅ اختبار ناجح', 'تم إرسال إشعار تجريبي', false);
+            setTimeout(dismissAlert, 3000);
+        }
+        
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && autoCheckEnabled) checkAllRoads(); });
+    </script>
+</body>
+</html>
