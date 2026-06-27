@@ -202,6 +202,7 @@ if (!messagesViewVisible && !homeViewVisible && typeof _currentDmUid !== 'undefi
 // ════ عرض إشعار قناة عامة ════
 function _displayChannelNotif(notif) {
   console.log('[Notif] displaying channel notif:', notif.text?.slice(0, 30));
+  if (window._dndEnabled) return;
 
   if (typeof incrementUnread === 'function') incrementUnread(notif.serverId, notif.channelId);
   playMsgSound();
