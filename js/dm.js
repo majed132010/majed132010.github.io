@@ -753,10 +753,9 @@ async function openSnap(msgKey, mediaUrl, dmId) {
   const overlay = document.createElement('div');
   overlay.id = 'snapOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
-  const img = document.createElement('img');
-  img.loading = 'eager';
-  img.decoding = 'sync';
+const img = new Image();
   img.src = mediaUrl;
+  await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
   img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
   const hint = document.createElement('div');
   hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
