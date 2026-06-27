@@ -444,7 +444,7 @@ window.sendDM = async function() {
     });
     try {
       const ext1 = m.name?.split('.').pop() || 'jpg';
-      const path1 = `dm_messages/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext1}`;
+      const path1 = `dm_messages/${dmId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext1}`;
       const url = await uploadToStorage(new File([m.blob], m.name, { type: m.mimeType }), path1, { retries: 3 });
       await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
       try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
