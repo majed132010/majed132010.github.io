@@ -1,6 +1,5 @@
 // ════ DIRECT MESSAGES ════
 
-// ── متغيرات الحالة ──
 let _currentDmUid = null;
 let _dmListener = null;
 let _dmTypingListener = null;
@@ -13,7 +12,6 @@ window._pendingDmMedia = [];
 
 function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 
-// ── فتح شاشة الرسائل الخاصة ──
 window.openDMFromSvBar = function() {
   if (typeof isMobile === 'function' && isMobile()) {
     if (typeof openDrawer === 'function') openDrawer();
@@ -25,8 +23,8 @@ window.openDMFromSvBar = function() {
 function openDMScreen() {
   closeSidebar();
   if (currentServer) _lastServerId = currentServer;
- currentServer = null; currentChannel = null; _currentDmUid = null;
-window.currentServerId = null; window.currentChannelId = null;
+  currentServer = null; currentChannel = null; _currentDmUid = null;
+  window.currentServerId = null; window.currentChannelId = null;
   const chBtn = document.getElementById('chSettingsBtn');
   if (chBtn) chBtn.style.display = 'none';
   document.getElementById('mhIcon').textContent = '💬';
@@ -44,7 +42,6 @@ window.currentServerId = null; window.currentChannelId = null;
   renderDmPickerList();
 }
 
-// ── عرض قائمة الأعضاء ──
 function renderDmPickerList() {
   const container = document.getElementById('dmPickerList');
   if (!container || !currentUser) return;
@@ -78,7 +75,7 @@ function renderDmPickerList() {
       card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s;position:relative';
       const av = document.createElement('div');
       av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
-      if (avatar) av.innerHTML = `<img src="${escHtml(avatar)}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = (name[0] || '?').toUpperCase();
+      if (avatar) av.innerHTML = '<img src="' + escHtml(avatar) + '" style="width:100%;height:100%;object-fit:cover">'; else av.textContent = (name[0] || '?').toUpperCase();
       const nameEl = document.createElement('div');
       nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif';
       nameEl.textContent = name;
@@ -93,8 +90,6 @@ function renderDmPickerList() {
   });
 }
 
-// ── فتح محادثة ──
-// بعد
 function openDM(uid, name) {
   if (!currentUser) { console.warn('[DM] openDM called before auth'); return; }
   closeSidebar();
@@ -129,14 +124,14 @@ function openDM(uid, name) {
 
   clearDmUnread(uid);
 
-  // تحديث آخر 10 رسائل كمقروءة
   const dmId = getDmId(currentUser.uid, uid);
+  // تحديث آخر 10 رسائل كمقروءة — مع استثناء السناب
   db.ref('dm_messages/' + dmId).limitToLast(10).once('value').then(snap => {
     const updates = {};
     const now = Date.now();
     snap.forEach(ch => {
       const msg = ch.val();
-      if (msg && msg.uid === uid && msg.status !== 'read') {
+      if (msg && msg.uid === uid && msg.status !== 'read' && !msg.snapType) {
         updates[ch.key + '/status'] = 'read';
         updates[ch.key + '/readAt'] = now;
       }
@@ -149,7 +144,6 @@ function openDM(uid, name) {
   const dmArea = document.getElementById('dmMessages');
   dmArea.innerHTML = '';
 
-  // تنظيف المستمعات القديمة
   if (_dmListener) {
     const _r = _dmListener.mainRef || null;
     if (_r) _r.off('child_added', _dmListener.fn);
@@ -164,12 +158,12 @@ function openDM(uid, name) {
 
   const fn = snap => {
     const msg = snap.val();
-    if (!msg || dmArea.querySelector(`[data-key="${snap.key}"]`)) return;
+    if (!msg || dmArea.querySelector('[data-key="' + snap.key + '"]')) return;
     const _d = buildDmMsgDiv(msg, snap.key, uid, name);
     if (!_d) return;
     dmArea.appendChild(_d);
-    // علّم الرسائل الواردة كمقروءة فوراً
-   if (msg.uid === uid && msg.status !== 'read' && !msg.snapType) {
+    // علّم الرسائل الواردة كمقروءة — مع استثناء السناب
+    if (msg.uid === uid && msg.status !== 'read' && !msg.snapType) {
       db.ref('dm_messages/' + dmId + '/' + snap.key).update({ status: 'read', readAt: Date.now() });
     }
     if (_dmInitialDone) dmArea.scrollTop = dmArea.scrollHeight;
@@ -178,10 +172,11 @@ function openDM(uid, name) {
   const changeFn = snap => {
     const msg = snap.val();
     if (!msg) return;
-   if (msg.snapType && msg.snapViewed) return;
+    // تجاهل السناب المشاهَد
+    if (msg.snapType && msg.snapViewed) return;
     // تحديث علامة القراءة للمُرسل
     if (msg.status === 'read' && msg.uid === currentUser.uid) {
-      const statusEl = dmArea.querySelector(`.msg-status[data-key="${snap.key}"]`);
+      const statusEl = dmArea.querySelector('.msg-status[data-key="' + snap.key + '"]');
       if (statusEl) {
         statusEl.textContent = '✓✓';
         statusEl.style.color = '#5865f2';
@@ -191,8 +186,7 @@ function openDM(uid, name) {
         }
       }
     }
-    // تحديث الميديا عند اكتمال الرفع
-    const el = dmArea.querySelector(`[data-key="${snap.key}"]`);
+    const el = dmArea.querySelector('[data-key="' + snap.key + '"]');
     if (!el) return;
     const body = el.querySelector('.msg-body');
     if (!body) return;
@@ -200,7 +194,7 @@ function openDM(uid, name) {
     if (progWrap) {
       if (msg.uploading) {
         if (typeof _updateUploadProgressEl === 'function') _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
- } else if (!msg.uploading && msg.mediaUrl && !msg.snapType) {
+      } else if (!msg.uploading && msg.mediaUrl && !msg.snapType) {
         if (typeof _cleanupUploadState === 'function') _cleanupUploadState(snap.key);
         progWrap.remove();
         if (msg.mediaType === 'video') {
@@ -251,12 +245,8 @@ function openDM(uid, name) {
   });
 }
 
-// ── بناء رسالة ──
 function buildDmMsgDiv(msg, key, otherUid, otherName) {
-  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
-  if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) {
-    return null;
-  }
+  if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null;
 
   const isMine = msg.uid === currentUser?.uid;
   const div = document.createElement('div');
@@ -264,9 +254,8 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   const av = document.createElement('div'); av.className = 'msg-av'; av.textContent = (msg.name || '?')[0];
   const body = document.createElement('div'); body.className = 'msg-body';
   const meta = document.createElement('div'); meta.className = 'msg-meta';
-  meta.innerHTML = `${escHtml(msg.name || '')} ${formatTime(msg.ts)}`;
+  meta.innerHTML = escHtml(msg.name || '') + ' ' + formatTime(msg.ts);
 
-  // ✅ إصلاح علامة القراءة — إدراجها في البداية لضمان الظهور
   if (isMine) {
     const statusEl = document.createElement('span');
     statusEl.className = 'msg-status';
@@ -285,7 +274,7 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
 
   if (msg.replyTo) {
     const quote = document.createElement('div'); quote.className = 'msg-reply-quote';
-    quote.innerHTML = `<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:2px">${escHtml(msg.replyTo.name || '')}</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(msg.replyTo.text || '🖼️')}</div>`;
+    quote.innerHTML = '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:2px">' + escHtml(msg.replyTo.name || '') + '</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(msg.replyTo.text || '🖼️') + '</div>';
     body.appendChild(quote);
   }
 
@@ -294,29 +283,38 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(txt);
   }
 
-  // 👻 السناب
+  // 👻 السناب — يجب أن يكون قبل uploading وقبل mediaUrl
   if (msg.snapType) {
     const dmId = getDmId(currentUser.uid, otherUid);
     const snapBubble = document.createElement('div');
     snapBubble.className = 'snap-bubble';
-    if (msg.snapViewed || !msg.mediaUrl) {
+    if (msg.snapViewed) {
       snapBubble.innerHTML = isMine ? '👁️ رآها' : '👁️ تمت المشاهدة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
+    } else if (msg.uploading || !msg.mediaUrl) {
+      snapBubble.innerHTML = '⏳ جاري الإرسال...';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.04);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
+      if (typeof _buildUploadProgressEl === 'function') body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
     } else if (isMine) {
       snapBubble.innerHTML = '👻 سناب أرسلته — بانتظار المشاهدة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(88,101,242,0.12);color:var(--acc);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
     } else {
-   snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+      snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
       snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
     }
     body.appendChild(snapBubble);
-div.appendChild(av); div.appendChild(body);
+    div.appendChild(av); div.appendChild(body);
     return div;
   }
+
+  if (msg.uploading && !msg.mediaUrl) {
+    if (typeof _buildUploadProgressEl === 'function') body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
+  }
+
   if (msg.mediaUrl) {
     if (msg.expiresAt && !msg.saved && Date.now() > msg.expiresAt) {
-      // لا تُعرض الميديا منتهية الصلاحية — لكن النص يبقى
+      // لا تُعرض الميديا منتهية الصلاحية
     } else if (msg.mediaType === 'video') {
       body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
@@ -348,7 +346,6 @@ div.appendChild(av); div.appendChild(body);
 
   div.appendChild(av); div.appendChild(body); div.appendChild(actions);
 
-  // Context bar
   if (!window._ctxDismissReady) {
     window._ctxDismissReady = true;
     document.addEventListener('click', () => {
@@ -361,7 +358,7 @@ div.appendChild(av); div.appendChild(body);
   const ctxActions = [
     { icon: '↩️', label: 'رد', fn: () => setDmReply(key, msg.name, msg.text) },
     { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
-    { icon: '⭐', label: 'تثبيت', fn: () => saveDmMessage(key) },  // ✅ تثبيت مثل السناب
+    { icon: '⭐', label: 'تثبيت', fn: () => saveDmMessage(key) },
     ...(isMine ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteDmMessage(key, otherUid) }] : []),
     ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => { const _a = document.createElement('a'); _a.href = msg.mediaUrl || msg.voiceUrl; _a.download = msg.mediaName || 'media'; _a.target = '_blank'; document.body.appendChild(_a); _a.click(); _a.remove(); } }] : []),
   ];
@@ -369,7 +366,7 @@ div.appendChild(av); div.appendChild(body);
     const b = document.createElement('button');
     b.className = 'mc-btn' + (ac.danger ? ' danger' : '');
     b.title = ac.label;
-    b.innerHTML = `${ac.icon}${ac.label}`;
+    b.innerHTML = ac.icon + ac.label;
     b.addEventListener('click', e => { e.stopPropagation(); ctxBar.classList.remove('visible'); ac.fn(); });
     ctxBar.appendChild(b);
   });
@@ -388,22 +385,15 @@ div.appendChild(av); div.appendChild(body);
   return div;
 }
 
-// ✅ دالة تثبيت الرسالة في الخاص (مثل السناب)
 async function saveDmMessage(key) {
   if (!_currentDmUid || !currentUser) return;
   const dmId = getDmId(currentUser.uid, _currentDmUid);
   try {
-    await db.ref('dm_messages/' + dmId + '/' + key).update({
-      saved: true,
-      expiresAt: null
-    });
+    await db.ref('dm_messages/' + dmId + '/' + key).update({ saved: true, expiresAt: null });
     toast('📌 تم تثبيت الرسالة — لن تختفي');
-  } catch(e) {
-    toast('❌ فشل التثبيت');
-  }
+  } catch(e) { toast('❌ فشل التثبيت'); }
 }
 
-// ── إرسال رسالة ──
 window.sendDM = async function() {
   if (!_currentDmUid || !currentUser) return;
   const inp = document.getElementById('dmChatInp');
@@ -417,26 +407,22 @@ window.sendDM = async function() {
   stopDmTyping();
 
   const dmId = getDmId(currentUser.uid, _currentDmUid);
-
-  // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة
   const msgBase = {
     uid: currentUser.uid,
     name: userProfile.displayName || 'مستخدم',
     ts: Date.now(),
     status: 'sent',
-    expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // ⏰ 24 ساعة
-    saved: false                                    // 📌 لم تُثبت
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    saved: false
   };
 
   if (_dmReplyTo) { msgBase.replyTo = { ..._dmReplyTo }; clearDmReply(); }
 
-  // إرسال النص
   if (text) {
     await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
     try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
   }
 
-  // إرسال الميديا
   const media = window._pendingDmMedia.slice();
   window._pendingDmMedia = [];
   const dmPreview = document.getElementById('dmMediaPreview');
@@ -455,7 +441,7 @@ window.sendDM = async function() {
     });
     try {
       const ext1 = m.name?.split('.').pop() || 'jpg';
-const path1 = `dm_messages/${dmId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext1}`;
+      const path1 = 'dm_messages/' + dmId + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext1;
       const url = await uploadToStorage(new File([m.blob], m.name, { type: m.mimeType }), path1, { retries: 3 });
       await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
       try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', m.type === 'video' ? '🎥 فيديو' : '🖼️ صورة', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
@@ -466,14 +452,12 @@ const path1 = `dm_messages/${dmId}/${Date.now()}_${Math.random().toString(36).sl
     if (m.localUrl) URL.revokeObjectURL(m.localUrl);
   }
 
-  // تحديث قائمة المحادثات
   const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
   const otherName = otherSnap.val() || 'مستخدم';
   await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
   await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
 };
 
-// ── اختيار ميديا ──
 async function handleDmMediaSelect(input) {
   const files = Array.from(input.files);
   input.value = '';
@@ -483,7 +467,7 @@ async function handleDmMediaSelect(input) {
   for (const file of files) {
     const isVideo = file.type.startsWith('video');
     const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
-    if (file.size > maxSize) { toast(`❌ الملف أكبر من ${isVideo ? '500MB' : '50MB'}`); continue; }
+    if (file.size > maxSize) { toast('❌ الملف أكبر من ' + (isVideo ? '500MB' : '50MB')); continue; }
     try {
       const arrayBuffer = await file.arrayBuffer();
       let blob = new Blob([arrayBuffer], { type: file.type });
@@ -491,7 +475,6 @@ async function handleDmMediaSelect(input) {
       const mimeType = blob.type || file.type;
       const localUrl = URL.createObjectURL(blob);
       window._pendingDmMedia.push({ blob, type: isVideo ? 'video' : 'image', name: file.name, mimeType, localUrl });
-      // عرض معاينة الصورة
       let preview = document.getElementById('dmMediaPreview');
       if (!preview) {
         preview = document.createElement('div');
@@ -514,7 +497,6 @@ async function handleDmMediaSelect(input) {
   }
 }
 
-// ── دوال مساعدة ──
 function clearDmUnread(uid) {
   _dmUnread[uid] = 0;
   if (typeof updateDmBadge === 'function') updateDmBadge();
@@ -538,12 +520,7 @@ function renderDmList() {
       const item = document.createElement('div');
       item.className = 'dm-item' + (_currentDmUid === uid ? ' active' : '');
       const unread = _dmUnread[uid] || 0;
-      item.innerHTML = `
-        <div class="dm-av">${(info.name || '?')[0]}</div>
-        <div class="dm-info">
-          <div class="dm-name">${escHtml(info.name || 'مستخدم')}</div>
-        </div>
-        ${unread > 0 ? `<div class="dm-badge">${unread > 99 ? '99+' : unread}</div>` : ''}`;
+      item.innerHTML = '<div class="dm-av">' + (info.name || '?')[0] + '</div><div class="dm-info"><div class="dm-name">' + escHtml(info.name || 'مستخدم') + '</div></div>' + (unread > 0 ? '<div class="dm-badge">' + (unread > 99 ? '99+' : unread) + '</div>' : '');
       item.addEventListener('click', () => openDM(uid, info.name || 'مستخدم'));
       container.appendChild(item);
     });
@@ -581,7 +558,7 @@ async function deleteDmMessage(key, otherUid) {
   if (!confirm('حذف هذه الرسالة؟')) return;
   const dmId = getDmId(currentUser.uid, otherUid);
   await db.ref('dm_messages/' + dmId + '/' + key).remove();
-  document.querySelector(`[data-key="${key}"]`)?.remove();
+  document.querySelector('[data-key="' + key + '"]')?.remove();
 }
 
 function listenDMs() {
@@ -599,9 +576,7 @@ function listenDMs() {
 }
 
 function _addDmListener(uid) {
-  // ✅ إذا كان المستمع موجوداً لا تُعد تسجيله
   if (_dmGlobalListeners[uid]) return;
-
   if (!currentUser) return;
   const dmId = getDmId(currentUser.uid, uid);
   const q = db.ref('dm_messages/' + dmId).limitToLast(1);
@@ -610,10 +585,8 @@ function _addDmListener(uid) {
     if (!initialized) return;
     const msg = msgSnap.val();
     if (!msg || msg.uid === currentUser.uid) return;
-
     const dmViewVisible = document.getElementById('dmView')?.style.display === 'flex';
     if (dmViewVisible && _currentDmUid === uid) return;
-
     if (typeof showDmNotif === 'function') showDmNotif(msg, uid);
     _refreshPickerBadge(uid);
   };
@@ -621,8 +594,9 @@ function _addDmListener(uid) {
   q.once('value', () => { initialized = true; });
   _dmGlobalListeners[uid] = { q, fn };
 }
+
 function _refreshPickerBadge(uid) {
-  const card = document.querySelector(`#dmPickerGrid [data-dm-uid="${uid}"]`);
+  const card = document.querySelector('#dmPickerGrid [data-dm-uid="' + uid + '"]');
   if (!card) return;
   const existing = card.querySelector('.dm-picker-badge');
   if (existing) existing.remove();
@@ -636,7 +610,7 @@ function _refreshPickerBadge(uid) {
   }
 }
 
-// ════ رسائل صوتية في الخاص ════
+// ════ رسائل صوتية ════
 let _dmMediaRecorder = null, _dmAudioChunks = [], _dmRecordingTimer = null;
 let _dmRecordingSeconds = 0, _dmVoiceRecordingBusy = false;
 let _dmRecordingMaxTimer = null;
@@ -659,11 +633,8 @@ async function toggleDmVoiceRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       _dmAudioChunks = []; _dmRecordingSeconds = 0;
-      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']
-        .find(t => MediaRecorder.isTypeSupported(t)) || '';
-      _dmMediaRecorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+      _dmMediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       _dmMediaRecorder.ondataavailable = e => { if (e.data.size > 0) _dmAudioChunks.push(e.data); };
       _dmMediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
@@ -689,13 +660,8 @@ async function toggleDmVoiceRecording() {
         const s = String(_recSeconds%60).padStart(2,'0');
         if (window._dmRecTimerEl) window._dmRecTimerEl.textContent = m+':'+s;
       }, 1000);
-      _dmRecordingTimer = setInterval(() => {
-        _dmRecordingSeconds++;
-        btn.textContent = `⏹ ${_dmRecordingSeconds}s`;
-      }, 1000);
-      _dmRecordingMaxTimer = setTimeout(() => {
-        toast('⏱️ 5 ثوانٍ متبقية — التسجيل سيتوقف تلقائياً');
-      }, 55000);
+      _dmRecordingTimer = setInterval(() => { _dmRecordingSeconds++; btn.textContent = '⏹ ' + _dmRecordingSeconds + 's'; }, 1000);
+      _dmRecordingMaxTimer = setTimeout(() => { toast('⏱️ 5 ثوانٍ متبقية — التسجيل سيتوقف تلقائياً'); }, 55000);
       toast('🎤 جاري التسجيل... اضغط مرة أخرى للإرسال (الحد: 60 ثانية)');
     } catch(e) { toast('❌ لا يمكن الوصول للميكروفون'); }
   }
@@ -707,24 +673,19 @@ async function sendDmVoiceMessage(blob, duration, mimeType) {
   const ct = (mimeType || 'audio/webm').split(';')[0];
   const ext = ct === 'audio/mp4' ? 'mp4' : ct === 'audio/ogg' ? 'ogg' : 'webm';
   try {
-    const voicePath = `dm_messages/voice_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-    const url = await uploadToStorage(new File([blob], `voice.${ext}`, { type: ct }), voicePath, { retries: 3 });
     const dmId = getDmId(currentUser.uid, _currentDmUid);
+    const voicePath = 'dm_messages/' + dmId + '/voice_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+    const url = await uploadToStorage(new File([blob], 'voice.' + ext, { type: ct }), voicePath, { retries: 3 });
     await db.ref('dm_messages/' + dmId).push({
-      uid: currentUser.uid,
-      name: userProfile.displayName || 'مستخدم',
-      ts: Date.now(),
-      voiceUrl: url,
-      voiceDuration: duration,
-      text: '',
-      status: 'sent',
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-      saved: false
+      uid: currentUser.uid, name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(), voiceUrl: url, voiceDuration: duration, text: '',
+      status: 'sent', expiresAt: Date.now() + 24 * 60 * 60 * 1000, saved: false
     });
     toast('✅ تم إرسال الرسالة الصوتية');
     try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
   } catch(e) { toast('❌ فشل إرسال الرسالة الصوتية'); }
 }
+
 // ════ نظام السناب 👻 ════
 
 async function handleDmSnapSelect(input) {
@@ -732,84 +693,49 @@ async function handleDmSnapSelect(input) {
   input.value = '';
   if (!file || !file.type.startsWith('image')) return;
   if (!_currentDmUid || !currentUser) return;
-
   try {
     const arrayBuffer = await file.arrayBuffer();
     let blob = new Blob([arrayBuffer], { type: file.type });
     if (typeof compressImage === 'function') blob = await compressImage(blob);
-
     const dmId = getDmId(currentUser.uid, _currentDmUid);
     const dmMsgPath = 'dm_messages/' + dmId;
     const msgRef = db.ref(dmMsgPath).push();
     const msgKey = msgRef.key;
-
     await msgRef.set({
-      uid: currentUser.uid,
-      name: userProfile.displayName || 'مستخدم',
-      ts: Date.now(),
-      status: 'sent',
-      snapType: true,
-      snapViewed: false,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-      uploading: true,
-      uploadProgress: 1,
-      mediaType: 'image',
-      mediaName: file.name,
-      text: ''
+      uid: currentUser.uid, name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(), status: 'sent', snapType: true, snapViewed: false,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000, uploading: true, uploadProgress: 1,
+      mediaType: 'image', mediaName: file.name, text: ''
     });
-
     toast('⏳ جاري إرسال السناب...');
-
     const ext = file.name.split('.').pop() || 'jpg';
-    const path = `dm_snaps/${dmId}/${Date.now()}.${ext}`;
-    const url = await uploadToStorage(
-      new File([blob], file.name, { type: blob.type }),
-      path, { retries: 3 }
-    );
-
-    await db.ref(dmMsgPath + '/' + msgKey).update({
-      mediaUrl: url,
-      uploading: false,
-      uploadProgress: null
-    });
-
-    try {
-      await sendPushToUser(_currentDmUid,
-        userProfile.displayName || 'عوالم',
-        '👻 أرسل لك سناباً',
-        { type: 'dm', fromUid: currentUser.uid }
-      );
-    } catch(e) {}
-
+    const path = 'dm_snaps/' + dmId + '/' + Date.now() + '.' + ext;
+    const url = await uploadToStorage(new File([blob], file.name, { type: blob.type }), path, { retries: 3 });
+    await db.ref(dmMsgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+    try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'عوالم', '👻 أرسل لك سناباً', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
     const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
     const otherName = otherSnap.val() || 'مستخدم';
     await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
     await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
-
-  } catch(e) {
-    toast('❌ فشل إرسال السناب: ' + (e.message || ''));
-  }
+  } catch(e) { toast('❌ فشل إرسال السناب: ' + (e.message || '')); }
 }
 
 async function openSnap(msgKey, mediaUrl, dmId) {
   if (!mediaUrl) return;
-
   const overlay = document.createElement('div');
   overlay.id = 'snapOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
-
   const img = document.createElement('img');
   img.src = mediaUrl;
   img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
-
   const hint = document.createElement('div');
   hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
   hint.textContent = 'اضغط في أي مكان للإغلاق';
-
   overlay.appendChild(img);
   overlay.appendChild(hint);
   document.body.appendChild(overlay);
-async function closeSnap() {
+
+  async function closeSnap() {
     overlay.remove();
     const snapRef = db.ref('dm_messages/' + dmId + '/' + msgKey);
     const snapData = await snapRef.once('value');
@@ -822,10 +748,13 @@ async function closeSnap() {
     }
     const el = document.querySelector('[data-key="' + msgKey + '"] .snap-bubble');
     if (el) {
-      el.innerHTML = '👁️ تمت المشاهدة';
-      el.style.background = 'rgba(88,101,242,0.1)';
-      el.style.color = 'var(--muted)';
-      el.style.cursor = 'default';
+      if (viewCount >= 2) {
+        el.innerHTML = '👁️ تمت المشاهدة';
+        el.style.background = 'rgba(88,101,242,0.1)';
+        el.style.color = 'var(--muted)';
+        el.style.cursor = 'default';
+        el.style.border = 'none';
+      }
     }
   }
 
