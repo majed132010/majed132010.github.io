@@ -9,7 +9,6 @@
     <title>ابحث عن الكثافة</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%2300d26a' width='192' height='192' rx='32'/%3E%3Ctext x='96' y='120' font-size='80' text-anchor='middle' fill='white'%3E🚦%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -392,17 +391,14 @@
             margin-bottom: 20px;
         }
         .loading-text { color: var(--text-secondary); font-size: 14px; }
-        .leaflet-container { background: var(--bg-primary) !important; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
         @media (max-width: 400px) {
             .stats-grid { gap: 8px; }
             .stat-card { padding: 12px; }
             .stat-number { font-size: 22px; }
             .road-card { padding: 12px; }
         }
+        /* Google Maps dark mode styling */
+        .gm-style { font-family: 'Segoe UI', sans-serif !important; }
     </style>
 </head>
 <body>
@@ -533,9 +529,11 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const TOMTOM_API_KEY = 'nlzqWQosYumhYhYxysXU8R7UmbSmOpxK';
+        // ==================== ضع مفتاح Google Maps هنا ====================
+const GOOGLE_MAPS_API_KEY = 'AIzaSyC0gVKOI-3DxmbW0biStTCUw-B04KHUUnc';
+        // ==================================================================
+
         const CHECK_INTERVAL = 5 * 60 * 1000;
 
         const ROADS = [
@@ -559,39 +557,170 @@
         let alertLog = JSON.parse(localStorage.getItem('trafficAlertLog') || '[]');
         let isPeakTime = false;
 
+        // Load Google Maps script dynamically
+        function loadGoogleMaps() {
+            return new Promise((resolve, reject) => {
+                if (GOOGLE_MAPS_API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+                    reject(new Error('API Key not set'));
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&language=ar&callback=initGoogleMap`;
+                script.async = true;
+                script.defer = true;
+                script.onerror = () => reject(new Error('Failed to load Google Maps'));
+                document.head.appendChild(script);
+
+                window.initGoogleMap = () => {
+                    resolve();
+                };
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
-            initMap();
-            loadSettings();
-            checkPeakTime();
-            updateAllRoads();
-            renderRoads();
-            renderLog();
-            document.getElementById('loading').classList.add('hidden');
-            if (autoCheckEnabled) startAutoCheck();
-            if ('serviceWorker' in navigator) {
-                try { await navigator.serviceWorker.register('sw.js'); } catch(e) { console.log('SW:', e); }
+            try {
+                await loadGoogleMaps();
+                initMap();
+                loadSettings();
+                checkPeakTime();
+                updateAllRoads();
+                renderRoads();
+                renderLog();
+                document.getElementById('loading').classList.add('hidden');
+                if (autoCheckEnabled) startAutoCheck();
+                if ('serviceWorker' in navigator) {
+                    try { await navigator.serviceWorker.register('sw.js'); } catch(e) { console.log('SW:', e); }
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                showAlert('⚠️ خطأ في التحميل', 'يرجى التحقق من API Key', false);
+                document.getElementById('loading').classList.add('hidden');
             }
         });
 
         function initMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.5433, 39.1728], 12);
+            // Dark mode map styles
+            const darkModeStyles = [
+                { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+                { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+                { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+                {
+                    featureType: 'administrative.locality',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#d59563' }]
+                },
+                {
+                    featureType: 'poi',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#d59563' }]
+                },
+                {
+                    featureType: 'poi.park',
+                    elementType: 'geometry',
+                    stylers: [{ color: '#263c3f' }]
+                },
+                {
+                    featureType: 'poi.park',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#6b9a76' }]
+                },
+                {
+                    featureType: 'road',
+                    elementType: 'geometry',
+                    stylers: [{ color: '#38414e' }]
+                },
+                {
+                    featureType: 'road',
+                    elementType: 'geometry.stroke',
+                    stylers: [{ color: '#212a37' }]
+                },
+                {
+                    featureType: 'road',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#9ca5b3' }]
+                },
+                {
+                    featureType: 'road.highway',
+                    elementType: 'geometry',
+                    stylers: [{ color: '#746855' }]
+                },
+                {
+                    featureType: 'road.highway',
+                    elementType: 'geometry.stroke',
+                    stylers: [{ color: '#1f2835' }]
+                },
+                {
+                    featureType: 'road.highway',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#f3d19c' }]
+                },
+                {
+                    featureType: 'transit',
+                    elementType: 'geometry',
+                    stylers: [{ color: '#2f3948' }]
+                },
+                {
+                    featureType: 'transit.station',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#d59563' }]
+                },
+                {
+                    featureType: 'water',
+                    elementType: 'geometry',
+                    stylers: [{ color: '#17263c' }]
+                },
+                {
+                    featureType: 'water',
+                    elementType: 'labels.text.fill',
+                    stylers: [{ color: '#515c6d' }]
+                },
+                {
+                    featureType: 'water',
+                    elementType: 'labels.text.stroke',
+                    stylers: [{ color: '#17263c' }]
+                }
+            ];
 
-            // Base map (dark)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '©OpenStreetMap, ©CartoDB',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(map);
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 21.5433, lng: 39.1728 },
+                zoom: 12,
+                styles: darkModeStyles,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+                zoomControl: false,
+                gestureHandling: 'greedy'
+            });
 
-            // TomTom Traffic Tiles (FREE - 50,000/day) - shows colored road lines!
-            L.tileLayer(`https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`, {
-                attribution: '©TomTom',
-                subdomains: 'abcd',
-                maxZoom: 19,
-                opacity: 0.8
-            }).addTo(map);
+            // Add Traffic Layer (shows colored road lines like Google Maps app!)
+            const trafficLayer = new google.maps.TrafficLayer();
+            trafficLayer.setMap(map);
 
-            // NO markers - traffic tiles show the roads as colored lines
+            // Add small markers for each road
+            ROADS.forEach(road => {
+                const marker = new google.maps.Marker({
+                    position: { lat: road.lat, lng: road.lng },
+                    map: map,
+                    title: road.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 5,
+                        fillColor: '#00d26a',
+                        fillOpacity: 0.9,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 1
+                    }
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div style="color:#333;font-family:Segoe UI,sans-serif"><b>${road.name}</b><br><span id="info-${road.id}">جاري التحميل...</span></div>`
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+            });
         }
 
         function checkPeakTime() {
@@ -719,8 +848,10 @@
                 const card = document.createElement('div');
                 card.className = `road-card ${status}`;
                 card.onclick = () => {
-                    // Center map on road area without markers
-                    map.setView([road.lat, road.lng], 14);
+                    if (map) {
+                        map.setCenter({ lat: road.lat, lng: road.lng });
+                        map.setZoom(15);
+                    }
                 };
 
                 card.innerHTML = `
