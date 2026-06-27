@@ -190,6 +190,17 @@ function openDM(uid, name) {
     if (!el) return;
     const body = el.querySelector('.msg-body');
     if (!body) return;
+    // تحديث فقاعة السناب عند اكتمال الرفع
+    if (msg.snapType && !msg.uploading && msg.mediaUrl && !msg.snapViewed) {
+      const existingSnap = body.querySelector('.snap-bubble');
+      if (existingSnap && existingSnap.innerHTML.includes('جاري')) {
+        existingSnap.innerHTML = '👁️ اضغط لفتح الصورة';
+        existingSnap.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
+        const dmId2 = getDmId(currentUser.uid, uid);
+        existingSnap.onclick = () => openSnap(snap.key, msg.mediaUrl, dmId2);
+      }
+      return;
+    }
     const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
     if (progWrap) {
       if (msg.uploading) {
@@ -214,10 +225,13 @@ function openDM(uid, name) {
         progWrap.remove();
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
-        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
-        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
-        const dmId2 = getDmId(currentUser.uid, uid);
-        snapBubble.addEventListener('click', () => openSnap(snap.key, msg.mediaUrl, dmId2));
+  const viewCount = msg.snapViewCount || 0;
+      if (viewCount >= 2) {
+        snapBubble.innerHTML = '👁️ تمت المشاهدة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
+      } else {
+        snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
+      }
         body.appendChild(snapBubble);
         requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
