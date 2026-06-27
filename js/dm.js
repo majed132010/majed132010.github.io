@@ -287,7 +287,7 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     const dmId = getDmId(currentUser.uid, otherUid);
     const snapBubble = document.createElement('div');
     snapBubble.className = 'snap-bubble';
-    if (msg.snapViewed || !msg.mediaUrl) {
+   if (msg.snapViewed) {
       snapBubble.innerHTML = isMine ? '👁️ رآها' : '👁️ تمت المشاهدة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
     } else if (isMine) {
@@ -815,25 +815,13 @@ async function openSnap(msgKey, mediaUrl, dmId) {
   img.src = mediaUrl;
   img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
 
-  const timerEl = document.createElement('div');
-  timerEl.style.cssText = 'position:absolute;top:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#fff;font-family:Tajawal,sans-serif;font-size:18px;font-weight:700;padding:8px 24px;border-radius:99px';
-
   const hint = document.createElement('div');
   hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
   hint.textContent = 'اضغط في أي مكان للإغلاق';
 
   overlay.appendChild(img);
-  overlay.appendChild(timerEl);
   overlay.appendChild(hint);
   document.body.appendChild(overlay);
-
-  let secs = 5;
-  timerEl.textContent = '👁️ ' + secs;
-  const interval = setInterval(() => {
-    secs--;
-    timerEl.textContent = '👁️ ' + secs;
-    if (secs <= 0) closeSnap();
-  }, 1000);
 
   async function closeSnap() {
     clearInterval(interval);
