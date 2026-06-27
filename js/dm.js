@@ -282,6 +282,27 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     body.appendChild(txt);
   }
 
+  // 👻 السناب
+  if (msg.snapType) {
+    const dmId = getDmId(currentUser.uid, otherUid);
+    const snapBubble = document.createElement('div');
+    snapBubble.className = 'snap-bubble';
+    if (msg.snapViewed || !msg.mediaUrl) {
+      snapBubble.innerHTML = isMine ? '👁️ رآها' : '👁️ تمت المشاهدة';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
+    } else if (isMine) {
+      snapBubble.innerHTML = '👻 سناب أرسلته — بانتظار المشاهدة';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(88,101,242,0.12);color:var(--acc);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
+    } else {
+      snapBubble.innerHTML = '👁️ اضغط لفتح السناب';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
+      snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
+    }
+    body.appendChild(snapBubble);
+    div.appendChild(av); div.appendChild(body);
+    return div;
+  }
+
   if (msg.uploading && !msg.mediaUrl) {
     if (typeof _buildUploadProgressEl === 'function') body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
   }
