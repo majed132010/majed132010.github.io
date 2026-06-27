@@ -118,11 +118,11 @@ document.getElementById('drawerOverlay')?.addEventListener('click', () => {
     const dy=e.changedTouches[0].clientY-touchStartY;
     if (Math.abs(dy)>Math.abs(dx)*0.8) return; // حركة عمودية — تجاهل
     if (Math.abs(dx) < SWIPE_THRESHOLD) return;
-    if (dx < 0) {
-      // سحب يسار → زيادة الحالة (إظهار المزيد)
-      _setMobState(_mobState + 1);
+ if (dx < 0) {
+      // سحب يسار → مرحلة واحدة فقط (إظهار القنوات مباشرة)
+      _setMobState(2);
     } else {
-      // سحب يمين → تقليل الحالة (إخفاء)
+      // سحب يمين → تقليل الحالة
       _setMobState(_mobState - 1);
     }
   }, {passive:true});
