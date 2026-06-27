@@ -173,6 +173,7 @@ function showInAppNotif(msg, sid, cid) {
 // ════ إشعار DM ════
 function showDmNotif(msg, fromUid) {
   console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
+  if (window._dndEnabled) return;
 
  const messagesViewVisible = document.getElementById('messagesView')?.style.display === 'flex';
 const homeViewVisible = document.getElementById('homeView')?.style.display === 'flex';
