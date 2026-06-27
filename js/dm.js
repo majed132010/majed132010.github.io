@@ -173,7 +173,14 @@ function openDM(uid, name) {
     const msg = snap.val();
     if (!msg) return;
     // تجاهل السناب المشاهَد
-    if (msg.snapType && msg.snapViewed) return;
+if (msg.snapType && msg.snapViewed) {
+      const snapEl = dmArea.querySelector('[data-key="' + snap.key + '"] .snap-bubble');
+      if (snapEl) {
+        snapEl.innerHTML = '👁️ رآها';
+        snapEl.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
+      }
+      return;
+    }
     // تحديث علامة القراءة للمُرسل
     if (msg.status === 'read' && msg.uid === currentUser.uid) {
       const statusEl = dmArea.querySelector('.msg-status[data-key="' + snap.key + '"]');
