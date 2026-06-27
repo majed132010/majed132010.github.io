@@ -697,3 +697,120 @@ async function sendDmVoiceMessage(blob, duration, mimeType) {
     try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', '🎤 رسالة صوتية', { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
   } catch(e) { toast('❌ فشل إرسال الرسالة الصوتية'); }
 }
+// ════ نظام السناب 👻 ════
+
+async function handleDmSnapSelect(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !file.type.startsWith('image')) return;
+  if (!_currentDmUid || !currentUser) return;
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    let blob = new Blob([arrayBuffer], { type: file.type });
+    if (typeof compressImage === 'function') blob = await compressImage(blob);
+
+    const dmId = getDmId(currentUser.uid, _currentDmUid);
+    const dmMsgPath = 'dm_messages/' + dmId;
+    const msgRef = db.ref(dmMsgPath).push();
+    const msgKey = msgRef.key;
+
+    await msgRef.set({
+      uid: currentUser.uid,
+      name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(),
+      status: 'sent',
+      snapType: true,
+      snapViewed: false,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      uploading: true,
+      uploadProgress: 1,
+      mediaType: 'image',
+      mediaName: file.name,
+      text: ''
+    });
+
+    toast('⏳ جاري إرسال السناب...');
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `dm_snaps/${dmId}/${Date.now()}.${ext}`;
+    const url = await uploadToStorage(
+      new File([blob], file.name, { type: blob.type }),
+      path, { retries: 3 }
+    );
+
+    await db.ref(dmMsgPath + '/' + msgKey).update({
+      mediaUrl: url,
+      uploading: false,
+      uploadProgress: null
+    });
+
+    try {
+      await sendPushToUser(_currentDmUid,
+        userProfile.displayName || 'عوالم',
+        '👻 أرسل لك سناباً',
+        { type: 'dm', fromUid: currentUser.uid }
+      );
+    } catch(e) {}
+
+    const otherSnap = await db.ref('users/' + _currentDmUid + '/displayName').once('value');
+    const otherName = otherSnap.val() || 'مستخدم';
+    await db.ref('dms/' + currentUser.uid + '/' + _currentDmUid).set({ name: otherName, ts: Date.now() });
+    await db.ref('dms/' + _currentDmUid + '/' + currentUser.uid).set({ name: userProfile.displayName || 'مستخدم', ts: Date.now() });
+
+  } catch(e) {
+    toast('❌ فشل إرسال السناب: ' + (e.message || ''));
+  }
+}
+
+async function openSnap(msgKey, mediaUrl, dmId) {
+  if (!mediaUrl) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'snapOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
+
+  const img = document.createElement('img');
+  img.src = mediaUrl;
+  img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+
+  const timerEl = document.createElement('div');
+  timerEl.style.cssText = 'position:absolute;top:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#fff;font-family:Tajawal,sans-serif;font-size:18px;font-weight:700;padding:8px 24px;border-radius:99px';
+
+  const hint = document.createElement('div');
+  hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
+  hint.textContent = 'اضغط في أي مكان للإغلاق';
+
+  overlay.appendChild(img);
+  overlay.appendChild(timerEl);
+  overlay.appendChild(hint);
+  document.body.appendChild(overlay);
+
+  let secs = 5;
+  timerEl.textContent = '👁️ ' + secs;
+  const interval = setInterval(() => {
+    secs--;
+    timerEl.textContent = '👁️ ' + secs;
+    if (secs <= 0) closeSnap();
+  }, 1000);
+
+  async function closeSnap() {
+    clearInterval(interval);
+    overlay.remove();
+    await db.ref('dm_messages/' + dmId + '/' + msgKey).update({
+      snapViewed: true,
+      snapViewedAt: Date.now(),
+      mediaUrl: null
+    });
+    try { await storage.refFromURL(mediaUrl).delete(); } catch(e) {}
+    const el = document.querySelector('[data-key="' + msgKey + '"] .snap-bubble');
+    if (el) {
+      el.innerHTML = '👁️ تمت المشاهدة';
+      el.style.background = 'rgba(88,101,242,0.1)';
+      el.style.color = 'var(--muted)';
+      el.style.cursor = 'default';
+    }
+  }
+
+  overlay.addEventListener('click', closeSnap);
+}
