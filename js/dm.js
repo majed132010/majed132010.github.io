@@ -178,6 +178,7 @@ function openDM(uid, name) {
   const changeFn = snap => {
     const msg = snap.val();
     if (!msg) return;
+    if (msg.snapType) return;
     // تحديث علامة القراءة للمُرسل
     if (msg.status === 'read' && msg.uid === currentUser.uid) {
       const statusEl = dmArea.querySelector(`.msg-status[data-key="${snap.key}"]`);
