@@ -824,7 +824,6 @@ async function openSnap(msgKey, mediaUrl, dmId) {
   document.body.appendChild(overlay);
 
   async function closeSnap() {
-    clearInterval(interval);
     overlay.remove();
     await db.ref('dm_messages/' + dmId + '/' + msgKey).update({
       snapViewed: true,
