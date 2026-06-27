@@ -747,6 +747,8 @@ async function openSnap(msgKey, mediaUrl, dmId) {
   overlay.id = 'snapOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
   const img = document.createElement('img');
+  img.loading = 'eager';
+  img.decoding = 'sync';
   img.src = mediaUrl;
   img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
   const hint = document.createElement('div');
