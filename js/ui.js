@@ -208,3 +208,15 @@ function mobSendMsg(){sendMessage();}
 function mobOpenSvSettings(){if(currentServer)openServerSettings();}
 function renderMobSvPills(){}
 function openBansList(){}
+
+// ════ وضع عدم الإزعاج ════
+function toggleDND() {
+  const btn = document.getElementById('dndBtn');
+  const isDND = btn?.classList.toggle('active');
+  window._dndEnabled = isDND;
+  if (isDND) {
+    toast('🔕 وضع عدم الإزعاج مفعّل');
+  } else {
+    toast('🔔 الإشعارات مفعّلة');
+  }
+}
