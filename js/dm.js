@@ -303,7 +303,7 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
       snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
     }
     body.appendChild(snapBubble);
-    div.appendChild(av); div.appendChild(body); div.appendChild(actions);
+div.appendChild(av); div.appendChild(body);
     return div;
   }
   if (msg.mediaUrl) {
