@@ -200,7 +200,7 @@ function openDM(uid, name) {
     if (progWrap) {
       if (msg.uploading) {
         if (typeof _updateUploadProgressEl === 'function') _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
-      } else if (!msg.uploading && msg.mediaUrl) {
+ } else if (!msg.uploading && msg.mediaUrl && !msg.snapType) {
         if (typeof _cleanupUploadState === 'function') _cleanupUploadState(snap.key);
         progWrap.remove();
         if (msg.mediaType === 'video') {
@@ -214,6 +214,17 @@ function openDM(uid, name) {
           mediaWrap.appendChild(img);
           body.appendChild(mediaWrap);
         }
+        requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
+      } else if (!msg.uploading && msg.mediaUrl && msg.snapType) {
+        if (typeof _cleanupUploadState === 'function') _cleanupUploadState(snap.key);
+        progWrap.remove();
+        const snapBubble = document.createElement('div');
+        snapBubble.className = 'snap-bubble';
+        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
+        const dmId2 = getDmId(currentUser.uid, uid);
+        snapBubble.addEventListener('click', () => openSnap(snap.key, msg.mediaUrl, dmId2));
+        body.appendChild(snapBubble);
         requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
         if (typeof _showUploadFailedEl === 'function') _showUploadFailedEl(progWrap, snap.key);
