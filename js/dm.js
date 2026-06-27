@@ -308,7 +308,6 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     } else if (msg.uploading || !msg.mediaUrl) {
       snapBubble.innerHTML = '⏳ جاري الإرسال...';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.04);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
-      if (typeof _buildUploadProgressEl === 'function') body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
     } else if (isMine) {
       snapBubble.innerHTML = '👻 سناب أرسلته — بانتظار المشاهدة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(88,101,242,0.12);color:var(--acc);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
