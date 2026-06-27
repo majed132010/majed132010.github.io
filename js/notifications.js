@@ -149,6 +149,7 @@ function listenAllChannels() {
 // ════ إشعار من messages.js / messages-v2.js (احتياطي) ════
 function showInAppNotif(msg, sid, cid) {
   console.log('[Notif] showInAppNotif called', {sid, cid, name: msg.name});
+  if (window._dndEnabled) return;
   if (!sid || !cid) return;
 
   const activeSid = window.currentServerId !== undefined ? window.currentServerId : (typeof currentServer !== 'undefined' ? currentServer : null);
