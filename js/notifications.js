@@ -3,7 +3,7 @@ let _notifListener = null;
 let _notifTimeout = null;
 let _dmNotifTimeout = null;
 
-// ✅ مجموعتان منفصلتان لمنع إلغاء DM وقناة بعضهما
+// مجموعتان منفصلتان لمنع إلغاء DM وقناة بعضهما
 let _lastChannelNotifSet = new Set();
 let _lastDmNotifSet = new Set();
 let _channelDebounceTimer = null;
@@ -26,18 +26,18 @@ function initFCM(uid) {
 
   const VAPID_KEY = 'BF_3lIDRYXMTohfkR1hmqyV3Z1YdZG9jq6s87-tjRsmwvsf1hWs2xbkdj5CCU-jpRHAC9rPRQD_aUvGoZfHQ7rk';
   if (!VAPID_KEY || VAPID_KEY === 'YOUR_VAPID_KEY_HERE') {
-    console.error('[FCM] ❌ VAPID Key غير مضبوط!');
+    console.error('[FCM] VAPID Key غير مضبوط!');
     return;
   }
 
   const messaging = firebase.messaging();
- const swReg = window._fcmSwRegistration || undefined;
-messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg }).then(token => {
+  const swReg = window._fcmSwRegistration || undefined;
+  messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg }).then(token => {
     if (token) {
       db.ref('users/' + uid + '/fcmToken').set(token).catch(() => {});
-      console.log('[FCM] ✅ Token saved');
+      console.log('[FCM] Token saved');
     } else {
-      console.warn('[FCM] لم يُعطَ token — تأكد من إذن الإشعارات');
+      console.warn('[FCM] لم يُعطَ token');
     }
   }).catch(e => console.warn('[FCM] getToken failed:', e.message));
 }
@@ -64,7 +64,6 @@ function listenAllChannels() {
     const userServers = snap.val() || {};
     const activeSids = new Set(Object.keys(userServers));
 
-    // تنظيف: عوالم خرج منها المستخدم
     Object.keys(_globalMsgListeners).forEach(key => {
       const sid = key.split('/')[0];
       if (!activeSids.has(sid)) {
@@ -81,7 +80,6 @@ function listenAllChannels() {
       }
     });
 
-    // لكل عالم نشط، استمع لقنواته
     activeSids.forEach(sid => {
       if (_globalChannelListeners[sid]) return;
 
@@ -90,7 +88,6 @@ function listenAllChannels() {
         const channels = chSnap.val() || {};
         const activeCids = new Set(Object.keys(channels));
 
-        // تنظيف: قنوات محذوفة
         Object.keys(_globalMsgListeners).forEach(key => {
           const [lsid, lcid] = key.split('/');
           if (lsid === sid && !activeCids.has(lcid)) {
@@ -100,7 +97,6 @@ function listenAllChannels() {
           }
         });
 
-        // استماع: قنوات جديدة
         Object.keys(channels).forEach(cid => {
           const key = sid + '/' + cid;
           if (_globalMsgListeners[key]) return;
@@ -110,7 +106,7 @@ function listenAllChannels() {
           const q = db.ref(path).limitToLast(1);
 
           const fn = snap => {
-            if (!initialized) return; // ✅ لا تُفعّل initialized هنا — تُفعّل من once('value')
+            if (!initialized) return;
             const msg = snap.val();
             if (!msg || msg.uid === currentUser.uid) return;
 
@@ -124,15 +120,14 @@ function listenAllChannels() {
             clearTimeout(_channelDebounceTimer);
             _channelDebounceTimer = setTimeout(() => { _lastChannelNotifSet.clear(); }, 5000);
 
-            console.log('[Notif] 🔔 إشعار قناة:', msg.name, '←', cid);
+            console.log('[Notif] إشعار قناة:', msg.name, '<-', cid);
             _displayChannelNotif({ serverId: sid, channelId: cid, senderName: msg.name, text: msg.text, ts: msg.ts });
           };
 
-          // ✅ تسجيل child_added أولاً ثم once('value') يُعلمنا بانتهاء التهيئة
           q.on('child_added', fn);
           q.once('value', () => {
             initialized = true;
-            console.log('[Notif] ✅ مستمع جاهز للقناة:', cid, 'في العالم:', sid);
+            console.log('[Notif] مستمع جاهز للقناة:', cid, 'في العالم:', sid);
           });
           _globalMsgListeners[key] = { q, fn };
         });
@@ -176,9 +171,9 @@ function showDmNotif(msg, fromUid) {
   console.log('[Notif] showDmNotif called', {fromUid, name: msg.name});
   if (window._dndEnabled) return;
 
- const messagesViewVisible = document.getElementById('messagesView')?.style.display === 'flex';
-const homeViewVisible = document.getElementById('homeView')?.style.display === 'flex';
-if (!messagesViewVisible && !homeViewVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
+  const messagesViewVisible = document.getElementById('messagesView')?.style.display === 'flex';
+  const homeViewVisible = document.getElementById('homeView')?.style.display === 'flex';
+  if (!messagesViewVisible && !homeViewVisible && typeof _currentDmUid !== 'undefined' && _currentDmUid === fromUid) return;
 
   const tag = 'dm/' + fromUid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || Date.now());
   if (_lastDmNotifSet.has(tag)) return;
@@ -202,92 +197,89 @@ if (!messagesViewVisible && !homeViewVisible && typeof _currentDmUid !== 'undefi
 
 // ════ عرض إشعار قناة عامة ════
 function _displayChannelNotif(notif) {
-  console.log('[Notif] displaying channel notif:', notif.text?.slice(0, 30));
   if (window._dndEnabled) return;
-
   if (typeof incrementUnread === 'function') incrementUnread(notif.serverId, notif.channelId);
   playMsgSound();
 
   const old = document.getElementById('notifToast');
-  if (old) old.remove();
+  if (old) { old.style.opacity = '0'; old.style.transform = 'translateX(-50%) translateY(120%)'; setTimeout(() => old.remove(), 300); }
   clearTimeout(_notifTimeout);
 
   const sv = typeof servers !== 'undefined' ? servers[notif.serverId] : null;
   const ch = sv?.channels?.[notif.channelId];
   const serverName = sv?.name || 'عوالم';
   const channelName = ch?.name || 'قناة';
+  const avatarLetter = (notif.senderName || '?')[0].toUpperCase();
 
   const t = document.createElement('div');
   t.id = 'notifToast';
-  t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-120%);z-index:10000;background:rgba(15,25,35,0.95);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px;min-width:280px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);cursor:pointer;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s ease;font-family:Tajawal,sans-serif;opacity:0;';
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(120%);z-index:10000;background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.95);border-radius:22px;padding:14px 16px;display:flex;align-items:center;gap:14px;min-width:300px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,0.13),0 2px 8px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.45s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s ease;font-family:Tajawal,sans-serif;opacity:0;';
 
-  t.innerHTML = `
-    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a5f5f,#1a6a6a);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0">${(notif.senderName || '?')[0]}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:12px;color:#d4af37;font-weight:700;margin-bottom:2px">${escHtml(serverName)} · #${escHtml(channelName)}</div>
-      <div style="font-size:14px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(notif.senderName || 'مستخدم')}: ${escHtml(notif.text || '🖼️')}</div>
-    </div>
-    <div style="font-size:16px;opacity:0.4;padding:0 4px;flex-shrink:0">✕</div>
-  `;
+  t.innerHTML = '<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1a6060,#2a8080);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(26,96,96,0.25)">' + avatarLetter + '</div><div style="flex:1;min-width:0"><div style="font-size:11px;color:#c8a84b;font-weight:800;margin-bottom:3px;letter-spacing:0.3px">' + escHtml(serverName) + ' · #' + escHtml(channelName) + '</div><div style="font-size:13px;color:#1a1a2e;font-weight:700;margin-bottom:2px">' + escHtml(notif.senderName || 'مستخدم') + '</div><div style="font-size:13px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(notif.text || 'صورة') + '</div></div><button id="ntfClose" style="background:rgba(0,0,0,0.06);border:none;color:#888;font-size:14px;cursor:pointer;padding:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>';
 
-  t.addEventListener('click', (e) => {
-    if (e.target.textContent === '✕') { t.remove(); return; }
-    t.remove();
+  t.querySelector('#ntfClose').addEventListener('click', e => {
+    e.stopPropagation();
+    t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(120%)';
+    setTimeout(() => t.remove(), 300);
+  });
+
+  t.addEventListener('click', () => {
+    t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(120%)';
+    setTimeout(() => t.remove(), 300);
     if (typeof selectServer === 'function') selectServer(notif.serverId);
-    if (ch && typeof selectChannel === 'function') {
-      setTimeout(() => selectChannel(notif.serverId, notif.channelId, ch), 200);
-    }
+    if (ch && typeof selectChannel === 'function') setTimeout(() => selectChannel(notif.serverId, notif.channelId, ch), 200);
   });
 
   document.body.appendChild(t);
-  requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     t.style.opacity = '1';
     t.style.transform = 'translateX(-50%) translateY(0)';
-  });
+  }));
 
   _notifTimeout = setTimeout(() => {
     t.style.opacity = '0';
-    t.style.transform = 'translateX(-50%) translateY(-120%)';
+    t.style.transform = 'translateX(-50%) translateY(120%)';
     setTimeout(() => t.remove(), 400);
   }, 5000);
 }
 
 // ════ عرض إشعار DM ════
 function _displayDmNotif(notif) {
-  console.log('[Notif] displaying DM notif:', notif.text?.slice(0, 30));
+  if (window._dndEnabled) return;
 
   const old = document.getElementById('notifToast');
-  if (old) old.remove();
+  if (old) { old.style.opacity = '0'; old.style.transform = 'translateX(-50%) translateY(120%)'; setTimeout(() => old.remove(), 300); }
   clearTimeout(_dmNotifTimeout);
+
+  const avatarLetter = (notif.senderName || '?')[0].toUpperCase();
 
   const t = document.createElement('div');
   t.id = 'notifToast';
-  t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-120%);z-index:10000;background:rgba(15,25,35,0.95);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px;min-width:280px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);cursor:pointer;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s ease;font-family:Tajawal,sans-serif;opacity:0;';
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(120%);z-index:10000;background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.95);border-radius:22px;padding:14px 16px;display:flex;align-items:center;gap:14px;min-width:300px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,0.13),0 2px 8px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.45s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s ease;font-family:Tajawal,sans-serif;opacity:0;';
 
-  t.innerHTML = `
-    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5865f2,#4752c4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0">💬</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:12px;color:#d4af37;font-weight:700;margin-bottom:2px">رسالة خاصة</div>
-      <div style="font-size:14px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(notif.senderName || 'مستخدم')}: ${escHtml(notif.text || '🖼️')}</div>
-    </div>
-    <div style="font-size:16px;opacity:0.4;padding:0 4px;flex-shrink:0">✕</div>
-  `;
+  t.innerHTML = '<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#5865f2,#4752c4);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(88,101,242,0.25)">' + avatarLetter + '</div><div style="flex:1;min-width:0"><div style="font-size:11px;color:#c8a84b;font-weight:800;margin-bottom:3px;letter-spacing:0.3px">رسالة خاصة</div><div style="font-size:13px;color:#1a1a2e;font-weight:700;margin-bottom:2px">' + escHtml(notif.senderName || 'مستخدم') + '</div><div style="font-size:13px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(notif.text || 'صورة') + '</div></div><button id="ntfClose" style="background:rgba(0,0,0,0.06);border:none;color:#888;font-size:14px;cursor:pointer;padding:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>';
 
-  t.addEventListener('click', (e) => {
-    if (e.target.textContent === '✕') { t.remove(); return; }
-    t.remove();
+  t.querySelector('#ntfClose').addEventListener('click', e => {
+    e.stopPropagation();
+    t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(120%)';
+    setTimeout(() => t.remove(), 300);
+  });
+
+  t.addEventListener('click', () => {
+    t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(120%)';
+    setTimeout(() => t.remove(), 300);
     if (typeof openDM === 'function') openDM(notif.fromUid, notif.senderName || 'مستخدم');
   });
 
   document.body.appendChild(t);
-  requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     t.style.opacity = '1';
     t.style.transform = 'translateX(-50%) translateY(0)';
-  });
+  }));
 
   _dmNotifTimeout = setTimeout(() => {
     t.style.opacity = '0';
-    t.style.transform = 'translateX(-50%) translateY(-120%)';
+    t.style.transform = 'translateX(-50%) translateY(120%)';
     setTimeout(() => t.remove(), 400);
   }, 5000);
 }
