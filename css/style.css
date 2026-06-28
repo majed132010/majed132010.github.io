@@ -922,8 +922,20 @@ body {
 /* القوائم تأخذ نفس لون الخلفية مع شفافية */
 @media (max-width: 768px) {
   #serverList {
-    background: rgba(200,220,238,0.82) !important;
-    backdrop-filter: none !important;
+    background: rgba(200,220,238,0.96) !important;
+  }
+  #channelSidebar {
+    background: rgba(210,228,245,0.97) !important;
+  }
+  .ch-header {
+    background: rgba(215,232,248,0.98) !important;
+  }
+  .user-panel {
+    background: rgba(205,222,240,0.97) !important;
+  }
+  .main-header {
+    background: rgba(225,235,248,0.97) !important;
+  }
     -webkit-backdrop-filter: none !important;
   }
   #channelSidebar {
