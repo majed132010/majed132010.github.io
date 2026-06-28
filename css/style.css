@@ -866,3 +866,42 @@ body.dark-theme .member-name{color:#dcddde !important}
 body.dark-theme .toast{background:rgba(20,22,26,0.95) !important}
 body.dark-theme .home-select-msg{background:rgba(46,48,54,0.9) !important;border-color:rgba(255,255,255,0.06) !important}
 body.dark-theme .home-title{color:#f2f3f5 !important}
+
+/* ════ إصلاح الخلفية على الموبايل ════ */
+/* نضع الخلفية على #app مباشرة */
+#app {
+  background: linear-gradient(135deg, #c8d8e8 0%, #dce8f4 25%, #e8eef8 50%, #dde8f0 75%, #c8d8e8 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* نجعل كل العناصر شفافة لتظهر الخلفية */
+#mainContent { background: transparent !important; }
+#homeView { background: transparent !important; }
+#messagesView { background: transparent !important; }
+#dmView { background: transparent !important; }
+#dmChatArea { background: transparent !important; }
+#contentArea { background: transparent !important; }
+
+/* القوائم الجانبية — خلفية شفافة مع لون خفيف */
+#serverList {
+  background: rgba(220,232,242,0.7) !important;
+}
+#channelSidebar {
+  background: rgba(230,238,248,0.75) !important;
+}
+.ch-header {
+  background: rgba(230,238,248,0.8) !important;
+}
+.user-panel {
+  background: rgba(220,232,242,0.7) !important;
+}
+.main-header {
+  background: rgba(240,245,252,0.82) !important;
+}
+
+/* الثيم الداكن */
+body.dark-theme #app {
+  background: #1a1d23 !important;
+}
+body.dark-theme #serverList { background: rgba(30,33,36,0.95) !important; }
+body.dark-theme #channelSidebar { background: rgba(43,45,49,0.95) !important; }
