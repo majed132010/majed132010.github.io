@@ -4,7 +4,7 @@
 window.onerror = function(message, source, lineno, colno, error) {
   try {
     var file = (source || 'غير معروف').split('/').pop();
-    alert('⚠️ خطأ برمجي:\n\n' + message +
+    console.error('⚠️ خطأ برمجي:', message,
           '\n\n📄 الملف: ' + file +
           '\n📍 الموقع: سطر ' + lineno + ' عمود ' + colno +
           (error && error.stack ? '\n\n' + error.stack : ''));
