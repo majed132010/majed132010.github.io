@@ -239,3 +239,11 @@ function closeGame() {
   if (overlay) overlay.style.display = 'none';
   if (frame) frame.src = '';
 }
+function openGamesScreen() {
+  showView('games');
+  document.getElementById('mhIcon').textContent = '🎮';
+  document.getElementById('mhName').textContent = 'الألعاب';
+  document.getElementById('searchToggleBtn').style.display = 'none';
+  document.getElementById('membersToggleBtn').style.display = 'none';
+  closeSidebar();
+}
