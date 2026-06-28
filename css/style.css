@@ -1542,146 +1542,314 @@ body{height:100vh;font-family:Tajawal,sans-serif;background:var(--bg);color:var(
   letter-spacing: 0.01em;
   flex-shrink: 0;
 }
-/* ════ DARK THEME OVERRIDE ════ */
-body.dark-theme {
-  --bg: #1a1d23;
-  --bg2: #141618;
-  --card: #232428;
-  --border: rgba(255,255,255,0.06);
-  --border2: rgba(255,255,255,0.1);
-  --text: #dcddde;
-  --muted: #72767d;
-  --acc: #c8a84b;
-  --acc2: #a88a3a;
-  --gold: #c8a84b;
-  --gold2: #a88a3a;
-  --teal: #1a6060;
-  --teal2: #0d4545;
-  --green: #23a55a;
-  --red: #ed4245;
-  --sidebar-bg: #1e2124;
-  --main-bg: #313338;
-  --header-bg: #313338;
-  --shadow: rgba(0,0,0,0.4);
+/* ════════════════════════════════════════
+   AWALEM GLASS THEME — تصميم زجاجي فاتح
+   ════════════════════════════════════════ */
+
+/* ── متغيرات الثيم الفاتح المحسّن ── */
+:root {
+  --glass-bg: rgba(255,255,255,0.72);
+  --glass-border: rgba(255,255,255,0.9);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  --glass-blur: blur(20px);
+  --app-gradient: linear-gradient(135deg, #e8f4f8 0%, #dbeafe 30%, #e8f0fe 60%, #f0e8f8 100%);
+  --msg-card: rgba(255,255,255,0.88);
+  --msg-card-mine: rgba(232,244,255,0.92);
+  --sidebar-glass: rgba(255,255,255,0.65);
+  --header-glass: rgba(255,255,255,0.80);
+  --input-glass: rgba(255,255,255,0.90);
+  --acc-light: #1a6060;
 }
 
-/* Body */
-body.dark-theme { background: #313338; color: #dcddde; }
+/* ── خلفية التطبيق ── */
+body {
+  background: var(--app-gradient) !important;
+  background-attachment: fixed !important;
+}
 
-/* Server List */
-body.dark-theme #serverList { background: #1e2124; border-left-color: rgba(255,255,255,0.04); }
-body.dark-theme .sv-item { background: #36393f; color: #72767d; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-body.dark-theme .sv-item::before { background: #dcddde; }
-body.dark-theme .sv-sep { background: rgba(255,255,255,0.08); }
+/* ── قائمة السيرفرات ── */
+#serverList {
+  background: rgba(255,255,255,0.5) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-left: 1px solid rgba(255,255,255,0.7) !important;
+}
 
-/* Channel Sidebar */
-body.dark-theme #channelSidebar { background: #2b2d31; border-left-color: rgba(255,255,255,0.04); }
-body.dark-theme .ch-header { background: #2b2d31; border-bottom-color: rgba(255,255,255,0.06); }
-body.dark-theme .ch-server-name { color: #f2f3f5; }
-body.dark-theme .ch-header-icon { color: #72767d; }
-body.dark-theme .ch-header-icon:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
-body.dark-theme .back-btn { color: #72767d; }
-body.dark-theme .back-btn:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
-body.dark-theme .ch-section-title { color: #72767d; }
-body.dark-theme .ch-item { color: #72767d; }
-body.dark-theme .ch-item:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
-body.dark-theme .ch-item.active { background: rgba(255,255,255,0.1); color: #f2f3f5; }
+.sv-item {
+  background: rgba(255,255,255,0.7) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  color: #555 !important;
+}
+.sv-item:hover, .sv-item.active {
+  background: rgba(26,96,96,0.85) !important;
+  color: #fff !important;
+}
+.sv-item::before { background: #1a6060 !important; }
+.sv-sep { background: rgba(0,0,0,0.08) !important; }
 
-/* User Panel */
-body.dark-theme .user-panel { background: #232428; border-top-color: rgba(255,255,255,0.06); }
-body.dark-theme .up-name { color: #f2f3f5; }
-body.dark-theme .up-tag { color: #72767d; }
-body.dark-theme .up-btn { color: #72767d; }
-body.dark-theme .up-btn:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
-body.dark-theme .up-av::after { border-color: #232428; }
+/* ── القائمة الجانبية ── */
+#channelSidebar {
+  background: var(--sidebar-glass) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-left: 1px solid rgba(255,255,255,0.8) !important;
+}
 
-/* Main Header */
-body.dark-theme .main-header { background: #313338; border-bottom-color: rgba(255,255,255,0.06); }
-body.dark-theme .main-header-icon { color: #72767d; }
-body.dark-theme .main-header-name { color: #f2f3f5; }
-body.dark-theme .main-header-back { color: #72767d; }
-body.dark-theme .main-header-back:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
-body.dark-theme #mobHamburger { background: rgba(200,168,75,0.1); border-color: rgba(200,168,75,0.2); }
+.ch-header {
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.7) !important;
+}
+.ch-server-name { color: #1a2a2a !important; font-weight: 800 !important; }
+.ch-item { color: #555 !important; border-radius: 10px !important; margin: 2px 8px !important; }
+.ch-item:hover { background: rgba(26,96,96,0.08) !important; color: #1a6060 !important; }
+.ch-item.active { background: rgba(26,96,96,0.12) !important; color: #1a6060 !important; font-weight: 700 !important; }
+.ch-section-title { color: #888 !important; font-weight: 800 !important; }
+.ch-category { color: #888 !important; }
 
-/* Messages View */
-body.dark-theme #messagesView { background: #313338; }
-body.dark-theme #messagesView::before { opacity: 0.03; }
-body.dark-theme .msg-group:hover { background: rgba(255,255,255,0.02); }
-body.dark-theme .msg-name { color: #f2f3f5; }
-body.dark-theme .msg-content { color: #dcddde; }
-body.dark-theme .msg-time { color: #72767d; }
+/* ── لوحة المستخدم ── */
+.user-panel {
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-top: 1px solid rgba(255,255,255,0.8) !important;
+}
+.up-name { color: #1a2a2a !important; font-weight: 700 !important; }
+.up-tag { color: #888 !important; }
+.up-btn { color: #666 !important; }
+.up-btn:hover { background: rgba(26,96,96,0.1) !important; color: #1a6060 !important; }
+.up-av { background: linear-gradient(135deg,#1a6060,#0d4545) !important; }
+.up-av::after { border-color: rgba(255,255,255,0.8) !important; }
 
-/* Chat Input */
-body.dark-theme .chat-input-wrap { background: #313338; }
-body.dark-theme .chat-input-box { background: #383a40; box-shadow: none; }
-body.dark-theme .chat-inp { color: #dcddde; }
-body.dark-theme .chat-inp::placeholder { color: #72767d; }
-body.dark-theme .ci-btn { color: #72767d; }
-body.dark-theme .ci-btn:hover { color: #dcddde; background: rgba(255,255,255,0.06); }
-body.dark-theme .ci-btn.send { background: #c8a84b; }
+/* ── الهيدر الرئيسي ── */
+.main-header {
+  background: var(--header-glass) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.8) !important;
+  box-shadow: 0 1px 12px rgba(0,0,0,0.06) !important;
+}
+.main-header-name { color: #1a2a2a !important; font-weight: 800 !important; }
+.main-header-icon { color: #888 !important; }
+.main-header-back { color: #666 !important; }
+.main-header-back:hover { background: rgba(26,96,96,0.08) !important; color: #1a6060 !important; }
+#mobHamburger { background: rgba(26,96,96,0.08) !important; border-color: rgba(26,96,96,0.15) !important; color: #1a6060 !important; }
 
-/* Home View */
-body.dark-theme #homeView { background: #313338; }
-body.dark-theme .home-title { color: #f2f3f5; }
-body.dark-theme .home-sub { color: #72767d; }
-body.dark-theme .home-select-msg { background: #2b2d31; }
-body.dark-theme .home-select-msg .hs-title { color: #f2f3f5; }
-body.dark-theme .home-select-msg .hs-sub { color: #72767d; }
+/* ── منطقة الرسائل ── */
+#messagesView {
+  background: transparent !important;
+}
+#messagesView::before { display: none !important; }
 
-/* DM View */
-body.dark-theme #dmView { background: #313338; }
-body.dark-theme #dmMessages { background: #313338; }
-body.dark-theme .dm-item:hover { background: rgba(255,255,255,0.06); }
-body.dark-theme .dm-item.active { background: rgba(255,255,255,0.1); }
-body.dark-theme .dm-name { color: #dcddde; }
-body.dark-theme .dm-online { border-color: #232428; }
+#messagesArea {
+  padding: 12px 16px 24px !important;
+  gap: 8px !important;
+}
 
-/* Modals */
-body.dark-theme .modal { background: #313338; border: 1px solid rgba(255,255,255,0.06); }
-body.dark-theme .modal-title { color: #f2f3f5; }
-body.dark-theme .modal-sub { color: #72767d; }
-body.dark-theme .modal-inp { background: #1e2124; color: #dcddde; }
-body.dark-theme .modal-inp:focus { outline-color: #c8a84b; }
-body.dark-theme .modal-btn { background: #c8a84b; color: #0d1520; }
-body.dark-theme .modal-btn:hover { background: #a88a3a; }
-body.dark-theme .modal-btn.secondary { background: #2b2d31; color: #dcddde; }
-body.dark-theme .modal-btn.secondary:hover { background: #383a40; }
-body.dark-theme .modal-close { color: #72767d; }
-body.dark-theme .modal-close:hover { background: rgba(255,255,255,0.06); color: #dcddde; }
+/* ── بطاقة الرسالة ── */
+.msg-group {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  gap: 0 !important;
+  background: transparent !important;
+}
+.msg-group:hover { background: transparent !important; }
 
-/* Toast */
-body.dark-theme .toast { background: #1e2124; color: #f2f3f5; }
+.msg-body {
+  background: var(--msg-card) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255,255,255,0.9) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07) !important;
+  padding: 10px 14px !important;
+  margin-bottom: 4px !important;
+}
 
-/* Voice View */
-body.dark-theme #voiceView { background: #1e2124; }
+.msg-av {
+  display: none !important;
+}
 
-/* Scrollbar */
-body.dark-theme ::-webkit-scrollbar-thumb { background: #4a4d55; }
+.msg-name { color: #1a2a2a !important; font-weight: 700 !important; font-size: 13px !important; }
+.msg-time { color: #999 !important; }
+.msg-content { color: #333 !important; font-size: 14px !important; line-height: 1.55 !important; }
+.msg-meta { margin-bottom: 4px !important; }
 
-/* Search */
-body.dark-theme #searchBar { background: rgba(0,0,0,0.2); }
-body.dark-theme #searchInput { background: rgba(255,255,255,0.06); color: #dcddde; border-color: rgba(200,168,75,0.3); }
+/* ── إخفاء msg-av وجعل الرسائل تملأ العرض ── */
+.msg-group { flex-direction: column !important; }
 
-/* Login */
-body.dark-theme #loginScreen { background: #1a1d23; }
-body.dark-theme .login-card { background: #232428; border-color: rgba(255,255,255,0.1); }
+/* ── خلفية الرسائل الخاصة ── */
+#dmMessages { background: transparent !important; padding: 12px 16px !important; gap: 8px !important; display: flex !important; flex-direction: column !important; }
+#dmView { background: transparent !important; }
 
-/* Message Reply Quote */
-body.dark-theme .msg-reply-quote { background: rgba(255,255,255,0.05); border-right-color: #c8a84b; color: #72767d; }
+/* ── رسائل DM ── */
+#dmMessages .msg-group .msg-body {
+  background: var(--msg-card) !important;
+}
 
-/* Context Menu */
-body.dark-theme .msg-ctx-bar { background: #1a2535; }
+/* ── حقل الإدخال ── */
+.chat-input-wrap {
+  background: transparent !important;
+  padding: 8px 12px 12px !important;
+}
+.chat-input-box {
+  background: var(--input-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255,255,255,0.9) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+}
+.chat-inp { color: #1a2a2a !important; }
+.chat-inp::placeholder { color: #aaa !important; }
+.ci-btn { color: #888 !important; }
+.ci-btn:hover { color: #1a6060 !important; background: rgba(26,96,96,0.08) !important; }
+.ci-btn.send { background: linear-gradient(135deg,#1a6060,#0d4545) !important; opacity: 1 !important; }
+.ci-btn.send:not(.active) { opacity: 0.5 !important; }
+.ci-btn.send.active { opacity: 1 !important; }
+
+/* ── الشاشة الرئيسية ── */
+#homeView { background: transparent !important; }
+#homeView #homeServersList {
+  gap: 12px !important;
+}
+
+/* ── بطاقات السيرفرات في الشاشة الرئيسية ── */
+.home-server-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* ── المودالات ── */
+.modal {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255,255,255,0.95) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+}
+.modal-title { color: #1a2a2a !important; }
+.modal-sub { color: #888 !important; }
+.modal-inp { background: rgba(0,0,0,0.04) !important; color: #1a2a2a !important; border-radius: 10px !important; }
+.modal-inp:focus { outline-color: #1a6060 !important; }
+.modal-btn { background: linear-gradient(135deg,#1a6060,#0d4545) !important; border-radius: 10px !important; }
+.modal-btn:hover { background: linear-gradient(135deg,#226868,#165050) !important; }
+.modal-btn.secondary { background: rgba(0,0,0,0.06) !important; color: #333 !important; }
+.modal-close { color: #888 !important; }
+.modal-close:hover { background: rgba(0,0,0,0.06) !important; color: #333 !important; }
+
+/* ── التوست ── */
+.toast {
+  background: rgba(26,42,42,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #fff !important;
+  border-radius: 22px !important;
+}
+
+/* ── شريط الرد ── */
+#replyBar, #dmReplyBar {
+  background: rgba(26,96,96,0.06) !important;
+  border-bottom: 1px solid rgba(26,96,96,0.12) !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+/* ── قائمة DM Picker ── */
+#dmPickerScreen {
+  background: transparent !important;
+}
+.dm-item { border-radius: 12px !important; }
+.dm-item:hover { background: rgba(26,96,96,0.08) !important; }
+.dm-item.active { background: rgba(26,96,96,0.12) !important; }
+.dm-name { color: #1a2a2a !important; }
+
+/* ── لوحة الأعضاء ── */
+#membersPanel {
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-right: 1px solid rgba(255,255,255,0.8) !important;
+}
+.member-name { color: #333 !important; }
+.member-item:hover { background: rgba(26,96,96,0.08) !important; }
+
+/* ── قائمة السياق ── */
+.msg-ctx-bar {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important;
+}
+.mc-label { color: #333 !important; }
+.mc-btn:hover { background: rgba(0,0,0,0.06) !important; }
+.mc-btn.danger:hover { background: rgba(220,50,50,0.08) !important; }
+.mc-btn.danger .mc-label { color: #e05555 !important; }
+
+/* ── شريط البحث ── */
+#searchBar {
+  background: rgba(255,255,255,0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.9) !important;
+}
+#searchInput {
+  background: rgba(0,0,0,0.04) !important;
+  color: #1a2a2a !important;
+  border-color: rgba(26,96,96,0.2) !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15) !important; }
+
+/* ── شريط الصوت المتصل ── */
+.voice-connected {
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-top: 1px solid rgba(255,255,255,0.8) !important;
+}
+
+/* ── Mobile overlay ── */
+#drawerOverlay { background: rgba(0,0,0,0.2) !important; }
+
+/* ══ الثيم الداكن يُلغي Glass Theme ══ */
+body.dark-theme {
+  background: #1a1d23 !important;
+  --glass-bg: rgba(35,36,40,0.85);
+  --msg-card: rgba(46,48,54,0.9);
+  --sidebar-glass: rgba(43,45,49,0.9);
+  --header-glass: rgba(49,51,56,0.95);
+  --input-glass: rgba(56,58,64,0.95);
+}
+body.dark-theme #serverList { background: rgba(30,33,36,0.95) !important; }
+body.dark-theme #channelSidebar { background: rgba(43,45,49,0.95) !important; }
+body.dark-theme .ch-header { background: rgba(43,45,49,0.95) !important; }
+body.dark-theme .main-header { background: rgba(49,51,56,0.95) !important; }
+body.dark-theme .user-panel { background: rgba(35,36,40,0.95) !important; }
+body.dark-theme .chat-input-wrap { background: transparent !important; }
+body.dark-theme .chat-input-box { background: rgba(56,58,64,0.95) !important; border-color: rgba(255,255,255,0.08) !important; }
+body.dark-theme .chat-inp { color: #dcddde !important; }
+body.dark-theme .msg-body { background: rgba(46,48,54,0.92) !important; border-color: rgba(255,255,255,0.06) !important; }
+body.dark-theme .msg-content { color: #dcddde !important; }
+body.dark-theme .msg-name { color: #f2f3f5 !important; }
+body.dark-theme .modal { background: rgba(49,51,56,0.96) !important; border-color: rgba(255,255,255,0.08) !important; }
+body.dark-theme .modal-title { color: #f2f3f5 !important; }
+body.dark-theme .modal-inp { background: rgba(0,0,0,0.3) !important; color: #dcddde !important; }
+body.dark-theme .modal-btn.secondary { background: rgba(255,255,255,0.08) !important; color: #dcddde !important; }
+body.dark-theme .msg-ctx-bar { background: rgba(30,37,53,0.96) !important; border-color: rgba(255,255,255,0.08) !important; }
 body.dark-theme .mc-label { color: #fff !important; }
-
-/* Members Panel */
-body.dark-theme #membersPanel { background: #2b2d31; border-right-color: rgba(255,255,255,0.06); }
-body.dark-theme .member-item:hover { background: rgba(255,255,255,0.06); }
-body.dark-theme .member-name { color: #dcddde; }
-
-/* Profile */
-body.dark-theme .profile-info-box { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.06); }
-
-/* Voice Connected Bar */
-body.dark-theme .voice-connected { background: #2b2d31; }
-body.dark-theme .vc-btn { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.06); color: #72767d; }
-body.dark-theme .vc-btn:hover { background: rgba(255,255,255,0.1); color: #dcddde; }
+body.dark-theme .up-name { color: #f2f3f5 !important; }
+body.dark-theme .ch-server-name { color: #f2f3f5 !important; }
+body.dark-theme .main-header-name { color: #f2f3f5 !important; }
+body.dark-theme .dm-name { color: #dcddde !important; }
+body.dark-theme .ch-item { color: #72767d !important; }
+body.dark-theme .ch-item:hover { background: rgba(255,255,255,0.06) !important; color: #dcddde !important; }
+body.dark-theme .ch-item.active { background: rgba(200,168,75,0.12) !important; color: #c8a84b !important; }
+body.dark-theme .sv-item { background: rgba(54,57,63,0.9) !important; color: #72767d !important; }
