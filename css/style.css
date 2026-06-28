@@ -1668,7 +1668,14 @@ body {
 }
 
 .msg-av {
-  display: none !important;
+  display: flex !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 50% !important;
+  font-size: 16px !important;
+  align-self: flex-start !important;
+  margin-top: 4px !important;
 }
 
 .msg-name { color: #1a2a2a !important; font-weight: 700 !important; font-size: 13px !important; }
