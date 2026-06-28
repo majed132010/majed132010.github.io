@@ -12,6 +12,7 @@ function showView(name) {
   if (msgs)  { msgs.style.display = name==='messages' ? 'flex' : 'none'; msgs.style.flexDirection='column'; msgs.style.overflow='hidden'; }
   if (voice) voice.style.display = name==='voice'    ? 'flex' : 'none';
   if (dm)    dm.style.display    = name==='dm'       ? 'flex' : 'none';
+  if (games) games.style.display = name==='games' ? 'flex' : 'none';
   if (searchBtn)  searchBtn.style.display  = name==='messages' ? '' : 'none';
   if (membersBtn) membersBtn.style.display = name==='messages' ? '' : 'none';
   if (name!=='messages') {
