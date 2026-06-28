@@ -4,19 +4,15 @@
 window.onerror = function(message, source, lineno, colno, error) {
   try {
     var file = (source || 'غير معروف').split('/').pop();
-    console.error('⚠️ خطأ برمجي:', message,
-          '\n\n📄 الملف: ' + file +
-          '\n📍 الموقع: سطر ' + lineno + ' عمود ' + colno +
-          (error && error.stack ? '\n\n' + error.stack : ''));
+    console.error('⚠️ خطأ برمجي:', message, 'الملف:', file, 'السطر:', lineno);
   } catch(_) {}
-  return false; // اترك المتصفح يسجّل الخطأ في Console أيضاً
+  return false;
 };
-// أخطاء الـ Promise غير المعالَجة (معظم كود التطبيق غير متزامن)
+
 window.addEventListener('unhandledrejection', function(ev) {
   try {
     var r = ev.reason || {};
- console.error('⚠️ خطأ غير معالَج (Promise):', (r.message || r),
-          (r.code ? '\n🔖 الكود: ' + r.code : ''));
+    console.error('⚠️ خطأ غير معالَج (Promise):', (r.message || r));
   } catch(_) {}
 });
 
