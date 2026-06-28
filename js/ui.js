@@ -118,11 +118,11 @@ document.getElementById('drawerOverlay')?.addEventListener('click', () => {
     const dy=e.changedTouches[0].clientY-touchStartY;
     if (Math.abs(dy)>Math.abs(dx)*0.8) return; // حركة عمودية — تجاهل
     if (Math.abs(dx) < SWIPE_THRESHOLD) return;
- if (dx < 0) {
-      // سحب يسار → مرحلة واحدة فقط (إظهار القنوات مباشرة)
-      _setMobState(2);
+    if (dx < 0) {
+      // سحب يسار → زيادة الحالة (إظهار المزيد)
+      _setMobState(_mobState + 1);
     } else {
-      // سحب يمين → تقليل الحالة
+      // سحب يمين → تقليل الحالة (إخفاء)
       _setMobState(_mobState - 1);
     }
   }, {passive:true});
@@ -208,15 +208,18 @@ function mobSendMsg(){sendMessage();}
 function mobOpenSvSettings(){if(currentServer)openServerSettings();}
 function renderMobSvPills(){}
 function openBansList(){}
-
-// ════ وضع عدم الإزعاج ════
-function toggleDND() {
-  const btn = document.getElementById('dndBtn');
-  const isDND = btn?.classList.toggle('active');
-  window._dndEnabled = isDND;
-  if (isDND) {
-    toast('🔕 وضع عدم الإزعاج مفعّل');
-  } else {
-    toast('🔔 الإشعارات مفعّلة');
-  }
+// ════ تبديل الثيم ════
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark-theme');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  toast(isDark ? '🌙 الوضع الداكن' : '☀️ الوضع الفاتح');
 }
+
+// تطبيق الثيم المحفوظ عند التحميل
+(function() {
+  if (localStorage.getItem('theme') === 'dark') {
+    document.body.classList.add('dark-theme');
+  }
+})();
