@@ -31,10 +31,6 @@ function goBack() {
 }
 
 // ════ Drawer — نظام 3 حالات ════
-// حالة 0: شاشة كاملة (لا قوائم)
-// حالة 1: قائمة السيرفرات فقط
-// حالة 2: قائمة السيرفرات + القنوات
-
 let _mobState = 0;
 
 function _setMobState(s) {
@@ -98,13 +94,12 @@ function closeSidebar() {
   }
 }
 
-// عند الضغط على overlay → إغلاق
 document.getElementById('drawerOverlay')?.addEventListener('click', () => {
   if (isMobile()) _setMobState(Math.max(0, _mobState - 1));
   else closeDrawer();
 });
 
-// Swipe gesture — 3 حالات
+// Swipe gesture
 (function initTouchGestures() {
   let touchStartX=0, touchStartY=0;
   const SWIPE_THRESHOLD=50;
@@ -116,13 +111,13 @@ document.getElementById('drawerOverlay')?.addEventListener('click', () => {
     if (!isMobile()) return;
     const dx=e.changedTouches[0].clientX-touchStartX;
     const dy=e.changedTouches[0].clientY-touchStartY;
-    if (Math.abs(dy)>Math.abs(dx)*0.8) return; // حركة عمودية — تجاهل
+    if (Math.abs(dy)>Math.abs(dx)*0.8) return;
     if (Math.abs(dx) < SWIPE_THRESHOLD) return;
     if (dx < 0) {
-      // سحب يسار → زيادة الحالة (إظهار المزيد)
-      _setMobState(_mobState + 1);
+      // سحب يسار → مرحلة واحدة فقط (إظهار القنوات مباشرة)
+      _setMobState(2);
     } else {
-      // سحب يمين → تقليل الحالة (إخفاء)
+      // سحب يمين → تقليل الحالة
       _setMobState(_mobState - 1);
     }
   }, {passive:true});
@@ -163,15 +158,10 @@ function installPWA() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      // سجّل sw.js للكاش والـ PWA
       const swReg = await navigator.serviceWorker.register('/sw.js');
-      console.log('✅ SW registered:', swReg.scope);
-
-      // سجّل firebase-messaging-sw.js يدوياً وأجبره على التفعيل فوراً
+      console.log('SW registered:', swReg.scope);
       const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('✅ FCM SW registered:', fcmReg.scope);
-
-      // أجبره على تخطي الانتظار إذا كان في حالة waiting
+      console.log('FCM SW registered:', fcmReg.scope);
       if (fcmReg.waiting) {
         fcmReg.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
@@ -185,8 +175,6 @@ if ('serviceWorker' in navigator) {
           });
         }
       });
-
-      // مرر التسجيل لـ FCM getToken
       window._fcmSwRegistration = fcmReg;
     } catch(err) {
       console.warn('SW registration error:', err);
@@ -194,7 +182,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ════ No-op stubs (للتوافق) ════
+// ════ No-op stubs ════
 function mobGoto(){}
 function mobSetActive(){}
 function mobShowServers(){closeDrawer();showHome();}
@@ -208,6 +196,15 @@ function mobSendMsg(){sendMessage();}
 function mobOpenSvSettings(){if(currentServer)openServerSettings();}
 function renderMobSvPills(){}
 function openBansList(){}
+
+// ════ وضع عدم الإزعاج ════
+function toggleDND() {
+  const btn = document.getElementById('dndBtn');
+  const isDND = btn?.classList.toggle('active');
+  window._dndEnabled = isDND;
+  toast(isDND ? '🔕 وضع عدم الإزعاج مفعّل' : '🔔 الإشعارات مفعّلة');
+}
+
 // ════ تبديل الثيم ════
 function toggleTheme() {
   const isDark = document.body.classList.toggle('dark-theme');
