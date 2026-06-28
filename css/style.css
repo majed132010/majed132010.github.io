@@ -1865,7 +1865,8 @@ body.dark-theme .sv-item { background: rgba(54,57,63,0.9) !important; color: #72
 
 /* إخفاء الصورة الرمزية وجعل الرسالة كاملة العرض */
 .msg-group {
-  flex-direction: column !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
   gap: 0 !important;
   padding: 2px 8px !important;
 }
