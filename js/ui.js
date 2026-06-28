@@ -220,3 +220,21 @@ function toggleTheme() {
     document.body.classList.add('dark-theme');
   }
 })();
+// ════ الألعاب ════
+function openGame(url, title) {
+  const overlay = document.getElementById('gameOverlay');
+  const frame = document.getElementById('gameFrame');
+  const titleEl = document.getElementById('gameTitle');
+  if (!overlay || !frame) return;
+  if (titleEl) titleEl.textContent = title || 'لعبة';
+  frame.src = url;
+  overlay.style.display = 'flex';
+  overlay.style.flexDirection = 'column';
+}
+
+function closeGame() {
+  const overlay = document.getElementById('gameOverlay');
+  const frame = document.getElementById('gameFrame');
+  if (overlay) overlay.style.display = 'none';
+  if (frame) frame.src = '';
+}
