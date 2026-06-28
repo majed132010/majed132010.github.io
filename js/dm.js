@@ -319,8 +319,8 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
       snapBubble.innerHTML = '👻 سناب أرسلته — بانتظار المشاهدة';
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(88,101,242,0.12);color:var(--acc);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
     } else {
-      snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
-      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
+  snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(26,122,122,0.15);color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(26,122,122,0.4)';
       snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
     }
    body.appendChild(snapBubble);
