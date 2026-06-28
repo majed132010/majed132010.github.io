@@ -15,7 +15,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 window.addEventListener('unhandledrejection', function(ev) {
   try {
     var r = ev.reason || {};
-    alert('⚠️ خطأ غير معالَج (Promise):\n\n' + (r.message || r) +
+ console.error('⚠️ خطأ غير معالَج (Promise):', (r.message || r),
           (r.code ? '\n🔖 الكود: ' + r.code : ''));
   } catch(_) {}
 });
