@@ -922,10 +922,20 @@ body {
 /* القوائم تأخذ نفس لون الخلفية مع شفافية */
 @media (max-width: 768px) {
   #serverList {
-    background: rgba(200,220,238,0.96) !important;
+  #serverList {
+    background: #ccdded !important;
   }
   #channelSidebar {
-    background: rgba(210,228,245,0.97) !important;
+    background: #d4e4f3 !important;
+  }
+  .ch-header {
+    background: #d8e7f5 !important;
+  }
+  .user-panel {
+    background: #ccdded !important;
+  }
+  .main-header {
+    background: #ddeaf8 !important;
   }
   .ch-header {
     background: rgba(215,232,248,0.98) !important;
