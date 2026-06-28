@@ -5,7 +5,7 @@ function showView(name) {
   const home  = document.getElementById('homeView');
   const msgs  = document.getElementById('messagesView');
   const voice = document.getElementById('voiceView');
-  const dm    = document.getElementById('dmView');
+  const games = document.getElementById('gamesView');
   const searchBtn  = document.getElementById('searchToggleBtn');
   const membersBtn = document.getElementById('membersToggleBtn');
   if (home)  home.style.display  = name==='home'     ? 'flex' : 'none';
