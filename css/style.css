@@ -152,6 +152,7 @@ html,body{
 
 /* ════ MAIN CONTENT ════ */
 #mainContent{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+#contentArea{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;width:100%}
 
 .main-header{height:52px;border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;padding:0 16px;gap:10px;background:var(--header);box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .main-header-back{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;background:transparent;border:none;transition:.15s;flex-shrink:0}
