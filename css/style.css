@@ -562,3 +562,7 @@ body.dark-theme .member-name{color:var(--text)}
 #dndBtn.active{color:var(--red);background:rgba(224,80,80,0.1)}
 #dndBtn .dnd-tooltip{display:none;position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;white-space:nowrap;color:var(--text);font-family:Tajawal,sans-serif;z-index:1000;box-shadow:var(--shadow)}
 #dndBtn:hover .dnd-tooltip{display:block}
+#voiceView { flex: 0 !important; }
+#dmView { flex: 0 !important; }
+#gamesView { flex: 0 !important; }
+#homeView { flex: 0 !important; }
