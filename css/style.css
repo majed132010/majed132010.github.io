@@ -564,4 +564,4 @@ body.dark-theme .member-name{color:var(--text)}
 #dndBtn:hover .dnd-tooltip{display:block}
 #voiceView { display: none !important; }
 #voiceView.active { display: flex !important; }
-#messagesArea > *:first-child { margin-top: auto; }
+#messagesArea::before { content: ''; flex: 1; }
