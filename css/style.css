@@ -289,8 +289,8 @@ html,body{
 .msg-mention{color:var(--acc);font-weight:800;background:rgba(26,122,122,0.1);border-radius:3px;padding:0 2px}
 
 /* Members panel */
-#membersPanel{width:0;overflow:hidden;transition:width .25s;background:var(--sidebar2);border-right:1px solid rgba(0,0,0,0.06);display:flex;flex-direction:column;flex-shrink:0}
-#membersPanel.open{width:200px}
+#membersPanel{display:none;width:0;overflow:hidden;transition:width .25s;background:var(--sidebar2);border-right:1px solid rgba(0,0,0,0.06);flex-direction:column;flex-shrink:0}
+#membersPanel.open{display:flex;width:200px}
 .members-title{font-size:11px;font-weight:800;color:var(--gold);padding:12px 12px 6px;white-space:nowrap}
 .member-item{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.15s}
 .member-item:hover{background:rgba(26,122,122,0.08)}
