@@ -520,13 +520,13 @@
 <script src="js/dm.js?v=58.0"></script>
 <script src="js/servers.js?v=18.0"></script>
 <script src="js/calls.js?v=17.0"></script>
-  <!-- نافذة الألعاب -->
-  style="display:none;position:fixed;inset:0;z-index:9000;flex-direction:column;background:#000;height:100dvh;height:100vh"
+ <!-- نافذة الألعاب -->
+<div id="gameOverlay" style="display:none;position:fixed;inset:0;z-index:9000;flex-direction:column;background:#000;height:100dvh">
   <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(0,0,0,0.9);border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0">
     <button onclick="closeGame()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
     <div id="gameTitle" style="font-size:15px;font-weight:700;color:#fff;font-family:Tajawal,sans-serif;flex:1"></div>
   </div>
-<iframe id="gameFrame" src="" style="flex:1;border:none;width:100%;height:100%;min-height:0" allowfullscreen allow="fullscreen;orientation-lock"
+  <iframe id="gameFrame" src="" style="flex:1;border:none;width:100%;height:100%" allowfullscreen></iframe>
 </div>
 </body>
 </html>
