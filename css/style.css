@@ -176,7 +176,7 @@ html,body{
 .home-server-card{background:var(--card) !important;border:1px solid var(--border) !important;border-radius:16px !important;box-shadow:var(--shadow) !important}
 
 /* ════ MESSAGES VIEW ════ */
-#messagesView{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;background:var(--bg);position:relative}
+#messagesView{position:absolute;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;overflow:hidden;background:var(--bg)}
 #messagesView::before{display:none}
 #messagesArea{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 24px;display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
 
