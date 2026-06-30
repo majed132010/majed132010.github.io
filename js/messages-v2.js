@@ -1,6 +1,11 @@
 /* ════════════════════════════════════════════════
    وضع السناب في العام + نظام الحفظ
    ════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════
+   وضع السناب النصي بالعام (snapMode) — موجود بالكود
+   لكن بدون زر ظاهر بالواجهة، تماماً مثل dmSnapMode
+   في dm.js (متاح للاستدعاء البرمجي عند الحاجة لاحقاً)
+   ════════════════════════════════════════════════ */
 let snapMode = false;
 
 function toggleSnapMode() {
@@ -146,7 +151,19 @@ function showMessages(sid, cid) {
     const progWrap = body.querySelector('.msg-uploading-wrap, .msg-upload-preview-wrap');
     if (progWrap) {
       if (msg.uploading) _updateUploadProgressEl(progWrap, msg.uploadProgress || 0, msg.mediaType);
-      else if (!msg.uploading && msg.mediaUrl) {
+      else if (!msg.uploading && msg.mediaUrl && msg.snapType) {
+        // 👻 سناب صورة اكتمل رفعه — فقاعة "اضغط لفتح" بدل الصورة المباشرة
+        _cleanupUploadState(snap.key);
+        progWrap.remove();
+        const snapBubble = document.createElement('div');
+        snapBubble.className = 'snap-bubble';
+        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
+        snapBubble.addEventListener('click', () => openServerSnap(snap.key, msg.mediaUrl));
+        body.appendChild(snapBubble);
+        const a = document.getElementById('messagesArea');
+        if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
+      } else if (!msg.uploading && msg.mediaUrl) {
         _cleanupUploadState(snap.key);
         progWrap.remove();
         if (msg.mediaType === 'video') body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
@@ -1124,6 +1141,49 @@ function _attachContextBar(div, body, actions, isMine) {
   div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
   div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
   div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
+}
+
+/* ════════════════════════════════════════════════
+   👻 إرسال سناب صورة فوري بالعام عبر زر مستقل
+   مطابق لـ handleDmSnapSelect في dm.js، لكن بمسار العام
+   ════════════════════════════════════════════════ */
+async function handleMainSnapSelect(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !file.type.startsWith('image')) return;
+  if (!currentServer || !currentChannel || !currentUser) return;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    let blob = new Blob([arrayBuffer], { type: file.type });
+    blob = await compressImage(blob);
+    const sv = servers[currentServer];
+    const role = sv?.members?.[currentUser.uid]?.role || 'member';
+    const msgPath = 'messages/' + currentServer + '/' + currentChannel;
+    const msgRef = db.ref(msgPath).push();
+    const msgKey = msgRef.key;
+    await msgRef.set({
+      uid: currentUser.uid, name: userProfile.displayName || 'مستخدم',
+      ts: Date.now(), role, snapType: true, snapViewed: false, snapViewCount: 0,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000, uploading: true, uploadProgress: 1,
+      mediaType: 'image', mediaName: file.name, text: '', saved: false
+    });
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const storageRef = storage.ref(`media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`);
+    const uploadTask = storageRef.put(blob, { contentType: blob.type || 'image/jpeg' });
+    await new Promise((resolve, reject) => {
+      uploadTask.on('state_changed', null, reject, resolve);
+    });
+    const url = await uploadTask.snapshot.ref.getDownloadURL();
+    await db.ref(msgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
+    const members = sv?.members || {};
+    Object.keys(members).forEach(uid => {
+      if (uid !== currentUser.uid) {
+        sendPushToUser(uid, userProfile.displayName || 'عوالم', '👻 أرسل سناباً', {
+          serverId: currentServer, channelId: currentChannel, type: 'message'
+        });
+      }
+    });
+  } catch(e) { toast('❌ فشل إرسال السناب: ' + (e.message || '')); }
 }
 
 /* ════════════════════════════════════════════════
