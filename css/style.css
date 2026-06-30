@@ -697,3 +697,48 @@ body.dark-theme .snap-save-btn:hover {
   background: var(--acc);
   color: #fff;
 }
+
+/* ════ فقاعة السناب النصية ════ */
+.snap-bubble-text {
+  padding: 10px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(88,101,242,0.15), rgba(114,137,218,0.2));
+  color: var(--acc);
+  font-family: Tajawal, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-block;
+  cursor: pointer;
+  border: 2px dashed rgba(88,101,242,0.4);
+  margin-top: 4px;
+  transition: all .15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.snap-bubble-text:hover {
+  background: linear-gradient(135deg, rgba(88,101,242,0.2), rgba(114,137,218,0.3));
+  border-color: rgba(88,101,242,0.6);
+  transform: scale(1.02);
+}
+
+.snap-bubble-text.revealed {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(88,101,242,0.08);
+  color: var(--text);
+  font-weight: 400;
+  border: 1px solid rgba(88,101,242,0.2);
+  cursor: default;
+}
+
+body.dark-theme .snap-bubble-text {
+  background: linear-gradient(135deg, rgba(88,101,242,0.2), rgba(114,137,218,0.25));
+  border-color: rgba(88,101,242,0.5);
+}
+
+body.dark-theme .snap-bubble-text.revealed {
+  background: rgba(88,101,242,0.12);
+  color: var(--text);
+  border-color: rgba(88,101,242,0.3);
+}
