@@ -312,7 +312,7 @@ function buildMsgDiv(msg, key) {
     } else {
       const txt = document.createElement('div');
       txt.className = 'msg-content';
-      const mentionRegex = /@([^\\s@]+)/g;
+      const mentionRegex = /@([^\s@]+)/g;
       const highlighted = escHtml(msg.text).replace(mentionRegex, (match, name) => {
         const isMentioned = userProfile?.displayName && name === userProfile.displayName;
         return `<span class="msg-mention${isMentioned ? ' mentioned' : ''}">@${escHtml(name)}</span>`;
@@ -338,7 +338,7 @@ function buildMsgDiv(msg, key) {
         snapBubble.className = 'snap-bubble';
         snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
         snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
-        snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, 'msg_' + currentServer + '_' + currentChannel));
+        snapBubble.addEventListener('click', () => openServerSnap(key, msg.mediaUrl));
         body.appendChild(snapBubble);
     } else if (msg.snapType && msg.snapViewed) {
         const snapBubble = document.createElement('div');
@@ -596,7 +596,7 @@ async function _uploadOneMedia(m, msgBase) {
       const compressed = await compressImage(m.blob);
       if (compressed.size < m.blob.size) {
         console.log("[compress] " + Math.round(m.blob.size/1024) + "KB → " + Math.round(compressed.size/1024) + "KB");
-        m = { ...m, blob: compressed, mimeType: "image/jpeg", name: m.name.replace(/\\.[^.]+$/, ".jpg") };
+        m = { ...m, blob: compressed, mimeType: "image/jpeg", name: m.name.replace(/\.[^.]+$/, ".jpg") };
       }
     } catch(e) { console.warn("[compress] فشل الضغط:", e); }
   }
@@ -859,7 +859,7 @@ function handleChatInput(el) {
   startTyping();
   const val = el.value, cursor = el.selectionStart;
   const atIdx = val.lastIndexOf('@', cursor-1);
-  if (atIdx !== -1 && (atIdx===0 || /\\s/.test(val[atIdx-1]))) showMentionPopup(val.substring(atIdx+1, cursor));
+  if (atIdx !== -1 && (atIdx===0 || /\s/.test(val[atIdx-1]))) showMentionPopup(val.substring(atIdx+1, cursor));
   else closeMentionPopup();
 }
 
@@ -1124,44 +1124,51 @@ function _attachContextBar(div, body, actions, isMine) {
   div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
   div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
   div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
-   }
-   async function openSnap(msgKey, mediaUrl, contextId) {
-    if (!mediaUrl) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'snapOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
-    const img = new Image();
-    img.src = mediaUrl;
-    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-    img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
-    const hint = document.createElement('div');
-    hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
-    hint.textContent = 'اضغط في أي مكان للإغلاق';
-    overlay.appendChild(img);
-    overlay.appendChild(hint);
-    document.body.appendChild(overlay);
+}
 
-    async function closeSnap() {
-        overlay.remove();
-        const ref = db.ref('messages/' + currentServer + '/' + currentChannel + '/' + msgKey);
-        const snapData = await ref.once('value');
-        const viewCount = (snapData.val()?.snapViewCount || 0) + 1;
-        if (viewCount >= 2) {
-            await ref.update({ snapViewed: true, snapViewedAt: Date.now(), mediaUrl: null, snapViewCount: viewCount });
-            try { await storage.refFromURL(mediaUrl).delete(); } catch(e) {}
-        } else {
-            await ref.update({ snapViewCount: viewCount });
-        }
-        const el = document.querySelector('[data-key="' + msgKey + '"] .snap-bubble');
-        if (el) {
-            if (viewCount >= 2) {
-                el.innerHTML = '👁️ تمت المشاهدة';
-                el.style.background = 'rgba(0,0,0,0.06)';
-                el.style.color = 'var(--muted)';
-                el.style.cursor = 'default';
-                el.style.border = 'none';
-            }
-        }
+/* ════════════════════════════════════════════════
+   👻 فتح سناب العام — اسم منفصل عمداً (openServerSnap)
+   لتفادي التعارض مع نفس الاسم openSnap في dm.js
+   (آخر سكربت يتحمّل في index.html يطغى على الآخر،
+   فاستخدام اسمين مختلفين يضمن عمل النظامين معاً)
+   ════════════════════════════════════════════════ */
+async function openServerSnap(msgKey, mediaUrl) {
+  if (!mediaUrl) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'snapOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
+  const img = new Image();
+  img.src = mediaUrl;
+  await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+  img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+  const hint = document.createElement('div');
+  hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
+  hint.textContent = 'اضغط في أي مكان للإغلاق';
+  overlay.appendChild(img);
+  overlay.appendChild(hint);
+  document.body.appendChild(overlay);
+
+  async function closeSnap() {
+    overlay.remove();
+    const ref = db.ref('messages/' + currentServer + '/' + currentChannel + '/' + msgKey);
+    const snapData = await ref.once('value');
+    const viewCount = (snapData.val()?.snapViewCount || 0) + 1;
+    if (viewCount >= 2) {
+      await ref.update({ snapViewed: true, snapViewedAt: Date.now(), mediaUrl: null, snapViewCount: viewCount });
+      try { await storage.refFromURL(mediaUrl).delete(); } catch(e) {}
+    } else {
+      await ref.update({ snapViewCount: viewCount });
     }
-    overlay.addEventListener('click', closeSnap);
+    const el = document.querySelector('[data-key="' + msgKey + '"] .snap-bubble');
+    if (el) {
+      if (viewCount >= 2) {
+        el.innerHTML = '👁️ تمت المشاهدة';
+        el.style.background = 'rgba(0,0,0,0.06)';
+        el.style.color = 'var(--muted)';
+        el.style.cursor = 'default';
+        el.style.border = 'none';
+      }
+    }
+  }
+  overlay.addEventListener('click', closeSnap);
 }
