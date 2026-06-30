@@ -152,7 +152,7 @@ html,body{
 
 /* ════ MAIN CONTENT ════ */
 #mainContent{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
-#contentArea{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;width:100%;position:relative;justify-content:flex-end}
+#contentArea{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;width:100%;position:relative}
 .main-header{height:52px;border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;padding:0 16px;gap:10px;background:var(--header);box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .main-header-back{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;background:transparent;border:none;transition:.15s;flex-shrink:0}
 .main-header-back:hover{background:rgba(26,122,122,0.1);color:var(--acc)}
@@ -562,5 +562,7 @@ body.dark-theme .member-name{color:var(--text)}
 #dndBtn.active{color:var(--red);background:rgba(224,80,80,0.1)}
 #dndBtn .dnd-tooltip{display:none;position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;white-space:nowrap;color:var(--text);font-family:Tajawal,sans-serif;z-index:1000;box-shadow:var(--shadow)}
 #dndBtn:hover .dnd-tooltip{display:block}
-#voiceView { display: none !important; }
-#voiceView.active { display: flex !important; }
+
+/* ← تعديل: أزيل !important و ::before */
+#voiceView { display: none; }
+#voiceView.active { display: flex; }
