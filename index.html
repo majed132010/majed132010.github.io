@@ -201,8 +201,8 @@
             </div>
             <div id="mediaPreviewArea"></div>
             <div class="chat-input-top">
-              <button class="ci-btn" type="button" onclick="document.getElementById('mediaFileInp').click()" title="إرفاق">📎</button>
-              <input type="file" id="mediaFileInp" accept="image/*,video/*" multiple style="display:none" onchange="handleMediaSelect(this)">
+<button class="ci-btn" type="button" onclick="document.getElementById('mainSnapInp').click()" title="إرسال سناب 👻" id="mainSnapBtn">👻</button>
+<input type="file" id="mainSnapInp" accept="image/*" style="display:none" onchange="handleMainSnapSelect(this)">              <input type="file" id="mediaFileInp" accept="image/*,video/*" multiple style="display:none" onchange="handleMediaSelect(this)">
               <textarea class="chat-inp" id="mainChatInp" placeholder="اكتب رسالة... (@ للإشارة)" rows="1" inputmode="text" autocomplete="off"
                 onkeydown="handleChatKeydown(event)"
                 oninput="handleChatInput(this)"
