@@ -139,10 +139,27 @@ function openSettings() { updateUserPanel(); openModal('settingsModal'); }
 // ════ PWA ════
 let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault(); _deferredInstallPrompt=e;
-  const btn=document.getElementById('pwaInstallBtn');
-  if (btn) btn.style.display='';
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  console.log('✅ beforeinstallprompt captured');
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn) {
+    btn.style.display = '';
+    btn.style.visibility = 'visible';
+    btn.style.opacity = '1';
+  }
 });
+
+// fallback: إذا فاتنا الحدث، تحقق بعد 3 ثواني
+setTimeout(() => {
+  if (!_deferredInstallPrompt) {
+    console.log('⚠️ beforeinstallprompt not fired');
+  }
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn && _deferredInstallPrompt) {
+    btn.style.display = '';
+  }
+}, 3000);
 window.addEventListener('appinstalled', () => {
   _deferredInstallPrompt=null;
   const btn=document.getElementById('pwaInstallBtn');
