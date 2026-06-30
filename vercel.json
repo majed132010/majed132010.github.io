@@ -23,13 +23,13 @@
       }
     },
     {
-      "src": "/icon192.png",
+      "src": "/icon-192.png",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
       }
     },
     {
-      "src": "/icon512.png",
+      "src": "/icon-512.png",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
       }
