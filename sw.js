@@ -1,5 +1,5 @@
-// ════ عوالم — Service Worker v6 (مُصلح) ════
-const CACHE_NAME = 'awalem-v7';
+// ════ عوالم — Service Worker v8 (إصلاح تحديث manifest.json) ════
+const CACHE_NAME = 'awalem-v8';
 const IMAGE_CACHE = 'awalem-images-v3';
 const CACHE_URLS = [
   '/',
