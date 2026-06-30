@@ -108,8 +108,10 @@ async function _cleanupExpiredDmMessages(dmId) {
       if (!msg.expiresAt || now <= msg.expiresAt) return;
       updates[ch.key] = null;
       count++;
-      if (msg.mediaUrl) {
-        storage.refFromURL(msg.mediaUrl).delete().catch(() => {});
+      if (msg.mediaUrl && typeof msg.mediaUrl === 'string' && msg.mediaUrl.startsWith('http')) {
+        try {
+          storage.refFromURL(msg.mediaUrl).delete().catch(() => {});
+        } catch(urlErr) { /* رابط غير صالح — تجاهل وتابع */ }
       }
     });
     if (count > 0) await db.ref(path).update(updates);
