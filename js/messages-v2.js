@@ -1125,4 +1125,44 @@ function _attachContextBar(div, body, actions, isMine) {
   div.addEventListener('touchstart', () => { _ctxLp = setTimeout(() => { document.querySelectorAll('.msg-ctx-bar.visible').forEach(el => el.classList.remove('visible')); ctxBar.classList.add('visible'); }, 600); }, { passive: true });
   div.addEventListener('touchend', () => clearTimeout(_ctxLp), { passive: true });
   div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
+   }
+   async function openSnap(msgKey, mediaUrl, contextId) {
+    if (!mediaUrl) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'snapOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
+    const img = new Image();
+    img.src = mediaUrl;
+    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+    img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+    const hint = document.createElement('div');
+    hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
+    hint.textContent = 'اضغط في أي مكان للإغلاق';
+    overlay.appendChild(img);
+    overlay.appendChild(hint);
+    document.body.appendChild(overlay);
+
+    async function closeSnap() {
+        overlay.remove();
+        const ref = db.ref('messages/' + currentServer + '/' + currentChannel + '/' + msgKey);
+        const snapData = await ref.once('value');
+        const viewCount = (snapData.val()?.snapViewCount || 0) + 1;
+        if (viewCount >= 2) {
+            await ref.update({ snapViewed: true, snapViewedAt: Date.now(), mediaUrl: null, snapViewCount: viewCount });
+            try { await storage.refFromURL(mediaUrl).delete(); } catch(e) {}
+        } else {
+            await ref.update({ snapViewCount: viewCount });
+        }
+        const el = document.querySelector('[data-key="' + msgKey + '"] .snap-bubble');
+        if (el) {
+            if (viewCount >= 2) {
+                el.innerHTML = '👁️ تمت المشاهدة';
+                el.style.background = 'rgba(0,0,0,0.06)';
+                el.style.color = 'var(--muted)';
+                el.style.cursor = 'default';
+                el.style.border = 'none';
+            }
+        }
+    }
+    overlay.addEventListener('click', closeSnap);
 }
