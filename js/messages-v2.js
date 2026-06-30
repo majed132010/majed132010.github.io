@@ -97,6 +97,33 @@ function incrementUnread(sid, cid) {
   }
 }
 
+/* ════════════════════════════════════════════════
+   🗑️ حذف فعلي للرسائل منتهية الصلاحية (24 ساعة)
+   لا تُحذف الرسائل المثبّتة (saved: true)
+   تُستدعى عند فتح كل قناة لتنظيف القناة تدريجياً
+   ════════════════════════════════════════════════ */
+async function _cleanupExpiredMessages(sid, cid) {
+  try {
+    const path = 'messages/' + sid + '/' + cid;
+    const snap = await db.ref(path).once('value');
+    const now = Date.now();
+    const updates = {};
+    let count = 0;
+    snap.forEach(ch => {
+      const msg = ch.val();
+      if (!msg) return;
+      if (msg.saved === true) return;
+      if (!msg.expiresAt || now <= msg.expiresAt) return;
+      updates[ch.key] = null;
+      count++;
+      if (msg.mediaUrl) {
+        storage.refFromURL(msg.mediaUrl).delete().catch(() => {});
+      }
+    });
+    if (count > 0) await db.ref(path).update(updates);
+  } catch(e) { console.warn('[cleanup] فشل تنظيف الرسائل المنتهية:', e); }
+}
+
 function showMessages(sid, cid) {
   window._sendingMedia = false;
   if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
@@ -113,6 +140,7 @@ function showMessages(sid, cid) {
   cleanupMessagesListener();
   clearUnread(sid, cid);
   listenTyping(sid, cid);
+  _cleanupExpiredMessages(sid, cid);
   if (currentUser && typeof listenNotifications === 'function') {
     listenNotifications(currentUser.uid);
   }
@@ -157,9 +185,9 @@ function showMessages(sid, cid) {
         progWrap.remove();
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
-        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+        snapBubble.innerHTML = msg.mediaType === 'video' ? '👁️ اضغط لفتح الفيديو' : '👁️ اضغط لفتح الصورة';
         snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
-        snapBubble.addEventListener('click', () => openServerSnap(snap.key, msg.mediaUrl));
+        snapBubble.addEventListener('click', () => openServerSnap(snap.key, msg.mediaUrl, msg.mediaType));
         body.appendChild(snapBubble);
         const a = document.getElementById('messagesArea');
         if (a) requestAnimationFrame(() => { a.scrollTop = a.scrollHeight; });
@@ -353,9 +381,9 @@ function buildMsgDiv(msg, key) {
     if (msg.snapType && !msg.snapViewed) {
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
-        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+        snapBubble.innerHTML = msg.mediaType === 'video' ? '👁️ اضغط لفتح الفيديو' : '👁️ اضغط لفتح الصورة';
         snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
-        snapBubble.addEventListener('click', () => openServerSnap(key, msg.mediaUrl));
+        snapBubble.addEventListener('click', () => openServerSnap(key, msg.mediaUrl, msg.mediaType));
         body.appendChild(snapBubble);
     } else if (msg.snapType && msg.snapViewed) {
         const snapBubble = document.createElement('div');
@@ -637,7 +665,7 @@ async function _uploadOneMedia(m, msgBase) {
     mediaName: m.name,
     uploading: true,
     uploadProgress: 1,
-    snapType: msgBase.isSnap || false,
+    snapType: true,
     snapViewed: false,
     snapViewCount: 0
 });
@@ -1143,48 +1171,7 @@ function _attachContextBar(div, body, actions, isMine) {
   div.addEventListener('touchmove', () => clearTimeout(_ctxLp), { passive: true });
 }
 
-/* ════════════════════════════════════════════════
-   👻 إرسال سناب صورة فوري بالعام عبر زر مستقل
-   مطابق لـ handleDmSnapSelect في dm.js، لكن بمسار العام
-   ════════════════════════════════════════════════ */
-async function handleMainSnapSelect(input) {
-  const file = input.files[0];
-  input.value = '';
-  if (!file || !file.type.startsWith('image')) return;
-  if (!currentServer || !currentChannel || !currentUser) return;
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    let blob = new Blob([arrayBuffer], { type: file.type });
-    blob = await compressImage(blob);
-    const sv = servers[currentServer];
-    const role = sv?.members?.[currentUser.uid]?.role || 'member';
-    const msgPath = 'messages/' + currentServer + '/' + currentChannel;
-    const msgRef = db.ref(msgPath).push();
-    const msgKey = msgRef.key;
-    await msgRef.set({
-      uid: currentUser.uid, name: userProfile.displayName || 'مستخدم',
-      ts: Date.now(), role, snapType: true, snapViewed: false, snapViewCount: 0,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000, uploading: true, uploadProgress: 1,
-      mediaType: 'image', mediaName: file.name, text: '', saved: false
-    });
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const storageRef = storage.ref(`media/${currentServer}/${currentChannel}/${Date.now()}.${ext}`);
-    const uploadTask = storageRef.put(blob, { contentType: blob.type || 'image/jpeg' });
-    await new Promise((resolve, reject) => {
-      uploadTask.on('state_changed', null, reject, resolve);
-    });
-    const url = await uploadTask.snapshot.ref.getDownloadURL();
-    await db.ref(msgPath + '/' + msgKey).update({ mediaUrl: url, uploading: false, uploadProgress: null });
-    const members = sv?.members || {};
-    Object.keys(members).forEach(uid => {
-      if (uid !== currentUser.uid) {
-        sendPushToUser(uid, userProfile.displayName || 'عوالم', '👻 أرسل سناباً', {
-          serverId: currentServer, channelId: currentChannel, type: 'message'
-        });
-      }
-    });
-  } catch(e) { toast('❌ فشل إرسال السناب: ' + (e.message || '')); }
-}
+
 
 /* ════════════════════════════════════════════════
    👻 فتح سناب العام — اسم منفصل عمداً (openServerSnap)
@@ -1192,23 +1179,33 @@ async function handleMainSnapSelect(input) {
    (آخر سكربت يتحمّل في index.html يطغى على الآخر،
    فاستخدام اسمين مختلفين يضمن عمل النظامين معاً)
    ════════════════════════════════════════════════ */
-async function openServerSnap(msgKey, mediaUrl) {
+async function openServerSnap(msgKey, mediaUrl, mediaType) {
   if (!mediaUrl) return;
   const overlay = document.createElement('div');
   overlay.id = 'snapOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
-  const img = new Image();
-  img.src = mediaUrl;
-  await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-  img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+  let mediaEl;
+  if (mediaType === 'video') {
+    mediaEl = document.createElement('video');
+    mediaEl.src = mediaUrl;
+    mediaEl.controls = true;
+    mediaEl.autoplay = true;
+    mediaEl.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+  } else {
+    mediaEl = new Image();
+    mediaEl.src = mediaUrl;
+    await new Promise(resolve => { mediaEl.onload = resolve; mediaEl.onerror = resolve; });
+    mediaEl.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
+  }
   const hint = document.createElement('div');
   hint.style.cssText = 'position:absolute;bottom:32px;color:rgba(255,255,255,0.5);font-family:Tajawal,sans-serif;font-size:13px';
-  hint.textContent = 'اضغط في أي مكان للإغلاق';
-  overlay.appendChild(img);
+  hint.textContent = mediaType === 'video' ? 'اضغط خارج الفيديو للإغلاق' : 'اضغط في أي مكان للإغلاق';
+  overlay.appendChild(mediaEl);
   overlay.appendChild(hint);
   document.body.appendChild(overlay);
 
   async function closeSnap() {
+    if (mediaType === 'video') { try { mediaEl.pause(); } catch(e) {} }
     overlay.remove();
     const ref = db.ref('messages/' + currentServer + '/' + currentChannel + '/' + msgKey);
     const snapData = await ref.once('value');
@@ -1230,5 +1227,8 @@ async function openServerSnap(msgKey, mediaUrl) {
       }
     }
   }
-  overlay.addEventListener('click', closeSnap);
+  overlay.addEventListener('click', e => {
+    if (mediaType === 'video' && e.target === mediaEl) return;
+    closeSnap();
+  });
 }
