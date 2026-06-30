@@ -207,7 +207,6 @@
                 onkeydown="handleChatKeydown(event)"
                 oninput="handleChatInput(this)"
                 style="font-size:16px!important"></textarea>
-<button class="ci-btn" id="snapToggleBtn" type="button" onclick="toggleSnapMode()" title="وضع السناب">👻</button>
 <button class="voice-record-btn" id="voiceRecordBtn" type="button" onclick="toggleVoiceRecording()" title="رسالة صوتية">🎤</button>              <button class="ci-btn send" id="sendBtn" type="button" onclick="sendMessage()" title="إرسال">➤</button>
             </div>
           </div>
@@ -240,7 +239,6 @@
             <div class="chat-input-top">
               <button class="ci-btn" type="button" onclick="document.getElementById('dmSnapInp').click()" title="إرسال سناب 👻" id="dmSnapBtn">👻</button>
 <input type="file" id="dmSnapInp" accept="image/*" style="display:none" onchange="handleDmSnapSelect(this)">
-              <button class="ci-btn" id="dmSnapToggleBtn" type="button" onclick="toggleDmSnapMode()" title="وضع السناب">👻</button>
               <button class="ci-btn" type="button" id="dmVoiceBtn" onclick="toggleDmVoiceRecording()" title="تسجيل صوتي">🎤</button>
               <textarea class="chat-inp" id="dmChatInp" placeholder="اكتب رسالة خاصة..." rows="1" inputmode="text" autocomplete="off"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDM()}"
