@@ -25,7 +25,28 @@
   --shadow:0 2px 8px rgba(0,0,0,0.08);
   --shadow2:0 4px 16px rgba(0,0,0,0.1);
 }
-
+#gameOverlay {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+#gameFrame {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  background: #000 !important;
+}
+body.game-open {
+  overflow: hidden !important;
+}
 html,body{
   height:100vh;height:100dvh;
   font-family:Tajawal,sans-serif;
