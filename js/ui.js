@@ -235,6 +235,7 @@ function openGame(url, title) {
   frame.src = url;
   overlay.style.display = 'flex';
   overlay.style.flexDirection = 'column';
+  document.body.classList.add('game-open');
 }
 
 function closeGame() {
