@@ -170,9 +170,13 @@ function installPWA() {
   if (_deferredInstallPrompt) {
     _deferredInstallPrompt.prompt();
     _deferredInstallPrompt.userChoice.then(choice => {
-      if (choice.outcome==='accepted') toast('✅ جاري تثبيت التطبيق...');
+      if (choice.outcome==='accepted') {
+        toast('✅ جاري تثبيت التطبيق...');
+      }
       _deferredInstallPrompt=null;
     });
+  } else {
+    toast('📱 افتح القائمة (⋮) واختر "Add to Home Screen"');
   }
 }
 
