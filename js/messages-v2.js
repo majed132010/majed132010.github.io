@@ -600,14 +600,17 @@ async function _uploadOneMedia(m, msgBase) {
     blob: m.blob, name: m.name, type: m.type, mimeType: m.mimeType, msgPath
   };
 
-  await msgRef.set({
+ await msgRef.set({
     ...msgBase,
     text: '',
     mediaType: m.type,
     mediaName: m.name,
     uploading: true,
-    uploadProgress: 1
-  });
+    uploadProgress: 1,
+    snapType: msgBase.isSnap || false,
+    snapViewed: false,
+    snapViewCount: 0
+});
 
   const area = document.getElementById('messagesArea');
   if (area) area.scrollTop = area.scrollHeight;
