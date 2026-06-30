@@ -11,7 +11,10 @@ function showView(name) {
   const membersBtn = document.getElementById('membersToggleBtn');
   if (home)  home.style.display  = name==='home'     ? 'flex' : 'none';
   if (msgs)  { msgs.style.display = name==='messages' ? 'flex' : 'none'; msgs.style.flexDirection='column'; msgs.style.overflow='hidden'; }
-  if (voice) voice.style.display = name==='voice'    ? 'flex' : 'none';
+  if (voice) {
+  voice.style.display = name==='voice' ? 'flex' : 'none';
+  voice.classList.toggle('active', name==='voice');
+}
   if (dm)    dm.style.display    = name==='dm'       ? 'flex' : 'none';
   if (games) games.style.display = name==='games' ? 'flex' : 'none';
   if (searchBtn)  searchBtn.style.display  = name==='messages' ? '' : 'none';
