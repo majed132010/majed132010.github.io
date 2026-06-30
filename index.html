@@ -240,6 +240,7 @@
             <div class="chat-input-top">
               <button class="ci-btn" type="button" onclick="document.getElementById('dmSnapInp').click()" title="إرسال سناب 👻" id="dmSnapBtn">👻</button>
 <input type="file" id="dmSnapInp" accept="image/*" style="display:none" onchange="handleDmSnapSelect(this)">
+              <button class="ci-btn" id="dmSnapToggleBtn" type="button" onclick="toggleDmSnapMode()" title="وضع السناب">👻</button>
               <button class="ci-btn" type="button" id="dmVoiceBtn" onclick="toggleDmVoiceRecording()" title="تسجيل صوتي">🎤</button>
               <textarea class="chat-inp" id="dmChatInp" placeholder="اكتب رسالة خاصة..." rows="1" inputmode="text" autocomplete="off"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDM()}"
