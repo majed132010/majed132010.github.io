@@ -332,36 +332,50 @@ function buildMsgDiv(msg, key) {
     body.appendChild(_buildUploadProgressEl(key, msg.uploadProgress || 1, msg.mediaType));
   }
 
-  if (msg.mediaUrl) {
-    if (msg.mediaType === 'video') {
-      body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+ if (msg.mediaUrl) {
+    if (msg.snapType && !msg.snapViewed) {
+        const snapBubble = document.createElement('div');
+        snapBubble.className = 'snap-bubble';
+        snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
+        snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, 'msg_' + currentServer + '_' + currentChannel));
+        body.appendChild(snapBubble);
+    } else if (msg.snapType && msg.snapViewed) {
+        const snapBubble = document.createElement('div');
+        snapBubble.className = 'snap-bubble';
+        snapBubble.innerHTML = '👁️ تمت المشاهدة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default;margin-top:4px;';
+        body.appendChild(snapBubble);
+    } else if (msg.mediaType === 'video') {
+        body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
     } else {
-      const mediaWrap = document.createElement('div');
-      mediaWrap.className = 'msg-media-wrap';
-      const img = document.createElement('img');
-      img.decoding = 'async';
-      img.className = 'msg-media-img';
-      img.style.background = '#2a2a2a';
-      img.style.minHeight = '80px';
-      img.dataset.msgKey = key;
-      img.alt = msg.mediaName || '';
-      img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
-      img.addEventListener('load', () => {
-        const a = document.getElementById('messagesArea');
-        if (!a) return;
-        requestAnimationFrame(() => {
-          const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
-          if (dist < 300) a.scrollTop = a.scrollHeight;
+        const mediaWrap = document.createElement('div');
+        mediaWrap.className = 'msg-media-wrap';
+        const img = document.createElement('img');
+        img.decoding = 'async';
+        img.className = 'msg-media-img';
+        img.style.background = '#2a2a2a';
+        img.style.minHeight = '80px';
+        img.dataset.msgKey = key;
+        img.alt = msg.mediaName || '';
+        img.addEventListener('click', () => openLightbox(msg.mediaUrl,'image',msg.mediaName, key, msg.uid === (currentUser&&currentUser.uid) || isAdminUser, msg.name, msg.ts));
+        img.addEventListener('load', () => {
+            const a = document.getElementById('messagesArea');
+            if (!a) return;
+            requestAnimationFrame(() => {
+                const dist = a.scrollHeight - a.scrollTop - a.clientHeight;
+                if (dist < 300) a.scrollTop = a.scrollHeight;
+            });
         });
-      });
-      loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
-        if (img.dataset.msgKey !== key) return;
-        if (src) img.src = src;
-        else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
-      });
-      mediaWrap.appendChild(img);
-      body.appendChild(mediaWrap);
+        loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => {
+            if (img.dataset.msgKey !== key) return;
+            if (src) img.src = src;
+            else { img.style.opacity='0.3'; img.style.filter='grayscale(1)'; }
+        });
+        mediaWrap.appendChild(img);
+        body.appendChild(mediaWrap);
     }
+}
   }
 
   if (msg.reactions) renderReactions(msg.reactions, key, body);
