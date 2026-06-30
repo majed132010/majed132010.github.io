@@ -10,7 +10,6 @@ function toggleSnapMode() {
   toast(snapMode ? '👻 وضع السناب مفعّل' : '💬 وضع الرسائل العادية');
 }
 
-// حفظ رسالة سناب (تحويلها لدائمة)
 function saveSnapMessage(msgId) {
   if (!currentServer || !currentChannel || !msgId) return;
   const ref = firebase.database().ref(
@@ -21,7 +20,6 @@ function saveSnapMessage(msgId) {
     .catch(() => toast('❌ فشل الحفظ'));
 }
 
-// حذف رسالة سناب بعد فتحها
 function markSnapViewed(msgId) {
   if (!msgId || !currentServer || !currentChannel) return;
   const ref = firebase.database().ref(
@@ -39,7 +37,6 @@ function markSnapViewed(msgId) {
 // ════ MESSAGES ════
 const PAGE_SIZE = 20;
 
-// ════ ضغط الصور قبل الرفع ════
 async function compressImage(blob, maxWidth = 1280, quality = 0.82) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -71,7 +68,6 @@ let _typingTimer = null;
 let _msgLoadGen = 0;
 let _searchResults = [], _searchIndex = 0;
 
-// ════ إدارة الرسائل غير المقروءة ════
 function clearUnread(sid, cid) {
   const key = sid + '/' + cid;
   if (_unreadCounts[key]) {
@@ -96,7 +92,6 @@ function incrementUnread(sid, cid) {
   }
 }
 
-// ════ عرض الرسائل ════
 function showMessages(sid, cid) {
   window._sendingMedia = false;
   if (auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
@@ -113,12 +108,9 @@ function showMessages(sid, cid) {
   cleanupMessagesListener();
   clearUnread(sid, cid);
   listenTyping(sid, cid);
-
-  // ✅ FIX: تشغيل الاستماع العالمي للإشعارات (مرة واحدة فقط)
   if (currentUser && typeof listenNotifications === 'function') {
     listenNotifications(currentUser.uid);
   }
-
   const gen = ++_msgLoadGen;
   let _initialDone = false;
   const fn = snap => {
@@ -136,7 +128,6 @@ function showMessages(sid, cid) {
         const activeSid = window.currentServerId !== undefined ? window.currentServerId : currentServer;
         const activeCid = window.currentChannelId !== undefined ? window.currentChannelId : currentChannel;
         if (!(activeSid === sid && activeCid === cid)) {
-          // ✅ حماية ضد التكرار باستخدام _lastNotifSet من notifications.js
           const tag = sid + '/' + cid + '/' + (msg.text || '').slice(0, 20) + '/' + (msg.ts || 0);
           if (typeof _lastNotifSet !== 'undefined' && _lastNotifSet.has(tag)) return;
           if (typeof _lastNotifSet !== 'undefined') _lastNotifSet.add(tag);
@@ -199,7 +190,6 @@ function showMessages(sid, cid) {
   });
 }
 
-// ════ تحميل رسائل أقدم ════
 async function loadMoreMessages() {
   if (!_currentMsgPath || !_oldestMsgKey || _allLoaded) return;
   const btn = document.getElementById('loadMoreBtn');
@@ -232,9 +222,7 @@ async function loadMoreMessages() {
   }
 }
 
-// ════ بناء رسالة ════
 function buildMsgDiv(msg, key) {
-  // ✅ نظام السناب: اختفاء تلقائي بعد 24 ساعة إذا لم تُثبت
   if (msg.isSnap && !msg.saved && msg.expiresAt && Date.now() > msg.expiresAt) return null;
   if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null;
   if (!msg.text && !msg.mediaUrl && !msg.voiceUrl && !msg.replyTo && !msg.uploading) return null;
@@ -254,7 +242,10 @@ function buildMsgDiv(msg, key) {
 
   const av = document.createElement('div');
   av.className = 'msg-av';
-  const _memberAv = sv?.members?.[msg.uid]?.avatar || null;if (_memberAv) { av.innerHTML = `<img src="${_memberAv}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`; } else { av.textContent = (msg.name || '?')[0]; } if (canModerate) {
+  const _memberAv = sv?.members?.[msg.uid]?.avatar || null;
+  if (_memberAv) { av.innerHTML = `<img src="${_memberAv}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`; } 
+  else { av.textContent = (msg.name || '?')[0]; }
+  if (canModerate) {
     av.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); _openModCtx(msg.uid, msg.name, e); });
     av.style.cursor = 'context-menu';
     av.title = 'انقر بالزر الأيمن لإجراءات الإشراف';
@@ -304,15 +295,31 @@ function buildMsgDiv(msg, key) {
   }
 
   if (msg.text) {
-    const txt = document.createElement('div');
-    txt.className = 'msg-content';
-    const mentionRegex = /@([^\\s@]+)/g;
-    const highlighted = escHtml(msg.text).replace(mentionRegex, (match, name) => {
-      const isMentioned = userProfile?.displayName && name === userProfile.displayName;
-      return `<span class="msg-mention${isMentioned ? ' mentioned' : ''}">@${escHtml(name)}</span>`;
-    });
-    txt.innerHTML = highlighted;
-    body.appendChild(txt);
+    if (isSnap && !msg.saved) {
+      // 👻 رسالة سناب نصية: تظهر كفقاعة "اضغط لفتح"
+      const snapBubble = document.createElement('div');
+      snapBubble.className = 'snap-bubble-text';
+      snapBubble.innerHTML = '👻 اضغط لفتح الرسالة';
+      snapBubble.dataset.text = msg.text;
+      snapBubble.dataset.key = key;
+      snapBubble.addEventListener('click', function(e) {
+        if (e.target.closest('.snap-save-btn')) return;
+        this.innerHTML = escHtml(this.dataset.text);
+        this.classList.add('revealed');
+        markSnapViewed(this.dataset.key);
+      });
+      body.appendChild(snapBubble);
+    } else {
+      const txt = document.createElement('div');
+      txt.className = 'msg-content';
+      const mentionRegex = /@([^\\s@]+)/g;
+      const highlighted = escHtml(msg.text).replace(mentionRegex, (match, name) => {
+        const isMentioned = userProfile?.displayName && name === userProfile.displayName;
+        return `<span class="msg-mention${isMentioned ? ' mentioned' : ''}">@${escHtml(name)}</span>`;
+      });
+      txt.innerHTML = highlighted;
+      body.appendChild(txt);
+    }
   }
 
   if (msg.voiceUrl && !msg.mediaUrl) {
@@ -359,7 +366,6 @@ function buildMsgDiv(msg, key) {
 
   if (msg.reactions) renderReactions(msg.reactions, key, body);
 
-  // ─── زر الحفظ + النقر للفتح (سناب فقط) ───
   if (isSnap && !msg.saved) {
     const saveBtn = document.createElement('button');
     saveBtn.className = 'snap-save-btn';
@@ -393,7 +399,6 @@ function buildMsgDiv(msg, key) {
   return div;
 }
 
-// ✅ دالة تثبيت الرسالة (مثل السناب)
 async function saveMessage(key) {
   if (!currentServer || !currentChannel) return;
   try {
@@ -406,8 +411,6 @@ async function saveMessage(key) {
     toast('❌ فشل التثبيت');
   }
 }
-
-// ════ قائمة سياق المشرف ════
 async function _openModCtx(targetUid, targetName, ev) {
   if (!currentServer || !currentUser) return;
   document.getElementById('modCtxMenu')?.remove();
@@ -474,7 +477,6 @@ async function _kickUserFromChat(uid, name) {
   } catch(e) { toast('❌ فشل الطرد: ' + (e.message || '')); }
 }
 
-// ════ إرسال رسالة ════
 async function sendMessage() {
   console.log('[sendMessage] called, pendingMedia:', window._pendingMedia?.length, 'text:', document.getElementById('mainChatInp')?.value?.trim()?.slice(0,20));
   console.log('[sendMessage] currentServer:', currentServer, 'currentChannel:', currentChannel, 'muted:', _currentUserMuted);
@@ -511,7 +513,6 @@ async function sendMessage() {
   const sv = servers[currentServer];
   const role = sv?.members?.[currentUser.uid]?.role || 'member';
 
-  // ✅ نظام السناب: كل رسالة تختفي بعد 24 ساعة إذا لم تُثبت
   const msgBase = {
     uid: currentUser.uid,
     name: userProfile.displayName || 'مستخدم',
@@ -547,7 +548,6 @@ async function sendMessage() {
     }, 0);
   }
 
-  // إطفاء وضع السناب بعد الإرسال
   if (snapMode) {
     snapMode = false;
     const btn = document.getElementById('snapToggleBtn');
@@ -577,9 +577,7 @@ async function sendMessage() {
   }
 }
 
-// ════ رفع ملف واحد ════
 async function _uploadOneMedia(m, msgBase) {
-  // ✅ ضغط الصور قبل الرفع
   if (m.type === "image") {
     try {
       const compressed = await compressImage(m.blob);
@@ -622,7 +620,6 @@ async function _uploadOneMedia(m, msgBase) {
     let mediaUrl;
 
     if (m.type === 'video') {
-      // ✅ استخدام Firebase Storage للفيديو (أكثر موثوقية)
       const ext = (m.name.split('.').pop() || 'mp4').toLowerCase();
       const storageRef = storage.ref(`media/${_sid}/${_cid}/${Date.now()}.${ext}`);
       const uploadTask = storageRef.put(m.blob, { contentType: m.mimeType || 'video/mp4' });
@@ -675,7 +672,6 @@ async function _uploadOneMedia(m, msgBase) {
   }
 }
 
-// ════ حذف رسالة ════
 async function deleteMessage(key) {
   if (!currentServer || !currentChannel) return;
   if (!confirm('هل تريد حذف هذه الرسالة؟')) return;
@@ -684,7 +680,6 @@ async function deleteMessage(key) {
   toast('🗑️ تم حذف الرسالة');
 }
 
-// ════ تعديل رسالة ════
 function startEditMessage(key, currentText) {
   _editingKey = key;
   const inp = document.getElementById('mainChatInp');
@@ -702,7 +697,6 @@ function cancelEdit() {
   document.querySelector('.chat-input-box').style.borderColor = '';
 }
 
-// ════ الرد على رسالة ════
 function setReply(key, name, text) {
   _replyTo = { key, name, text };
   document.getElementById('replyName').textContent = name;
@@ -715,7 +709,6 @@ function clearReply() {
   document.getElementById('replyBar').classList.remove('show');
 }
 
-// ════ التفاعلات ════
 const REACTION_EMOJIS = ['👍','😂','🔥','❤️','😮','😢'];
 
 function showReactionPicker(msgKey, anchorEl) {
@@ -777,7 +770,6 @@ function renderReactions(reactions, msgKey, container) {
   if (wrap.children.length) container.appendChild(wrap);
 }
 
-// ════ الكتابة ════
 function startTyping() {
   if (!currentServer || !currentChannel || !currentUser) return;
   const path = 'typing/' + currentServer + '/' + currentChannel + '/' + currentUser.uid;
@@ -819,7 +811,6 @@ function listenTyping(sid, cid) {
   });
 }
 
-// ════ تنظيف الـ listener ════
 function cleanupMessagesListener() {
   if (messagesListener) {
     const ref = messagesListener.mainRef || messagesListener.queryRef;
@@ -833,7 +824,6 @@ function cleanupMessagesListener() {
   if (el) { el.innerHTML = ''; el.classList.remove('active'); }
 }
 
-// ════ الإشارة (@mention) ════
 let _mentionIndex = 0, _mentionResults = [];
 
 function handleChatKeydown(e) {
@@ -895,7 +885,6 @@ function closeMentionPopup() {
   _mentionResults = [];
 }
 
-// ════ اختيار الوسائط ════
 window._pendingMedia = [];
 window._sendingMedia = false;
 async function handleMediaSelect(input) {
@@ -963,7 +952,6 @@ async function handleMediaSelect(input) {
   }
 }
 
-// ════ البحث ════
 function toggleSearch() {
   const bar = document.getElementById('searchBar');
   const isOpen = bar.classList.contains('show');
@@ -983,11 +971,9 @@ function searchMessages(query) {
   if (!query.trim()) { countEl.textContent=''; return; }
   document.querySelectorAll('#messagesArea .msg-content').forEach(el => {
     if (!el.textContent.toLowerCase().includes(query.toLowerCase())) return;
-    // ✅ تخزين HTML الأصلي لاستعادته لاحقاً
     if (!el.dataset.originalHtml) el.dataset.originalHtml = el.innerHTML;
     const text = el.textContent;
     const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    // ✅ إعادة بناء DOM بدون تدمير الأحداث على العنصر الأب
     el.innerHTML = '';
     el.appendChild(document.createTextNode(text.substring(0, idx)));
     const mark = document.createElement('mark');
@@ -1018,9 +1004,7 @@ function clearSearchHighlights() {
   });
 }
 
-// ════ Lightbox ════
 let _lightboxUrl='', _lightboxType='', _lightboxName='';
-// مفتاح الرسالة الحالية في lightbox (للحذف)
 let _lightboxMsgKey = null;
 
 function openLightbox(url, type, name, msgKey, canDelete, senderName, ts) {
@@ -1089,7 +1073,6 @@ function downloadMedia(url, name, type) {
   });
 }
 
-// ESC key
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') {
     if (_editingKey) cancelEdit();
@@ -1097,7 +1080,6 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ════ دالة شريط السياق المشتركة (messages-v2.js + dm.js) ════
 function _attachContextBar(div, body, actions, isMine) {
   if (!window._ctxDismissReady) {
     window._ctxDismissReady = true;
