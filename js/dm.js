@@ -325,8 +325,26 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
   }
 
   if (msg.text) {
-    const txt = document.createElement('div'); txt.className = 'msg-content'; txt.textContent = msg.text;
-    body.appendChild(txt);
+    if (isSnap && !msg.saved) {
+      // 👻 رسالة سناب نصية: تظهر كفقاعة "اضغط لفتح"
+      const snapBubble = document.createElement('div');
+      snapBubble.className = 'snap-bubble';
+      snapBubble.innerHTML = '👻 اضغط لفتح الرسالة';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.15),rgba(114,137,218,0.2));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
+      snapBubble.dataset.text = msg.text;
+      snapBubble.dataset.key = key;
+      snapBubble.addEventListener('click', function(e) {
+        if (e.target.closest('.snap-save-btn')) return;
+        // إظهار النص مؤقتاً
+        this.innerHTML = escHtml(this.dataset.text);
+        this.style.cssText = 'padding:10px 14px;border-radius:12px;background:rgba(88,101,242,0.08);color:var(--text);font-family:Tajawal,sans-serif;font-size:14px;line-height:1.6;display:inline-block;margin-top:4px;border:1px solid rgba(88,101,242,0.2);';
+        markDmSnapViewed(this.dataset.key);
+      });
+      body.appendChild(snapBubble);
+    } else {
+      const txt = document.createElement('div'); txt.className = 'msg-content'; txt.textContent = msg.text;
+      body.appendChild(txt);
+    }
   }
 
   // 👻 السناب — يجب أن يكون قبل uploading وقبل mediaUrl
