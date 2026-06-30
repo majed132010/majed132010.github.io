@@ -376,7 +376,6 @@ function buildMsgDiv(msg, key) {
         body.appendChild(mediaWrap);
     }
 }
-  }
 
   if (msg.reactions) renderReactions(msg.reactions, key, body);
 
