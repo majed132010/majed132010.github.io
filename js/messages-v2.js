@@ -207,6 +207,22 @@ function showMessages(sid, cid) {
       } else if (!msg.uploading && msg.uploadFailed) _showUploadFailedEl(progWrap, snap.key);
     }
     renderReactions(msg.reactions || null, snap.key, body);
+    // 👻 السناب تم تثبيته (saved) — استبدال الفقاعة بالصورة/الفيديو الفعلي فوراً
+    if (msg.snapType && msg.saved && msg.mediaUrl) {
+      const existingBubble = body.querySelector('.snap-bubble');
+      if (existingBubble) {
+        existingBubble.remove();
+        if (msg.mediaType === 'video') {
+          body.appendChild(buildCachedVideoEl(msg.mediaUrl, msg.mediaName));
+        } else {
+          const mediaWrap = document.createElement('div'); mediaWrap.className = 'msg-media-wrap';
+          const img = document.createElement('img'); img.decoding = 'async'; img.className = 'msg-media-img'; img.alt = msg.mediaName || '';
+          img.addEventListener('click', () => { const sv=servers[currentServer]; const myRole=sv?.members?.[currentUser?.uid]?.role; const _isAdmin=myRole==='owner'||myRole==='admin'; openLightbox(msg.mediaUrl, 'image', msg.mediaName, snap.key, msg.uid===(currentUser&&currentUser.uid)||_isAdmin, msg.name, msg.ts); });
+          loadCachedImage(msg.mediaUrl, msg.expiresAt, msg.saved).then(src => { if (src) img.src = src; });
+          mediaWrap.appendChild(img); body.appendChild(mediaWrap);
+        }
+      }
+    }
     const a = document.getElementById('messagesArea');
     if (a && a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
     if (msg.text !== undefined) {
@@ -378,14 +394,14 @@ function buildMsgDiv(msg, key) {
   }
 
  if (msg.mediaUrl) {
-    if (msg.snapType && !msg.snapViewed) {
+    if (msg.snapType && !msg.saved && !msg.snapViewed) {
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
         snapBubble.innerHTML = msg.mediaType === 'video' ? '👁️ اضغط لفتح الفيديو' : '👁️ اضغط لفتح الصورة';
         snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
         snapBubble.addEventListener('click', () => openServerSnap(key, msg.mediaUrl, msg.mediaType));
         body.appendChild(snapBubble);
-    } else if (msg.snapType && msg.snapViewed) {
+    } else if (msg.snapType && !msg.saved && msg.snapViewed) {
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
         snapBubble.innerHTML = '👁️ تمت المشاهدة';
@@ -446,12 +462,13 @@ function buildMsgDiv(msg, key) {
   div.appendChild(av); div.appendChild(body);
 
   const _ctxHasMedia = !!(msg.mediaUrl || msg.voiceUrl);
+  const _isUnsavedSnap = !!(msg.snapType && !msg.saved);
   _attachContextBar(div, body, [
     { icon: '↩️', label: 'رد', fn: () => setReply(key, msg.name, msg.text) },
     { icon: '📤', label: 'إعادة إرسال', fn: () => toast('📤 قريباً') },
-    { icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) },
+    ...(_isUnsavedSnap ? [{ icon: '💾', label: 'حفظ', fn: () => saveMessage(key) }] : [{ icon: '⭐', label: 'تثبيت', fn: () => saveMessage(key) }]),
     ...((isMine || isAdminUser) ? [{ icon: '🗑️', label: 'حذف', danger: true, fn: () => deleteMessage(key) }] : []),
-    ...(_ctxHasMedia ? [{ icon: '💾', label: 'حفظ', fn: () => downloadMedia(msg.mediaUrl || msg.voiceUrl, msg.mediaName || 'media', msg.mediaType || 'image') }] : []),
+    ...(_ctxHasMedia && !_isUnsavedSnap ? [{ icon: '⬇️', label: 'تنزيل', fn: () => downloadMedia(msg.mediaUrl || msg.voiceUrl, msg.mediaName || 'media', msg.mediaType || 'image') }] : []),
   ], isMine);
 
   return div;
