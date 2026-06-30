@@ -243,6 +243,7 @@ function closeGame() {
   const frame = document.getElementById('gameFrame');
   if (overlay) overlay.style.display = 'none';
   if (frame) frame.src = '';
+document.body.classList.remove('game-open');
 }
 function openGamesScreen() {
   showView('games');
