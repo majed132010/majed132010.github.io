@@ -11,7 +11,10 @@ function showView(name) {
   const membersBtn = document.getElementById('membersToggleBtn');
   if (home)  home.style.display  = name==='home'     ? 'flex' : 'none';
   if (msgs)  { msgs.style.display = name==='messages' ? 'flex' : 'none'; msgs.style.flexDirection='column'; msgs.style.overflow='hidden'; }
-  if (voice) voice.style.display = name==='voice'    ? 'flex' : 'none';
+  if (voice) {
+  voice.style.display = name==='voice' ? 'flex' : 'none';
+  voice.classList.toggle('active', name==='voice');
+}
   if (dm)    dm.style.display    = name==='dm'       ? 'flex' : 'none';
   if (games) games.style.display = name==='games' ? 'flex' : 'none';
   if (searchBtn)  searchBtn.style.display  = name==='messages' ? '' : 'none';
@@ -136,10 +139,27 @@ function openSettings() { updateUserPanel(); openModal('settingsModal'); }
 // ════ PWA ════
 let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault(); _deferredInstallPrompt=e;
-  const btn=document.getElementById('pwaInstallBtn');
-  if (btn) btn.style.display='';
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  console.log('✅ beforeinstallprompt captured');
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn) {
+    btn.style.display = '';
+    btn.style.visibility = 'visible';
+    btn.style.opacity = '1';
+  }
 });
+
+// fallback: إذا فاتنا الحدث، تحقق بعد 3 ثواني
+setTimeout(() => {
+  if (!_deferredInstallPrompt) {
+    console.log('⚠️ beforeinstallprompt not fired');
+  }
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn && _deferredInstallPrompt) {
+    btn.style.display = '';
+  }
+}, 3000);
 window.addEventListener('appinstalled', () => {
   _deferredInstallPrompt=null;
   const btn=document.getElementById('pwaInstallBtn');
@@ -150,9 +170,13 @@ function installPWA() {
   if (_deferredInstallPrompt) {
     _deferredInstallPrompt.prompt();
     _deferredInstallPrompt.userChoice.then(choice => {
-      if (choice.outcome==='accepted') toast('✅ جاري تثبيت التطبيق...');
+      if (choice.outcome==='accepted') {
+        toast('✅ جاري تثبيت التطبيق...');
+      }
       _deferredInstallPrompt=null;
     });
+  } else {
+    toast('📱 افتح القائمة (⋮) واختر "Add to Home Screen"');
   }
 }
 
@@ -232,6 +256,7 @@ function openGame(url, title) {
   frame.src = url;
   overlay.style.display = 'flex';
   overlay.style.flexDirection = 'column';
+  document.body.classList.add('game-open');
 }
 
 function closeGame() {
@@ -239,6 +264,7 @@ function closeGame() {
   const frame = document.getElementById('gameFrame');
   if (overlay) overlay.style.display = 'none';
   if (frame) frame.src = '';
+document.body.classList.remove('game-open');
 }
 function openGamesScreen() {
   showView('games');
