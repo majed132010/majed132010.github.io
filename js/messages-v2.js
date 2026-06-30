@@ -1,3 +1,41 @@
+/* ════════════════════════════════════════════════
+   وضع السناب في العام + نظام الحفظ
+   ════════════════════════════════════════════════ */
+let snapMode = false;
+
+function toggleSnapMode() {
+  snapMode = !snapMode;
+  const btn = document.getElementById('snapToggleBtn');
+  if (btn) btn.classList.toggle('active', snapMode);
+  toast(snapMode ? '👻 وضع السناب مفعّل' : '💬 وضع الرسائل العادية');
+}
+
+// حفظ رسالة سناب (تحويلها لدائمة)
+function saveSnapMessage(msgId) {
+  if (!currentServer || !currentChannel || !msgId) return;
+  const ref = firebase.database().ref(
+    `servers/${currentServer}/channels/${currentChannel}/messages/${msgId}`
+  );
+  ref.update({ isSnap: false, expiresAt: null, saved: true })
+    .then(() => toast('💾 تم حفظ الرسالة'))
+    .catch(() => toast('❌ فشل الحفظ'));
+}
+
+// حذف رسالة سناب بعد فتحها
+function markSnapViewed(msgId) {
+  if (!msgId || !currentServer || !currentChannel) return;
+  const ref = firebase.database().ref(
+    `servers/${currentServer}/channels/${currentChannel}/messages/${msgId}`
+  );
+  setTimeout(() => {
+    ref.once('value', s => {
+      const msg = s.val();
+      if (msg && msg.isSnap && !msg.saved) {
+        s.ref.remove().catch(() => {});
+      }
+    });
+  }, 3000);
+}
 // ════ MESSAGES ════
 const PAGE_SIZE = 20;
 
