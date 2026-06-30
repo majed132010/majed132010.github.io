@@ -10,30 +10,6 @@ const _dmUnread = {};
 const _dmGlobalListeners = {};
 window._pendingDmMedia = [];
 
-// ════ وضع السناب في الخاص ════
-let dmSnapMode = false;
-
-function toggleDmSnapMode() {
-  dmSnapMode = !dmSnapMode;
-  const btn = document.getElementById('dmSnapToggleBtn');
-  if (btn) btn.classList.toggle('active', dmSnapMode);
-  toast(dmSnapMode ? '👻 وضع السناب مفعّل' : '💬 وضع الرسائل العادية');
-}
-
-function markDmSnapViewed(msgId) {
-  if (!msgId || !_currentDmUid || !currentUser) return;
-  const dmId = getDmId(currentUser.uid, _currentDmUid);
-  const ref = db.ref('dm_messages/' + dmId + '/' + msgId);
-  setTimeout(() => {
-    ref.once('value', s => {
-      const msg = s.val();
-      if (msg && msg.isSnap && !msg.saved) {
-        s.ref.remove().catch(() => {});
-      }
-    });
-  }, 3000);
-}
-
 function getDmId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 
 window.openDMFromSvBar = function() {
@@ -79,7 +55,7 @@ function renderDmPickerList() {
   const memberUids = Object.keys(svMembers);
   container.innerHTML = '';
   if (!memberUids.length) {
-    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-family:Tajawal,sans-serif">لا يوجد أعضاء آخرون في هذا العالم</div>';
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-family:Tajawal,sans-serif">لا يوجد أعضاء آخرون في هذا العالم</div>';
     return;
   }
   Promise.all(memberUids.map(uid =>
@@ -98,7 +74,9 @@ function renderDmPickerList() {
       card.dataset.dmUid = uid;
       card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px 14px;border-radius:18px;background:rgba(0,0,0,0.03);border:1.5px solid rgba(0,0,0,0.07);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.15s;position:relative';
       const av = document.createElement('div');
-      av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';if (avatar) av.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover">`; else av.textContent = (name[0] || '?').toUpperCase(); const nameEl = document.createElement('div');
+      av.style.cssText = 'width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff';
+      if (avatar) av.innerHTML = '<img src="' + escHtml(avatar) + '" style="width:100%;height:100%;object-fit:cover">'; else av.textContent = (name[0] || '?').toUpperCase();
+      const nameEl = document.createElement('div');
       nameEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:Tajawal,sans-serif';
       nameEl.textContent = name;
       card.appendChild(av);
@@ -110,6 +88,32 @@ function renderDmPickerList() {
     });
     container.appendChild(grid);
   });
+}
+
+/* ════════════════════════════════════════════════
+   🗑️ حذف فعلي للرسائل الخاصة منتهية الصلاحية (24 ساعة)
+   لا تُحذف الرسائل المثبّتة (saved: true)
+   ════════════════════════════════════════════════ */
+async function _cleanupExpiredDmMessages(dmId) {
+  try {
+    const path = 'dm_messages/' + dmId;
+    const snap = await db.ref(path).once('value');
+    const now = Date.now();
+    const updates = {};
+    let count = 0;
+    snap.forEach(ch => {
+      const msg = ch.val();
+      if (!msg) return;
+      if (msg.saved === true) return;
+      if (!msg.expiresAt || now <= msg.expiresAt) return;
+      updates[ch.key] = null;
+      count++;
+      if (msg.mediaUrl) {
+        storage.refFromURL(msg.mediaUrl).delete().catch(() => {});
+      }
+    });
+    if (count > 0) await db.ref(path).update(updates);
+  } catch(e) { console.warn('[cleanup] فشل تنظيف الرسائل الخاصة المنتهية:', e); }
 }
 
 function openDM(uid, name) {
@@ -147,6 +151,7 @@ function openDM(uid, name) {
   clearDmUnread(uid);
 
   const dmId = getDmId(currentUser.uid, uid);
+  _cleanupExpiredDmMessages(dmId);
   // تحديث آخر 10 رسائل كمقروءة — مع استثناء السناب
   db.ref('dm_messages/' + dmId).limitToLast(10).once('value').then(snap => {
     const updates = {};
@@ -195,7 +200,7 @@ function openDM(uid, name) {
     const msg = snap.val();
     if (!msg) return;
     // تجاهل السناب المشاهَد
-    if (msg.snapType && msg.snapViewed) {
+if (msg.snapType && msg.snapViewed) {
       const snapEl = dmArea.querySelector('[data-key="' + snap.key + '"] .snap-bubble');
       if (snapEl) {
         snapEl.innerHTML = '👁️ رآها';
@@ -254,13 +259,13 @@ function openDM(uid, name) {
         progWrap.remove();
         const snapBubble = document.createElement('div');
         snapBubble.className = 'snap-bubble';
-        const viewCount = msg.snapViewCount || 0;
-        if (viewCount >= 2) {
-          snapBubble.innerHTML = '👁️ تمت المشاهدة';
-          snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
-        } else {
-          snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
-        }
+  const viewCount = msg.snapViewCount || 0;
+      if (viewCount >= 2) {
+        snapBubble.innerHTML = '👁️ تمت المشاهدة';
+        snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(0,0,0,0.06);color:var(--muted);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block;cursor:default';
+      } else {
+        snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
+      }
         body.appendChild(snapBubble);
         requestAnimationFrame(() => { dmArea.scrollTop = dmArea.scrollHeight; });
       } else if (!msg.uploading && msg.uploadFailed) {
@@ -289,14 +294,11 @@ function openDM(uid, name) {
 }
 
 function buildDmMsgDiv(msg, key, otherUid, otherName) {
-  if (msg.isSnap && !msg.saved && msg.expiresAt && Date.now() > msg.expiresAt) return null;
   if (msg.saved !== true && msg.expiresAt && Date.now() > msg.expiresAt) return null;
 
   const isMine = msg.uid === currentUser?.uid;
-  const isSnap = msg.isSnap || false;
   const div = document.createElement('div');
-  div.className = 'msg-group' + (isSnap ? ' snap' : '') + (msg.saved ? ' saved' : '');
-  div.dataset.key = key;
+  div.className = 'msg-group'; div.dataset.key = key;
   const av = document.createElement('div'); av.className = 'msg-av'; av.textContent = (msg.name || '?')[0];
   const body = document.createElement('div'); body.className = 'msg-body';
   const meta = document.createElement('div'); meta.className = 'msg-meta';
@@ -320,31 +322,13 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
 
   if (msg.replyTo) {
     const quote = document.createElement('div'); quote.className = 'msg-reply-quote';
-    quote.innerHTML = '<div class="rq-name">' + escHtml(msg.replyTo.name || '') + '</div><div class="rq-text">' + escHtml(msg.replyTo.text || '🖼️') + '</div>';
+    quote.innerHTML = '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:2px">' + escHtml(msg.replyTo.name || '') + '</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(msg.replyTo.text || '🖼️') + '</div>';
     body.appendChild(quote);
   }
 
   if (msg.text) {
-    if (isSnap && !msg.saved) {
-      // 👻 رسالة سناب نصية: تظهر كفقاعة "اضغط لفتح"
-      const snapBubble = document.createElement('div');
-      snapBubble.className = 'snap-bubble';
-      snapBubble.innerHTML = '👻 اضغط لفتح الرسالة';
-      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.15),rgba(114,137,218,0.2));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4);margin-top:4px;';
-      snapBubble.dataset.text = msg.text;
-      snapBubble.dataset.key = key;
-      snapBubble.addEventListener('click', function(e) {
-        if (e.target.closest('.snap-save-btn')) return;
-        // إظهار النص مؤقتاً
-        this.innerHTML = escHtml(this.dataset.text);
-        this.style.cssText = 'padding:10px 14px;border-radius:12px;background:rgba(88,101,242,0.08);color:var(--text);font-family:Tajawal,sans-serif;font-size:14px;line-height:1.6;display:inline-block;margin-top:4px;border:1px solid rgba(88,101,242,0.2);';
-        markDmSnapViewed(this.dataset.key);
-      });
-      body.appendChild(snapBubble);
-    } else {
-      const txt = document.createElement('div'); txt.className = 'msg-content'; txt.textContent = msg.text;
-      body.appendChild(txt);
-    }
+    const txt = document.createElement('div'); txt.className = 'msg-content'; txt.textContent = msg.text;
+    body.appendChild(txt);
   }
 
   // 👻 السناب — يجب أن يكون قبل uploading وقبل mediaUrl
@@ -363,10 +347,10 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
       snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(88,101,242,0.12);color:var(--acc);font-family:Tajawal,sans-serif;font-size:13px;display:inline-block';
     } else {
       snapBubble.innerHTML = '👁️ اضغط لفتح الصورة';
-      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:rgba(26,122,122,0.15);color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(26,122,122,0.4)';
+      snapBubble.style.cssText = 'padding:10px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(88,101,242,0.2),rgba(114,137,218,0.3));color:var(--acc);font-family:Tajawal,sans-serif;font-size:14px;font-weight:700;display:inline-block;cursor:pointer;border:2px dashed rgba(88,101,242,0.4)';
       snapBubble.addEventListener('click', () => openSnap(key, msg.mediaUrl, dmId));
     }
-    body.appendChild(snapBubble);
+   body.appendChild(snapBubble);
     if (isMine) {
       const snapAct = document.createElement('div'); snapAct.className = 'msg-actions';
       const delBtn = document.createElement('button'); delBtn.className = 'ma-btn danger'; delBtn.textContent = '🗑️'; delBtn.title = 'حذف';
@@ -403,26 +387,6 @@ function buildDmMsgDiv(msg, key, otherUid, otherName) {
     const vw = document.createElement('div'); vw.style.cssText = 'margin-top:4px';
     vw.appendChild(buildVoiceMsg(msg.voiceUrl, msg.voiceDuration));
     body.appendChild(vw);
-  }
-
-  // ─── زر الحفظ + النقر للفتح (سناب نصي فقط، ليس snapType الصوري) ───
-  if (isSnap && !msg.saved && !msg.snapType) {
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'snap-save-btn';
-    saveBtn.innerHTML = '💾';
-    saveBtn.title = 'حفظ الرسالة';
-    saveBtn.onclick = function(e) {
-      e.stopPropagation();
-      saveDmMessage(key);
-    };
-    body.appendChild(saveBtn);
-
-    div.style.cursor = 'pointer';
-    div.title = '👻 اضغط لفتح (ستختفي بعد ٣ ثوانٍ)';
-    div.onclick = function(e) {
-      if (e.target.closest('.snap-save-btn') || e.target.closest('.msg-ctx-bar') || e.target.closest('.ma-btn')) return;
-      markDmSnapViewed(key);
-    };
   }
 
   const actions = document.createElement('div'); actions.className = 'msg-actions';
@@ -503,8 +467,7 @@ window.sendDM = async function() {
     name: userProfile.displayName || 'مستخدم',
     ts: Date.now(),
     status: 'sent',
-    isSnap: dmSnapMode || false,
-    expiresAt: dmSnapMode ? Date.now() + 24 * 60 * 60 * 1000 : null,
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     saved: false
   };
 
@@ -513,13 +476,6 @@ window.sendDM = async function() {
   if (text) {
     await db.ref('dm_messages/' + dmId).push({ ...msgBase, text });
     try { await sendPushToUser(_currentDmUid, userProfile.displayName || 'رسالة خاصة', text.slice(0, 80), { type: 'dm', fromUid: currentUser.uid }); } catch(e) {}
-  }
-
-  // إطفاء وضع السناب بعد الإرسال
-  if (dmSnapMode) {
-    dmSnapMode = false;
-    const btn = document.getElementById('dmSnapToggleBtn');
-    if (btn) btn.classList.remove('active');
   }
 
   const media = window._pendingDmMedia.slice();
@@ -619,7 +575,7 @@ function renderDmList() {
       const item = document.createElement('div');
       item.className = 'dm-item' + (_currentDmUid === uid ? ' active' : '');
       const unread = _dmUnread[uid] || 0;
-      item.innerHTML = '<div class="dm-av">' + (info.name || '?')[0] + (unread > 0 ? '<div class="dm-unread">' + (unread > 99 ? '99+' : unread) + '</div>' : '') + '</div><div class="dm-name">' + escHtml(info.name || 'مستخدم') + '</div>';
+      item.innerHTML = '<div class="dm-av">' + (info.name || '?')[0] + '</div><div class="dm-info"><div class="dm-name">' + escHtml(info.name || 'مستخدم') + '</div></div>' + (unread > 0 ? '<div class="dm-badge">' + (unread > 99 ? '99+' : unread) + '</div>' : '');
       item.addEventListener('click', () => openDM(uid, info.name || 'مستخدم'));
       container.appendChild(item);
     });
@@ -824,7 +780,7 @@ async function openSnap(msgKey, mediaUrl, dmId) {
   const overlay = document.createElement('div');
   overlay.id = 'snapOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none';
-  const img = new Image();
+const img = new Image();
   img.src = mediaUrl;
   await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
   img.style.cssText = 'max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px';
