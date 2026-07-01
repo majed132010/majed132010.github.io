@@ -508,29 +508,27 @@
 <script src="js/servers.js?v=18.0"></script>
 <script src="js/calls.js?v=17.0"></script>
 
-<!-- نافذة الألعاب -->
+<!-- ════ متصفح الألعاب الداخلي ════ -->
 <style>
 #gameOverlay {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 9000;
-  flex-direction: column;
   background: #000;
   width: 100%;
   height: 100%;
+  flex-direction: column;
 }
 #gameBar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  padding-top: max(10px, env(safe-area-inset-top));
-  padding-right: max(16px, env(safe-area-inset-right));
-  background: rgba(0,0,0,0.9);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.95);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
-  transition: all 0.3s;
+  z-index: 1;
 }
 #gameFrame {
   flex: 1;
@@ -538,25 +536,104 @@
   width: 100%;
   height: 100%;
   display: block;
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  box-sizing: border-box;
+  background: #000;
 }
-@media (orientation: landscape) {
-  #gameBar {
-    padding-top: max(6px, env(safe-area-inset-top));
-    padding-bottom: 6px;
-    min-height: 0;
-  }
+/* إخفاء الشريط عند الضغط المطوّل على الشاشة (تجربة fullscreen بدون زر) */
+#gameOverlay.fullscreen-mode #gameBar {
+  display: none;
+}
+#gameOverlay.fullscreen-mode #gameFrame {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 </style>
+
 <div id="gameOverlay">
   <div id="gameBar">
-    <button onclick="closeGame()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
-    <div id="gameTitle" style="font-size:15px;font-weight:700;color:#fff;font-family:Tajawal,sans-serif;flex:1"></div>
+    <button onclick="closeGame()"
+      style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);color:#fff;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent">✕</button>
+    <div id="gameTitle" style="font-size:14px;font-weight:700;color:#fff;font-family:Tajawal,sans-serif;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <button id="gameFullscreenBtn" onclick="toggleGameFullscreen()"
+      style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);color:#fff;width:34px;height:34px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent"
+      title="ملء الشاشة">⛶</button>
   </div>
-  <iframe id="gameFrame" src="" allowfullscreen></iframe>
+  <iframe id="gameFrame" src="" allowfullscreen allow="fullscreen"></iframe>
 </div>
+
+<script>
+function openGame(url, title) {
+  const overlay = document.getElementById('gameOverlay');
+  const frame = document.getElementById('gameFrame');
+  const titleEl = document.getElementById('gameTitle');
+  if (titleEl) titleEl.textContent = title || '';
+  if (frame) frame.src = url;
+  if (overlay) { overlay.style.display = 'flex'; overlay.classList.remove('fullscreen-mode'); }
+  // محاولة طلب fullscreen فوراً (يعمل على كثير من متصفحات الجوال)
+  _requestGameFullscreen();
+}
+
+function closeGame() {
+  const overlay = document.getElementById('gameOverlay');
+  const frame = document.getElementById('gameFrame');
+  // إلغاء fullscreen إذا كان مفعّلاً
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+    }
+  } catch(e) {}
+  if (frame) frame.src = '';
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.remove('fullscreen-mode'); }
+}
+
+function _requestGameFullscreen() {
+  const frame = document.getElementById('gameFrame');
+  if (!frame) return;
+  try {
+    const req = frame.requestFullscreen || frame.webkitRequestFullscreen || frame.mozRequestFullScreen || frame.msRequestFullscreen;
+    if (req) { req.call(frame); return; }
+  } catch(e) {}
+  // fallback: إذا Fullscreen API غير مدعوم، استخدم CSS class للمحاكاة
+  const overlay = document.getElementById('gameOverlay');
+  if (overlay) overlay.classList.add('fullscreen-mode');
+}
+
+function toggleGameFullscreen() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    try {
+      (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+    } catch(e) {}
+    const overlay = document.getElementById('gameOverlay');
+    if (overlay) overlay.classList.remove('fullscreen-mode');
+  } else {
+    _requestGameFullscreen();
+  }
+}
+
+// تحديث زر fullscreen عند تغيّر الحالة (مثلاً عند الضغط على Escape)
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('gameFullscreenBtn');
+  const overlay = document.getElementById('gameOverlay');
+  if (document.fullscreenElement) {
+    if (btn) btn.textContent = '⊠';
+    if (overlay) overlay.classList.add('fullscreen-mode');
+  } else {
+    if (btn) btn.textContent = '⛶';
+    if (overlay) overlay.classList.remove('fullscreen-mode');
+  }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  const btn = document.getElementById('gameFullscreenBtn');
+  const overlay = document.getElementById('gameOverlay');
+  if (document.webkitFullscreenElement) {
+    if (btn) btn.textContent = '⊠';
+    if (overlay) overlay.classList.add('fullscreen-mode');
+  } else {
+    if (btn) btn.textContent = '⛶';
+    if (overlay) overlay.classList.remove('fullscreen-mode');
+  }
+});
+</script>
 </body>
 </html>
